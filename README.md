@@ -1,13 +1,12 @@
 # waste-batteries-submit-backend
 
-Core delivery C# ASP.NET backend template.
+Core delivery C# ASP.NET backend template
 
-* [Install MongoDB](#install-mongodb)
-* [Inspect MongoDB](#inspect-mongodb)
-* [Testing](#testing)
-* [Running](#running)
-* [Dependabot](#dependabot)
-
+- [Install MongoDB](#install-mongodb)
+- [Inspect MongoDB](#inspect-mongodb)
+- [Testing](#testing)
+- [Running](#running)
+- [Dependabot](#dependabot)
 
 ### Docker Compose
 
@@ -43,6 +42,7 @@ Alternatively install MongoDB locally:
 
 - Install [MongoDB](https://www.mongodb.com/docs/manual/tutorial/#installation) on your local machine
 - Start MongoDB:
+
 ```bash
 sudo mongod --dbpath ~/mongodb-cdp
 ```
@@ -52,10 +52,10 @@ sudo mongod --dbpath ~/mongodb-cdp
 In CDP environments a MongoDB instance is already set up
 and the credentials exposed as enviromment variables.
 
-
 ### Inspect MongoDB
 
 To inspect the Database and Collections locally:
+
 ```bash
 mongosh
 ```
@@ -71,24 +71,47 @@ Tests do not use mocking of any sort and read and write from the in-memory datab
 
 ```bash
 dotnet test
-````
+```
 
 ### Running
 
 Run CDP-Deployments application:
+
 ```bash
 dotnet run --project WasteBatteriesSubmitBackend --launch-profile Development
 ```
 
+The backend requires a Defra ID access token in the `Authorization: Bearer <token>`
+header for every endpoint except `/health`. The token is validated against the
+configured OIDC metadata and audience.
+
+Local development uses the Defra ID stub values in `appsettings.Development.json`.
+Deployed environments must provide `Jwt__MetadataAddress` and `Jwt__Audience`
+configuration for the real Defra ID/API audience.
+
 ### SonarCloud
 
-Example SonarCloud configuration are available in the GitHub Action workflows.
+SonarCloud analysis runs from the pull request, publish and publish-hotfix GitHub Action workflows.
+
+To run the same scan locally:
+
+```bash
+SONAR_TOKEN=your-token ./sonarCloudLocal.sh
+```
+
+The script writes unresolved issues to `sonar-issues.json` and, when `python3`
+is available, a copy/paste friendly `sonar-issues.md`.
+
+To match the SonarCloud pull request summary view, pass the pull request key:
+
+```bash
+SONAR_TOKEN=your-token SONAR_PULL_REQUEST=1 ./sonarCloudLocal.sh
+```
 
 ### Dependabot
 
 We have added an example dependabot configuration file to the repository. You can enable it by renaming
 the [.github/example.dependabot.yml](.github/example.dependabot.yml) to `.github/dependabot.yml`
-
 
 ### About the licence
 

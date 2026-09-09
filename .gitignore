@@ -267,3 +267,11 @@ __pycache__/
 
 library.db
 .envrc
+
+
+# SonarCloud
+.sonar/
+.sonarqube/
+coverage.xml
+sonar-issues.json
+sonar-issues.md
