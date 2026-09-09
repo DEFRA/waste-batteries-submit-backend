@@ -1,13 +1,12 @@
 # waste-batteries-submit-backend
 
-Core delivery C# ASP.NET backend template.
+Core delivery C# ASP.NET backend template
 
-* [Install MongoDB](#install-mongodb)
-* [Inspect MongoDB](#inspect-mongodb)
-* [Testing](#testing)
-* [Running](#running)
-* [Dependabot](#dependabot)
-
+- [Install MongoDB](#install-mongodb)
+- [Inspect MongoDB](#inspect-mongodb)
+- [Testing](#testing)
+- [Running](#running)
+- [Dependabot](#dependabot)
 
 ### Docker Compose
 
@@ -43,6 +42,7 @@ Alternatively install MongoDB locally:
 
 - Install [MongoDB](https://www.mongodb.com/docs/manual/tutorial/#installation) on your local machine
 - Start MongoDB:
+
 ```bash
 sudo mongod --dbpath ~/mongodb-cdp
 ```
@@ -52,10 +52,10 @@ sudo mongod --dbpath ~/mongodb-cdp
 In CDP environments a MongoDB instance is already set up
 and the credentials exposed as enviromment variables.
 
-
 ### Inspect MongoDB
 
 To inspect the Database and Collections locally:
+
 ```bash
 mongosh
 ```
@@ -71,11 +71,12 @@ Tests do not use mocking of any sort and read and write from the in-memory datab
 
 ```bash
 dotnet test
-````
+```
 
 ### Running
 
 Run CDP-Deployments application:
+
 ```bash
 dotnet run --project WasteBatteriesSubmitBackend --launch-profile Development
 ```
@@ -111,7 +112,6 @@ SONAR_TOKEN=your-token SONAR_PULL_REQUEST=1 ./sonarCloudLocal.sh
 
 We have added an example dependabot configuration file to the repository. You can enable it by renaming
 the [.github/example.dependabot.yml](.github/example.dependabot.yml) to `.github/dependabot.yml`
-
 
 ### About the licence
 

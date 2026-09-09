@@ -8,11 +8,6 @@ concurrency:
   cancel-in-progress: false
   queue: max
 
-permissions:
-  id-token: write
-  contents: write
-  pull-requests: write
-
 env:
   AWS_REGION: eu-west-2
   AWS_ACCOUNT_ID: "094954420758"
@@ -21,6 +16,10 @@ jobs:
   build:
     name: CDP-build-hotfix-workflow
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
     steps:
       - name: Check out code
         uses: actions/checkout@v5
