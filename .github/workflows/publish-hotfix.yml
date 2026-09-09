@@ -30,3 +30,15 @@ jobs:
         uses: DEFRA/cdp-build-action/build-hotfix@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  sonarcloud-scan:
+    name: CDP SonarCloud Scan
+    permissions:
+      id-token: write
+      pull-requests: write
+      contents: read
+      packages: read
+    uses: ./.github/workflows/sonarcloud.yml
+    needs: build
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

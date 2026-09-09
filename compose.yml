@@ -70,7 +70,12 @@ services:
       - 'compose/aws.env'
     environment:
       ASPNETCORE_URLS: http://+:8085
+      Jwt__MetadataAddress: http://host.docker.internal:3200/cdp-defra-id-stub/.well-known/openid-configuration
+      Jwt__Audience: 63983fc2-cfff-45bb-8ec2-959e21062b9a
+      Jwt__RequireHttpsMetadata: false
       Mongo__DatabaseUri: mongodb://mongodb:27017/
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     networks:
       - cdp-tenant
 

@@ -1,10 +1,10 @@
 ﻿{
   "profiles": {
-    "WasteBatteriesSubmitBackend": {
+    "Development": {
       "commandName": "Project",
       "dotnetRunMessages": false,
       "launchBrowser": false,
-      "applicationUrl": "http://localhost:8085",
+      "applicationUrl": "http://localhost:3001",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "Mongo__DatabaseUri": "mongodb://127.0.0.1:27017/",
