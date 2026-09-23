@@ -108,6 +108,48 @@ To match the SonarCloud pull request summary view, pass the pull request key:
 SONAR_TOKEN=your-token SONAR_PULL_REQUEST=1 ./sonarCloudLocal.sh
 ```
 
+### Security scanning (ZAP)
+
+Every pull request runs a **passive** [OWASP ZAP](https://www.zaproxy.org/)
+scan as a `zap` job. The compose API is started from
+[compose-github.override-zap.yml](./compose-github.override-zap.yml) and
+`/health` is requested through the ZAP proxy so the daemon inspects the
+response. There is no Playwright suite in this repo.
+
+The pull request fails if ZAP reports any **High** alerts against this API
+(port 8085). The assert script waits until ZAP's passive scan queue is empty
+before it reads those alerts. Medium and Low findings stay in the report;
+they do not fail the check. An empty scan (ZAP recorded no traffic on 8085)
+also fails.
+
+The HTML and JSON reports are uploaded as the `zap-test-report` artefact and
+linked from a comment on the pull request.
+
+ZAP is CI/test-only — it does not change app configuration.
+
+To run the same scan locally:
+
+```bash
+docker compose -f compose.yml -f compose-github.override-zap.yml \
+  up -d --wait floci mongodb your-backend
+docker compose -f compose.yml -f compose-github.override-zap.yml up -d zap
+# wait until http://127.0.0.1:8080 and http://localhost:8085/health answer
+curl -fsS -x http://127.0.0.1:8080 http://localhost:8085/health
+bash scripts/zap-assert.sh
+docker compose -f compose.yml -f compose-github.override-zap.yml down
+```
+
+On PowerShell, `curl` is an alias for `Invoke-WebRequest` and does not accept
+`-x`. After the same `docker compose` commands above, use `curl.exe` for the
+proxied health check and `scripts/zap-assert.ps1` in place of the bash script.
+Always `down` the overlay stack afterwards, including when the scan fails.
+
+```powershell
+curl.exe -fsS -x http://127.0.0.1:8080 http://localhost:8085/health
+.\scripts\zap-assert.ps1
+docker compose -f compose.yml -f compose-github.override-zap.yml down
+```
+
 ### Dependabot
 
 We have added an example dependabot configuration file to the repository. You can enable it by renaming

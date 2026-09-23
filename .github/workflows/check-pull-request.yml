@@ -44,3 +44,87 @@ jobs:
     needs: pr-validator
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  zap:
+    name: Run ZAP security scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      COMPOSE_FILE_ARGS: -f compose.yml -f compose-github.override-zap.yml
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      - name: Start supporting services
+        id: start-compose
+        run: |
+          mkdir -p zap-reports
+          docker compose ${COMPOSE_FILE_ARGS} up -d --wait floci mongodb your-backend
+          docker compose ${COMPOSE_FILE_ARGS} up -d zap
+
+      - name: Wait for the API
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:8085/health > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "The compose backend service did not become healthy"
+          docker compose ${COMPOSE_FILE_ARGS} logs your-backend
+          exit 1
+
+      - name: Prepare ZAP
+        run: |
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/OTHER/core/other/rootcert/ -o "$RUNNER_TEMP/zap-root-ca.pem"; then
+              echo "NODE_EXTRA_CA_CERTS=$RUNNER_TEMP/zap-root-ca.pem" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "ZAP did not become ready on port 8080"
+          docker compose ${COMPOSE_FILE_ARGS} logs zap
+          exit 1
+
+      - name: Scan through ZAP proxy
+        id: zap-scan
+        env:
+          ZAP_PROXY_API_URL: http://127.0.0.1:8080
+          ZAP_APP_PORT: '8085'
+        run: |
+          curl -fsS -x http://127.0.0.1:8080 http://localhost:8085/health
+          bash scripts/zap-assert.sh
+
+      - name: Upload ZAP report
+        if: always()
+        id: upload-zap-report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-test-report
+          path: zap-reports/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Comment ZAP report link on PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const statusEmoji = '${{ steps.zap-scan.outcome }}' === 'success' ? '✅' : '❌';
+            const zapLine = '${{ steps.upload-zap-report.outcome }}' === 'success'
+              ? `\n\n🔒 [Download ZAP Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts/${{ steps.upload-zap-report.outputs.artifact-id }})`
+              : '';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🔒 ZAP security scan ${statusEmoji}\n\nThe passive ZAP report has been generated and is available as an artefact.${zapLine}`
+            })
+
+      - name: Stop Docker Compose services
+        if: always() && steps.start-compose.outcome == 'success'
+        run: docker compose ${COMPOSE_FILE_ARGS} down

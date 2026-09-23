@@ -277,3 +277,4 @@ library.db
 coverage.xml
 sonar-issues.json
 sonar-issues.md
+zap-reports/
