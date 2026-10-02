@@ -1,0 +1,66 @@
+# ZAP overlay — merge after compose.yml.
+#
+# Start the same named services CI uses; do not `up --wait` the whole file.
+# A full-stack wait will fail if floci exits after its init hook, or if ZAP's
+# image healthcheck is still probing `localhost` (see extra_hosts below).
+#
+#   docker compose -f compose.yml -f compose-github.override-zap.yml \
+#     up -d --wait floci mongodb your-backend
+#   docker compose -f compose.yml -f compose-github.override-zap.yml up -d zap
+#   docker compose -f compose.yml -f compose-github.override-zap.yml down
+#
+# Host vs in-network URLs:
+# - From other Compose services on cdp-tenant: http://zap:8080
+# - From the host (curl / the GitHub runner / your laptop): http://127.0.0.1:8080
+#   (hostname "zap" only resolves inside the Compose network.)
+#
+# extra_hosts is on here on purpose. Traffic from the runner is
+# http://localhost:8085 (the published API). ZAP therefore sees
+# Host: localhost:8085 and must open that port on the host, not inside
+# its own container.
+#
+# The image's default healthcheck curls http://localhost:$ZAP_PORT/ — that
+# hostname now points at the host gateway, so the probe is unhealthy forever
+# and `compose --wait` never returns. Override it to 127.0.0.1.
+#
+# -silent skips ZAP's call-home / addon autoupdate, which otherwise keeps the
+# API flaky for a minute after the daemon binds 8080.
+services:
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    user: zap
+    environment:
+      ZAP_PORT: '8080'
+      ZAP_REPORTS_DIR: /home/zap/reports
+    volumes:
+      - ./zap-reports:/home/zap/reports:z
+    command:
+      - zap.sh
+      - -daemon
+      - -silent
+      - -host
+      - 0.0.0.0
+      - -port
+      - '8080'
+      - -config
+      - api.addrs.addr.name=.*
+      - -config
+      - api.addrs.addr.regex=true
+      - -config
+      - api.disablekey=true
+    ports:
+      - '8080:8080'
+    extra_hosts:
+      - 'localhost:host-gateway'
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'curl --silent --output /dev/null --fail http://127.0.0.1:8080/ || exit 1'
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 90s
+    networks:
+      - cdp-tenant

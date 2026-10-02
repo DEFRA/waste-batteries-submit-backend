@@ -1,3 +1,5 @@
+root = true
+
 [*]
 charset = utf-8
 end_of_line = lf
@@ -97,3 +99,6 @@ indent_size = 2
 
 [*.json]
 indent_size = 2
+
+[*.{bat,cmd,ps1}]
+end_of_line = crlf
