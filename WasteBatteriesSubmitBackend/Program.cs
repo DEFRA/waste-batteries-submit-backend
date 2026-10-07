@@ -119,9 +119,6 @@ static void ConfigureHeaderPropagation(IServiceCollection services, IConfigurati
 static void ConfigureHttpClients(IServiceCollection services)
 {
     services.AddTransient<ProxyHttpMessageHandler>();
-
-    // services.AddHttpClientWithTracing<IExampleClient, ExampleClient>();
-    // services.AddHttpClientWithProxy<IExternalClient, ExternalClient>();
 }
 
 [ExcludeFromCodeCoverage]

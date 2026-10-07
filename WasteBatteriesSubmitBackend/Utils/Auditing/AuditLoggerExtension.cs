@@ -10,6 +10,10 @@ public static class AuditLoggingExtension
         [AuditLogger.AuditPropertyName] = true
     };
 
+    [SuppressMessage(
+        "Usage",
+        "CA2254:Template should be a static expression",
+        Justification = "Callers pass a constant message template.")]
     public static void Audit(this Microsoft.Extensions.Logging.ILogger logger,
         string message,
         params object?[] args)
@@ -21,6 +25,10 @@ public static class AuditLoggingExtension
         }
     }
 
+    [SuppressMessage(
+        "Usage",
+        "CA2254:Template should be a static expression",
+        Justification = "Callers pass a constant message template.")]
     public static void Audit(this Microsoft.Extensions.Logging.ILogger logger,
         Exception exception,
         string message,
