@@ -21,7 +21,7 @@ env:
 jobs:
   pr-validator:
     name: Run Pull Request Checks
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       pull-requests: write
       id-token: write
@@ -38,7 +38,7 @@ jobs:
 
   vulnerable-packages:
     name: Check vulnerable NuGet packages
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -75,16 +75,16 @@ jobs:
       contents: read
       packages: read
     uses: ./.github/workflows/sonarcloud.yml
-    needs: pr-validator
     # Reusable workflow calls cannot read env. Keep this aligned with DOTNET_VERSION above.
     with:
       dotnet-version: "10.0"
+      runner: ${{ vars.RUNNER || 'ubuntu-latest' }}
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   zap:
     name: Run ZAP security scan
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     permissions:
       contents: read
@@ -139,7 +139,7 @@ jobs:
       - name: Upload ZAP report
         if: always()
         id: upload-zap-report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: zap-test-report
           path: zap-reports/

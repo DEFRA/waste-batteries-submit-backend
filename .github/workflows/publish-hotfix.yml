@@ -15,7 +15,7 @@ env:
 jobs:
   build:
     name: CDP-build-hotfix-workflow
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       id-token: write
       contents: write
@@ -39,5 +39,7 @@ jobs:
       packages: read
     uses: ./.github/workflows/sonarcloud.yml
     needs: build
+    with:
+      runner: ${{ vars.RUNNER || 'ubuntu-latest' }}
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
