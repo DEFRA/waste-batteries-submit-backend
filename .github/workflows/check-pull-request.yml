@@ -76,8 +76,9 @@ jobs:
       packages: read
     uses: ./.github/workflows/sonarcloud.yml
     needs: pr-validator
+    # Reusable workflow calls cannot read env. Keep this aligned with DOTNET_VERSION above.
     with:
-      dotnet-version: ${{ env.DOTNET_VERSION }}
+      dotnet-version: "10.0"
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
