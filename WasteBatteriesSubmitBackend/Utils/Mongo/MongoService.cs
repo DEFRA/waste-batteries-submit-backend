@@ -29,9 +29,9 @@ public abstract class MongoService<T>
         if (indexes.Count == 0) return;
 
         Logger.LogInformation(
-            "Ensuring index is created if it does not exist for collection {CollectionNamespaceCollectionName} in DB {DatabaseDatabaseNamespace}",
+            "Ensuring index is created if it does not exist for collection {CollectionName} in DB {DatabaseName}",
             Collection.CollectionNamespace.CollectionName,
-            Collection.Database.DatabaseNamespace);
+            Collection.Database.DatabaseNamespace.DatabaseName);
         Collection.Indexes.CreateMany(indexes);
     }
 }

@@ -2,6 +2,17 @@ name: Run SonarCloud coverage scan
 
 on:
   workflow_call:
+    inputs:
+      dotnet-version:
+        description: .NET SDK version to install
+        type: string
+        default: "10.0"
+        required: false
+      runner:
+        description: GitHub-hosted runner label. Defaults to ubuntu-latest.
+        type: string
+        default: ubuntu-latest
+        required: false
     secrets:
       SONAR_TOKEN:
         description: "SonarCloud token used for authentication"
@@ -16,10 +27,10 @@ jobs:
   build:
     if: github.run_number != 1
     name: CDP SonarCloud coverage scan
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     steps:
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: 17
           distribution: "zulu"
@@ -27,11 +38,10 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Set up .NET 10.0
+      - name: Set up .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: |
-            10.0
+          dotnet-version: ${{ inputs.dotnet-version }}
       - name: Cache SonarCloud packages
         uses: actions/cache@v5
         with:
@@ -47,7 +57,7 @@ jobs:
           restore-keys: ${{ runner.os }}-sonar-scanner
       - name: Cache dotNet code coverage
         id: cache-sonar-coverage
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ./.sonar/coverage
           key: ${{ runner.os }}-sonar-coverage

@@ -15,10 +15,13 @@ permissions:
   contents: read
   packages: read
 
+env:
+  DOTNET_VERSION: "10.0"
+
 jobs:
   pr-validator:
     name: Run Pull Request Checks
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       pull-requests: write
       id-token: write
@@ -30,9 +33,40 @@ jobs:
       - name: Test
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: |
-            10.0
+          dotnet-version: ${{ env.DOTNET_VERSION }}
       - run: dotnet test
+
+  vulnerable-packages:
+    name: Check vulnerable NuGet packages
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore packages
+        run: dotnet restore
+
+      # `dotnet list package --vulnerable` exits 0 even when advisories are reported.
+      # Print that report, then fail the job from the JSON output if any advisory exists.
+      - name: Fail on vulnerable packages
+        run: |
+          set -euo pipefail
+          dotnet list package --vulnerable --include-transitive --no-restore | tee vulnerable-packages.txt
+          dotnet list package --vulnerable --include-transitive --format json --no-restore > vulnerable-packages.json
+          count="$(jq '[.. | objects | select(has("vulnerabilities")) | .vulnerabilities[]] | length' vulnerable-packages.json)"
+          echo "Vulnerable advisory count: ${count}"
+          if [ "${count}" -gt 0 ]; then
+            echo "::error::Found ${count} known vulnerability advisory(ies) in direct or transitive NuGet packages."
+            exit 1
+          fi
+
   sonarcloud-scan:
     name: CDP SonarCloud Scan
     permissions:
@@ -41,13 +75,16 @@ jobs:
       contents: read
       packages: read
     uses: ./.github/workflows/sonarcloud.yml
-    needs: pr-validator
+    # Reusable workflow calls cannot read env. Keep this aligned with DOTNET_VERSION above.
+    with:
+      dotnet-version: "10.0"
+      runner: ${{ vars.RUNNER || 'ubuntu-latest' }}
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   zap:
     name: Run ZAP security scan
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     permissions:
       contents: read
@@ -102,7 +139,7 @@ jobs:
       - name: Upload ZAP report
         if: always()
         id: upload-zap-report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: zap-test-report
           path: zap-reports/
