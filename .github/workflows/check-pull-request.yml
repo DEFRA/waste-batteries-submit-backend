@@ -33,6 +33,39 @@ jobs:
           dotnet-version: |
             10.0
       - run: dotnet test
+
+  vulnerable-packages:
+    name: Check vulnerable NuGet packages
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            10.0
+
+      - name: Restore packages
+        run: dotnet restore
+
+      # `dotnet list package --vulnerable` exits 0 even when advisories are reported.
+      # Print that report, then fail the job from the JSON output if any advisory exists.
+      - name: Fail on vulnerable packages
+        run: |
+          set -euo pipefail
+          dotnet list package --vulnerable --include-transitive --no-restore | tee vulnerable-packages.txt
+          dotnet list package --vulnerable --include-transitive --format json --no-restore > vulnerable-packages.json
+          count="$(jq '[.. | objects | select(has("vulnerabilities")) | .vulnerabilities[]] | length' vulnerable-packages.json)"
+          echo "Vulnerable advisory count: ${count}"
+          if [ "${count}" -gt 0 ]; then
+            echo "::error::Found ${count} known vulnerability advisory(ies) in direct or transitive NuGet packages."
+            exit 1
+          fi
+
   sonarcloud-scan:
     name: CDP SonarCloud Scan
     permissions:
