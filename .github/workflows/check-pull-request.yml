@@ -15,6 +15,9 @@ permissions:
   contents: read
   packages: read
 
+env:
+  DOTNET_VERSION: "10.0"
+
 jobs:
   pr-validator:
     name: Run Pull Request Checks
@@ -30,8 +33,7 @@ jobs:
       - name: Test
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: |
-            10.0
+          dotnet-version: ${{ env.DOTNET_VERSION }}
       - run: dotnet test
 
   vulnerable-packages:
@@ -46,8 +48,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: |
-            10.0
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore packages
         run: dotnet restore
@@ -75,6 +76,8 @@ jobs:
       packages: read
     uses: ./.github/workflows/sonarcloud.yml
     needs: pr-validator
+    with:
+      dotnet-version: ${{ env.DOTNET_VERSION }}
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
