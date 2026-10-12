@@ -45,7 +45,11 @@ public class ExamplePersistence(IMongoDbClientFactory connectionFactory, ILogger
     public async Task<ExampleModel?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
     {
         var result = await Collection.Find(b => b.Name == name).FirstOrDefaultAsync(cancellationToken);
-        Logger.LogInformation("Searching for {Name}, found {Result}", name, result);
+        if (Logger.IsEnabled(LogLevel.Information))
+        {
+            Logger.LogInformation("Searching for {Name}, found {Result}", name, result);
+        }
+
         return result;
     }
 

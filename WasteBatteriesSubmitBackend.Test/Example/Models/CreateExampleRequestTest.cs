@@ -18,7 +18,7 @@ public class CreateExampleRequestTest
     [Fact]
     public void Test_validation_fails_on_invalid_request()
     {
-        var req = new CreateExampleRequest { Name = "", Counter = -1, Value = null };
+        var req = new CreateExampleRequest { Name = "", Counter = -1, Value = null! };
         var ctx = new ValidationContext(req);
         var results = new List<ValidationResult>();
         Assert.False(Validator.TryValidateObject(req, ctx, results));

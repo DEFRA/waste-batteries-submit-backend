@@ -7,9 +7,10 @@ RUN dotnet test WasteBatteriesSubmitBackend.Test
 RUN dotnet publish WasteBatteriesSubmitBackend -c Release -o /app/publish /p:UseAppHost=false
 
 # Final production image
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 
+USER root
 # Add curl to template, CDP PLATFORM HEALTHCHECK REQUIREMENT
 RUN apt update && \
     apt install curl -y && \
@@ -17,5 +18,6 @@ RUN apt update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/publish .
+USER $APP_UID
 EXPOSE 8085
 ENTRYPOINT ["dotnet", "WasteBatteriesSubmitBackend.dll"]
