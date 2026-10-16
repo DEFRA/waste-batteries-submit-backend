@@ -275,6 +275,8 @@ library.db
 .sonar/
 .sonarqube/
 coverage.xml
+coverage.cobertura.xml
+.tools/
 sonar-issues.json
 sonar-issues.md
 zap-reports/

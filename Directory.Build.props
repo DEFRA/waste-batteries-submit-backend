@@ -1,0 +1,36 @@
+<Project>
+  <!--
+    Pins transitive packages for every project in the repository.
+    Each pin says why it is held and when it is safe to move.
+  -->
+  <ItemGroup>
+    <!--
+      Snappier before 1.1.0 is vulnerable (https://github.com/advisories/GHSA-pggp-6c3x-2vxg).
+      Update to any newer release. Do not go below 1.1.0.
+    -->
+    <PackageReference Include="Snappier" Version="1.3.1" />
+
+    <!--
+      SharpCompress before 0.48.0 is vulnerable (https://github.com/advisories/GHSA-6c8g-7p36-r338).
+      Update to any newer release. Do not go below 0.48.0.
+    -->
+    <PackageReference Include="SharpCompress" Version="0.50.5" />
+
+    <!--
+      Microsoft.OpenApi 2.7.5 or later fixes https://github.com/advisories/GHSA-v5pm-xwqc-g5wc.
+      Microsoft.AspNetCore.OpenApi 10.0.13 only accepts 2.x (>= 2.12.2 and < 3.0.0).
+      OpenAPI 3.x makes IOpenApiMediaType.Example read-only, and the ASP.NET OpenAPI
+      source generator still assigns that property, so the build fails.
+      The range keeps 3.x out of the NuGet Package Manager Updates tab.
+      Move within 2.x when a newer 2.x release exists. Move to 3.x only after
+      Microsoft.AspNetCore.OpenApi declares a dependency on Microsoft.OpenApi 3.x,
+      and then raise this upper bound with it.
+    -->
+    <PackageReference Include="Microsoft.OpenApi" Version="[2.12.2,3.0.0)" />
+  </ItemGroup>
+
+  <!--
+    TODO: Add SonarAnalyzer.CSharp in its own ItemGroup, with PrivateAssets set to all,
+    as waste-obligations does. Keep that separate from the package pins above.
+  -->
+</Project>

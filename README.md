@@ -1,12 +1,13 @@
 # waste-batteries-submit-backend
 
-Core delivery C# ASP.NET backend template
+Core delivery C# ASP.NET backend template.
 
-- [Install MongoDB](#install-mongodb)
-- [Inspect MongoDB](#inspect-mongodb)
-- [Testing](#testing)
-- [Running](#running)
-- [Dependabot](#dependabot)
+* [Install MongoDB](#install-mongodb)
+* [Inspect MongoDB](#inspect-mongodb)
+* [Testing](#testing)
+* [Running](#running)
+* [Dependabot](#dependabot)
+
 
 ### Docker Compose
 
@@ -42,7 +43,6 @@ Alternatively install MongoDB locally:
 
 - Install [MongoDB](https://www.mongodb.com/docs/manual/tutorial/#installation) on your local machine
 - Start MongoDB:
-
 ```bash
 sudo mongod --dbpath ~/mongodb-cdp
 ```
@@ -52,10 +52,10 @@ sudo mongod --dbpath ~/mongodb-cdp
 In CDP environments a MongoDB instance is already set up
 and the credentials exposed as enviromment variables.
 
+
 ### Inspect MongoDB
 
 To inspect the Database and Collections locally:
-
 ```bash
 mongosh
 ```
@@ -66,24 +66,28 @@ You can use the CDP Terminal to access the environments' MongoDB.
 
 Run the tests with:
 
-Tests run by running a full `WebApplication` backed by [Ephemeral MongoDB](https://github.com/asimmon/ephemeral-mongo).
-Tests do not use mocking of any sort and read and write from the in-memory database.
-
 ```bash
 dotnet test
 ```
 
+`WasteBatteriesSubmitBackend.Tests.Unit` covers validators, configuration gating, and handlers without hosting the API.
+
+`WasteBatteriesSubmitBackend.Tests.Integration` hosts the API in process with `WebApplicationFactory`. Repositories and other collaborators are substituted with NSubstitute. The tests do not start MongoDB.
+
 ### Running
 
 Run CDP-Deployments application:
-
 ```bash
-dotnet run --project WasteBatteriesSubmitBackend --launch-profile Development
+dotnet run --project src/WasteBatteriesSubmitBackend --launch-profile Development
 ```
 
 The backend requires a Defra ID access token in the `Authorization: Bearer <token>`
-header for every endpoint except `/health`. The token is validated against the
-configured OIDC metadata and audience.
+header for every endpoint except `/health`, `/openapi/v1.json`, and `/swagger`.
+The token is validated against the configured OIDC metadata and audience.
+
+Outside Production, Swagger UI is available at `/swagger` and the OpenAPI
+document is available at `/openapi/v1.json`. Set `Swagger:Enabled` to `true`
+to turn the explorer on in Production.
 
 Local development uses the Defra ID stub values in `appsettings.Development.json`.
 Deployed environments must provide `Jwt__MetadataAddress` and `Jwt__Audience`
@@ -154,6 +158,7 @@ docker compose -f compose.yml -f compose-github.override-zap.yml down
 
 We have added an example dependabot configuration file to the repository. You can enable it by renaming
 the [.github/example.dependabot.yml](.github/example.dependabot.yml) to `.github/dependabot.yml`
+
 
 ### About the licence
 

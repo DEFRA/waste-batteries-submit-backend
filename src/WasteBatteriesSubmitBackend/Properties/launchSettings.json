@@ -1,0 +1,16 @@
+﻿{
+  "profiles": {
+    "Development": {
+      "commandName": "Project",
+      "dotnetRunMessages": false,
+      "launchBrowser": true,
+      "launchUrl": "swagger",
+      "applicationUrl": "http://localhost:3001",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Mongo__DatabaseUri": "mongodb://127.0.0.1:27017/",
+        "Mongo__DatabaseName": "waste-batteries-submit-backend"
+      }
+    }
+  }
+}

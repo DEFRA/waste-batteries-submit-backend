@@ -40,7 +40,18 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-      - run: dotnet test
+      # Line coverage is the WasteBatteriesSubmitBackend source the profiler instruments.
+      # Generated files under obj are excluded. ExcludeFromCodeCoverage types are
+      # already omitted. Unit and integration tests both run before this is measured.
+      - name: Test with coverage
+        run: |
+          set -euo pipefail
+          dotnet build --configuration Debug
+          dotnet tool update dotnet-coverage --tool-path ./.tools/coverage
+          ./.tools/coverage/dotnet-coverage collect "bash scripts/run-tests.sh" -f cobertura -o coverage.cobertura.xml
+
+      - name: Fail when line coverage is below 90%
+        run: python3 scripts/assert-line-coverage.py coverage.cobertura.xml 90
 
   vulnerable-packages:
     name: Check vulnerable NuGet packages
