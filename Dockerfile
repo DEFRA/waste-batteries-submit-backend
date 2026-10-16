@@ -3,8 +3,8 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY . .
 WORKDIR "/src"
-RUN dotnet test WasteBatteriesSubmitBackend.Test
-RUN dotnet publish WasteBatteriesSubmitBackend -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet test WasteBatteriesSubmitBackend.slnx
+RUN dotnet publish src/WasteBatteriesSubmitBackend -c Release -o /app/publish /p:UseAppHost=false
 
 # Final production image
 FROM mcr.microsoft.com/dotnet/aspnet:10.0

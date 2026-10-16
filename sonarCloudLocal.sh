@@ -44,6 +44,8 @@ sonar_begin_args=(
   /d:sonar.token="$SONAR_TOKEN"
   /d:sonar.host.url="https://sonarcloud.io"
   /d:sonar.cs.vscoveragexml.reportsPaths=coverage.xml
+  # scripts/ is the coverage gate and is not run under dotnet-coverage.
+  /d:sonar.coverage.exclusions="scripts/**"
 )
 
 if [[ -n "$pull_request" ]]; then

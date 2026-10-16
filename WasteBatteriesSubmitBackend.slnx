@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WasteBatteriesSubmitBackend/WasteBatteriesSubmitBackend.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WasteBatteriesSubmitBackend.Tests.Unit/WasteBatteriesSubmitBackend.Tests.Unit.csproj" />
+    <Project Path="tests/WasteBatteriesSubmitBackend.Tests.Integration/WasteBatteriesSubmitBackend.Tests.Integration.csproj" />
+  </Folder>
+</Solution>
