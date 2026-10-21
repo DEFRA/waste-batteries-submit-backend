@@ -1,0 +1,31 @@
+﻿{
+  "_id" : { "$oid" : "000000000000000000000001" },
+  "schemeOrgId" : { "$oid" : "674a1b2c3d4e5f6789012345" },
+  "memberOrgId" : { "$oid" : "674a1b2c3d4e5f6789012346" },
+  "memberName" : "Northwind Batteries Ltd",
+  "memberBprn" : "BPRN-EA-2026-000123",
+  "schemeMembershipRef" : "SCH-00417",
+  "compliancePeriodYear" : { "$numberInt" : "2026" },
+  "compliancePeriodQuarter" : "Quarter 2",
+  "dataBasis" : "Actual",
+  "schemaVersion" : { "$numberInt" : "1" },
+  "version" : { "$numberInt" : "1" },
+  "supersedesSubmissionId" : null,
+  "isCurrent" : true,
+  "status" : "Submitted",
+  "tonnageEntries" : [{
+      "classification" : {
+        "batteryCategory" : "Portable",
+        "chemistry" : "Alkaline",
+        "subCategory" : "General use",
+        "cellType" : "Primary",
+        "equipmentState" : "In equipment"
+      },
+      "tonnes" : { "$numberDecimal" : "12.500" },
+      "id" : { "$oid" : "000000000000000000000002" },
+      "activity" : "Placed"
+    }],
+  "submittedOnUtc" : { "$date" : { "$numberLong" : "1792573200000" } },
+  "createdAtUtc" : { "$date" : { "$numberLong" : "1792573200000" } },
+  "updatedAtUtc" : null
+}

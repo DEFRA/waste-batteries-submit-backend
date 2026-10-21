@@ -22,4 +22,14 @@ internal static partial class LoggerExtensions
 
     [LoggerMessage(EventId = 6, Level = LogLevel.Warning, Message = "HTTP_PROXY is NOT set, proxy client will be disabled")]
     public static partial void ProxyNotConfigured(this ILogger logger);
+
+    [LoggerMessage(
+        EventId = 7,
+        Level = LogLevel.Information,
+        Message = "Created POM submission {SubmissionId} for scheme {SchemeOrgId} member {MemberOrgId}")]
+    public static partial void CreatedPomSubmission(
+        this ILogger logger,
+        string submissionId,
+        string schemeOrgId,
+        string memberOrgId);
 }

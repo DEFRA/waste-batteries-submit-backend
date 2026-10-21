@@ -3,12 +3,14 @@ using WasteBatteriesSubmitBackend.Authentication;
 using WasteBatteriesSubmitBackend.Endpoints;
 using WasteBatteriesSubmitBackend.Example;
 using WasteBatteriesSubmitBackend.ExampleData;
+using WasteBatteriesSubmitBackend.PomSubmission;
 using WasteBatteriesSubmitBackend.OpenApi;
 using WasteBatteriesSubmitBackend.Utils;
 using WasteBatteriesSubmitBackend.Utils.Health;
 using WasteBatteriesSubmitBackend.Utils.Http;
 using WasteBatteriesSubmitBackend.Utils.Logging;
 using WasteBatteriesSubmitBackend.Utils.Mongo;
+using WasteBatteriesSubmitBackend.Utils.Time;
 using Serilog;
 
 var app = BuildApp(args);
@@ -57,6 +59,8 @@ static void ConfigureServices(WebApplicationBuilder builder)
     services.AddHealth();
     services.AddApiOpenApi();
 
+    services.AddTimeProvider();
+    services.AddPomSubmissionServices(configuration);
     services.AddExampleServices();
     services.AddExampleDataServices();
 }
