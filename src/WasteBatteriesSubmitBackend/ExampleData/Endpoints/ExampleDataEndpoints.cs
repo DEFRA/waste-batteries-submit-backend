@@ -1,9 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
-using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using WasteBatteriesSubmitBackend.Endpoints;
 using WasteBatteriesSubmitBackend.ExampleData.Models;
 using WasteBatteriesSubmitBackend.ExampleData.Services;
 
@@ -17,44 +15,30 @@ public static class ExampleDataEndpoints
         var group = app.MapGroup("/example")
             .WithTags("ExampleData");
 
-        group.MapGet(string.Empty, GetAll);
-        group.MapPost(string.Empty, Create);
+        group.MapGet(string.Empty, GetAll).ProducesValidationProblem();
+        group.MapPost(string.Empty, Create).ProducesValidationProblem();
         group.MapGet("/{exampleId}", GetById).WithName("GetExampleDataById");
 
         return group;
     }
 
-    private static async Task<Results<Ok<IReadOnlyCollection<ExampleDataModel>>, ValidationProblem>> GetAll(
+    private static async Task<Ok<IReadOnlyCollection<ExampleDataModel>>> GetAll(
         ClaimsPrincipal user,
         [FromServices] IExampleDataService exampleDataService,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var examples = await exampleDataService.GetAllAsync(GetUserId(user), cancellationToken);
-            return TypedResults.Ok(examples);
-        }
-        catch (ValidationException exception)
-        {
-            return ValidationExceptionResults.ToProblem(exception);
-        }
+        var examples = await exampleDataService.GetAllAsync(GetUserId(user), cancellationToken);
+        return TypedResults.Ok(examples);
     }
 
-    private static async Task<Results<CreatedAtRoute<ExampleDataModel>, ValidationProblem>> Create(
+    private static async Task<CreatedAtRoute<ExampleDataModel>> Create(
         CreateExampleDataRequest request,
         ClaimsPrincipal user,
         [FromServices] IExampleDataService exampleDataService,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var saved = await exampleDataService.CreateAsync(request, GetUserId(user), cancellationToken);
-            return TypedResults.CreatedAtRoute(saved, "GetExampleDataById", new { exampleId = saved.Id });
-        }
-        catch (ValidationException exception)
-        {
-            return ValidationExceptionResults.ToProblem(exception);
-        }
+        var saved = await exampleDataService.CreateAsync(request, GetUserId(user), cancellationToken);
+        return TypedResults.CreatedAtRoute(saved, "GetExampleDataById", new { exampleId = saved.Id });
     }
 
     private static async Task<Results<Ok<ExampleDataModel>, NotFound>> GetById(

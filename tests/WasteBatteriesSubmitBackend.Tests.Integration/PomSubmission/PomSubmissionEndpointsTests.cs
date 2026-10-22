@@ -289,8 +289,8 @@ public class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture) : ICla
         Assert.True(created.GetProperty("isCurrent").GetBoolean());
         Assert.Equal(JsonValueKind.Null, created.GetProperty("supersedesSubmissionId").ValueKind);
         Assert.Equal(JsonValueKind.Null, created.GetProperty("updatedAtUtc").ValueKind);
-        Assert.False(created.TryGetProperty("schemaVersion", out _));
-        Assert.False(created.TryGetProperty("version", out _));
+        Assert.Equal(PomSubmissionModel.CurrentSchemaVersion, created.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(fixture.Defaults.InitialVersion, created.GetProperty("version").GetInt32());
         Assert.Equal("12.500", created.GetProperty("tonnageEntries")[0].GetProperty("tonnes").GetString());
         Assert.Equal(PomSubmissionApiFixture.CreatedAt, created.GetProperty("createdAtUtc").GetDateTime().ToUniversalTime());
         Assert.Equal(PomSubmissionApiFixture.SchemeOrgId, created.GetProperty("schemeOrgId").GetString());

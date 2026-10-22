@@ -14,15 +14,6 @@ public interface IPomSubmissionService
     Task<PomSubmissionModel> CreateAsync(PomSubmissionRequest request, CancellationToken cancellationToken = default);
 }
 
-// Saves a first filing.
-// The request validator checks the posted shape only. A current submission for the same
-// scheme, member, year and quarter is read once here: a first filing rejects when one exists,
-// and an amendment will use that same document to supersede it.
-// TODO: Check vocabulary texts against the reference lists, and resolve scheme and member references.
-// TODO: Infer compliancePeriodYear from the submission window.
-// TODO: An amendment loads the current submission once, rejects when it is missing, writes a new
-// submission with SupersedesSubmissionId and the next version, and clears isCurrent and sets
-// updatedAtUtc on the previous submission in one transaction.
 public class PomSubmissionService(
     IPomSubmissionRepository pomSubmissionRepository,
     IPomSubmissionMapper pomSubmissionMapper,
@@ -30,6 +21,11 @@ public class PomSubmissionService(
     ITimeProvider timeProvider,
     ILogger<PomSubmissionService> logger) : IPomSubmissionService
 {
+    // Saves a first submission.
+    // The request validator checks the posted shape only. A current submission for the same
+    // scheme, member, year and quarter is read once here: a first submission is rejected when one exists.
+    // TODO: Check vocabulary texts against the reference lists, and resolve scheme and member references.
+    // TODO: Infer compliancePeriodYear from the submission window.
     public async Task<PomSubmissionModel> CreateAsync(PomSubmissionRequest request, CancellationToken cancellationToken = default)
     {
         var result = await pomSubmissionRequestValidator.ValidateAsync(request, cancellationToken);
@@ -62,6 +58,10 @@ public class PomSubmissionService(
         logger.CreatedPomSubmission(submission.Id, submission.SchemeOrgId, submission.MemberOrgId);
         return submission;
     }
+
+    // TODO: An amendment loads the current submission once, rejects when it is missing, writes a new
+    // submission with SupersedesSubmissionId and the next version, and clears isCurrent and sets
+    // updatedAtUtc on the previous submission in one transaction.
 
     // The current-submission key can be read only when these fields are well formed.
     private static bool CanLookUpCurrentSubmission(PomSubmissionRequest request) =>

@@ -1,5 +1,9 @@
+using System.Text.Json;
+using FluentValidation;
+using FluentValidation.Results;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using WasteBatteriesSubmitBackend.Utils.Logging;
@@ -32,9 +36,10 @@ public class ExceptionLoggingHandlerTests
         Assert.Equal(StatusCodes.Status500InternalServerError, captured.ProblemDetails.Status);
         Assert.Equal("An error occurred while processing your request.", captured.ProblemDetails.Title);
         Assert.Null(captured.ProblemDetails.Detail);
-        var (level, logged) = Assert.Single(logger.Entries);
-        Assert.Equal(LogLevel.Error, level);
-        Assert.Same(exception, logged);
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Error, entry.Level);
+        Assert.Equal(1, entry.EventId.Id);
+        Assert.Same(exception, entry.Exception);
     }
 
     [Fact]
@@ -59,11 +64,54 @@ public class ExceptionLoggingHandlerTests
         Assert.Equal(StatusCodes.Status400BadRequest, captured.ProblemDetails.Status);
         Assert.Equal("Bad request", captured.ProblemDetails.Title);
         Assert.Equal("Malformed JSON.", captured.ProblemDetails.Detail);
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Error, entry.Level);
+    }
+
+    [Fact]
+    public async Task TryHandleAsync_WhenRequestIsInvalid_LogsInformationAndReturnsValidationProblem()
+    {
+        // Arrange
+        var logger = new CapturingLogger<ExceptionLoggingHandler>();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddProblemDetails();
+        var handler = new ExceptionLoggingHandler(logger, services.BuildServiceProvider().GetRequiredService<IProblemDetailsService>());
+        var body = new MemoryStream();
+        var httpContext = new DefaultHttpContext
+        {
+            RequestServices = services.BuildServiceProvider(),
+            Response = { Body = body }
+        };
+        var exception = new ValidationException(
+        [
+            new ValidationFailure("MemberName", "Member name is required."),
+            new ValidationFailure("MemberName", "Member name is too long.")
+        ]);
+
+        // Act
+        var handled = await handler.TryHandleAsync(httpContext, exception, CancellationToken.None);
+
+        // Assert
+        Assert.True(handled);
+        Assert.Equal(StatusCodes.Status400BadRequest, httpContext.Response.StatusCode);
+        body.Position = 0;
+        using var json = await JsonDocument.ParseAsync(body, cancellationToken: TestContext.Current.CancellationToken);
+        var messages = json.RootElement.GetProperty("errors").GetProperty("MemberName").EnumerateArray()
+            .Select(message => message.GetString())
+            .ToArray();
+        Assert.Equal(["Member name is required.", "Member name is too long."], messages);
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Information, entry.Level);
+        Assert.Equal(8, entry.EventId.Id);
+        Assert.Null(entry.Exception);
+        Assert.Contains("MemberName: Member name is required.", entry.Message, StringComparison.Ordinal);
+        Assert.Contains("MemberName: Member name is too long.", entry.Message, StringComparison.Ordinal);
     }
 
     private sealed class CapturingLogger<T> : ILogger<T>
     {
-        public List<(LogLevel Level, Exception? Exception)> Entries { get; } = [];
+        public List<(LogLevel Level, EventId EventId, Exception? Exception, string Message)> Entries { get; } = [];
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
@@ -75,6 +123,6 @@ public class ExceptionLoggingHandlerTests
             TState state,
             Exception? exception,
             Func<TState, Exception?, string> formatter) =>
-            Entries.Add((logLevel, exception));
+            Entries.Add((logLevel, eventId, exception, formatter(state, exception)));
     }
 }

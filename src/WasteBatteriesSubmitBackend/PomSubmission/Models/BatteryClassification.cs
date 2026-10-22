@@ -5,7 +5,7 @@ using MongoDB.Bson.Serialization.Attributes;
 namespace WasteBatteriesSubmitBackend.PomSubmission.Models;
 
 // Embedded value object. It has no id of its own. Each dimension stores the
-// reference-data text (for example "Portable", "Alkaline"), not the vocabulary id.
+// reference-data text (for example "Portable", "Alkaline"), not the id.
 [ExcludeFromCodeCoverage]
 [BsonIgnoreExtraElements]
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

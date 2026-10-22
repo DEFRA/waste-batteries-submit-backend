@@ -205,7 +205,31 @@ public class PomSubmissionMapperTests
 
         // Assert
         Assert.Equal(3, submission.Version);
+        Assert.Null(submission.SupersedesSubmissionId);
         Assert.Equal(CreatedAt, submission.CreatedAtUtc);
+    }
+
+    [Fact]
+    public void ToNewSubmission_WhenSupersedesSubmissionIdIsSupplied_SetsIt()
+    {
+        // Arrange
+        var previousId = ObjectId.GenerateNewId().ToString();
+        var request = new PomSubmissionRequest
+        {
+            TonnageEntries = [new TonnageEntryBase { Tonnes = "1.000" }]
+        };
+
+        // Act
+        var submission = Mapper().ToNewSubmission(
+            request,
+            CreatedAt,
+            version: 2,
+            supersedesSubmissionId: previousId);
+
+        // Assert
+        Assert.Equal(2, submission.Version);
+        Assert.Equal(previousId, submission.SupersedesSubmissionId);
+        Assert.True(submission.IsCurrent);
     }
 
     [Fact]

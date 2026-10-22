@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Text.Json.Serialization;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
@@ -31,7 +30,8 @@ public sealed record PomSubmissionModel : PomSubmissionBase
         DateTime createdAtUtc,
         List<TonnageEntry> tonnageEntries,
         string status,
-        int version)
+        int version,
+        string? supersedesSubmissionId = null)
         : base(header)
     {
         if (tonnageEntries is null || tonnageEntries.Count == 0)
@@ -49,7 +49,7 @@ public sealed record PomSubmissionModel : PomSubmissionBase
             ? createdAtUtc
             : null;
         IsCurrent = true;
-        SupersedesSubmissionId = null;
+        SupersedesSubmissionId = supersedesSubmissionId;
         UpdatedAtUtc = null;
     }
 
@@ -58,15 +58,14 @@ public sealed record PomSubmissionModel : PomSubmissionBase
     [BsonRepresentation(BsonType.ObjectId)]
     public required string Id { get; init; }
 
-    // Physical fields. Stripped from the API; schemaVersion records which vocabulary
-    // texts this document was written against, and version supports optimistic locking.
-    [JsonIgnore]
+    // Returned on the API. A client uses schemaVersion to tell which vocabulary the stored
+    // texts were written against. version is the optimistic concurrency token a later write
+    // sends back. The submitter does not post either; the service sets them.
     public int SchemaVersion { get; init; }
 
-    [JsonIgnore]
     public int Version { get; init; }
 
-    // Null on a first filing. An amendment sets this to the id of the submission it replaces.
+    // Null on a first submission. An amendment sets this to the id of the submission it replaces.
     [BsonRepresentation(BsonType.ObjectId)]
     public string? SupersedesSubmissionId { get; init; }
 

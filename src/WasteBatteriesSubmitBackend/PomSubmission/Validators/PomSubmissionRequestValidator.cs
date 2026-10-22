@@ -44,6 +44,7 @@ public sealed partial class PomSubmissionRequestValidator : AbstractValidator<Po
             .WithMessage("compliancePeriodYear must be a calendar year.");
 
         RuleFor(request => request.CompliancePeriodQuarter).NotEmpty();
+
         RuleFor(request => request.DataBasis).NotEmpty();
 
         RuleFor(request => request.TonnageEntries).NotEmpty();

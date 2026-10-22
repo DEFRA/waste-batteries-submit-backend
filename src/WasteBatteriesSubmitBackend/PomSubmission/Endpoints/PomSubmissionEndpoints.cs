@@ -1,8 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
-using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using WasteBatteriesSubmitBackend.Endpoints;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
 
@@ -21,24 +19,18 @@ public static class PomSubmissionEndpoints
 
         group.MapPost(string.Empty, Create)
             .WithName("CreatePomSubmission")
-            .WithSummary("Create a placed-on-market submission");
+            .WithSummary("Create a placed-on-market submission")
+            .ProducesValidationProblem();
 
         return group;
     }
 
-    private static async Task<Results<Created<PomSubmissionModel>, ValidationProblem>> Create(
+    private static async Task<Created<PomSubmissionModel>> Create(
         PomSubmissionRequest request,
         [FromServices] IPomSubmissionService pomSubmissionService,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var submission = await pomSubmissionService.CreateAsync(request, cancellationToken);
-            return TypedResults.Created($"{RoutePrefix}/{submission.Id}", submission);
-        }
-        catch (ValidationException exception)
-        {
-            return ValidationExceptionResults.ToProblem(exception);
-        }
+        var submission = await pomSubmissionService.CreateAsync(request, cancellationToken);
+        return TypedResults.Created($"{RoutePrefix}/{submission.Id}", submission);
     }
 }

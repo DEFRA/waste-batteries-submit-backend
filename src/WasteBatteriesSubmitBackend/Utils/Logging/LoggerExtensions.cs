@@ -5,6 +5,9 @@ internal static partial class LoggerExtensions
     [LoggerMessage(EventId = 1, Level = LogLevel.Error, Message = "Unhandled exception")]
     public static partial void UnhandledException(this ILogger logger, Exception exception);
 
+    [LoggerMessage(EventId = 8, Level = LogLevel.Information, Message = "Request validation failed: {ValidationErrors}")]
+    public static partial void RequestValidationFailed(this ILogger logger, string validationErrors);
+
     [LoggerMessage(
         EventId = 2,
         Level = LogLevel.Information,
