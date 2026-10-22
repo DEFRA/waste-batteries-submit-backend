@@ -1,32 +1,45 @@
 <Project>
   <!--
-    Pins transitive packages for every project in the repository.
+    Pins packages for every project in the repository.
     Each pin says why it is held and when it is safe to move.
+
+    Change a pin here. The NuGet Package Manager does not edit this file.
+    It writes a PackageReference Update into each csproj, and that Update
+    replaces the pin. Directory.Build.targets fails the build when that happens.
+    A version with no upper bound is only a minimum, so the Updates tab lists every
+    newer release. A range keeps versions outside it off that list. Applying an
+    update still writes a csproj override, which Directory.Build.targets rejects.
   -->
+  <PropertyGroup>
+    <PinnedSnappierVersion>1.3.1</PinnedSnappierVersion>
+    <PinnedSharpCompressVersion>0.50.7</PinnedSharpCompressVersion>
+    <PinnedMicrosoftOpenApiVersion>[2.13.0,3.0.0)</PinnedMicrosoftOpenApiVersion>
+  </PropertyGroup>
+
   <ItemGroup>
     <!--
       Snappier before 1.1.0 is vulnerable (https://github.com/advisories/GHSA-pggp-6c3x-2vxg).
       Update to any newer release. Do not go below 1.1.0.
     -->
-    <PackageReference Include="Snappier" Version="1.3.1" />
+    <PackageReference Include="Snappier" Version="$(PinnedSnappierVersion)" />
 
     <!--
       SharpCompress before 0.48.0 is vulnerable (https://github.com/advisories/GHSA-6c8g-7p36-r338).
       Update to any newer release. Do not go below 0.48.0.
     -->
-    <PackageReference Include="SharpCompress" Version="0.50.5" />
+    <PackageReference Include="SharpCompress" Version="$(PinnedSharpCompressVersion)" />
 
     <!--
       Microsoft.OpenApi 2.7.5 or later fixes https://github.com/advisories/GHSA-v5pm-xwqc-g5wc.
-      Microsoft.AspNetCore.OpenApi 10.0.13 only accepts 2.x (>= 2.12.2 and < 3.0.0).
+      Microsoft.AspNetCore.OpenApi 10.0.13 accepts 2.x only (>= 2.12.2 and < 3.0.0).
       OpenAPI 3.x makes IOpenApiMediaType.Example read-only, and the ASP.NET OpenAPI
       source generator still assigns that property, so the build fails.
-      The range keeps 3.x out of the NuGet Package Manager Updates tab.
-      Move within 2.x when a newer 2.x release exists. Move to 3.x only after
+      2.13.0 is the newest 2.x release. The upper bound makes restore reject 3.x.
+      Move the lower bound when a newer 2.x release exists. Move to 3.x only after
       Microsoft.AspNetCore.OpenApi declares a dependency on Microsoft.OpenApi 3.x,
       and then raise this upper bound with it.
     -->
-    <PackageReference Include="Microsoft.OpenApi" Version="[2.12.2,3.0.0)" />
+    <PackageReference Include="Microsoft.OpenApi" Version="$(PinnedMicrosoftOpenApiVersion)" />
   </ItemGroup>
 
   <!--

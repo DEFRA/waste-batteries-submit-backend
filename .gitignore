@@ -281,6 +281,6 @@ sonar-issues.json
 sonar-issues.md
 zap-reports/
 
-# Verify snapshot diffs
+# Snapshot diffs
 *.received.*
 *.received.txt

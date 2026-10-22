@@ -9,6 +9,7 @@ using MongoDB.Bson;
 using MongoDB.Bson.IO;
 using MongoDB.Driver;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
+using WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
 
@@ -311,10 +312,11 @@ public class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture) : ICla
         var json = snapshot.ToJson(new JsonWriterSettings
         {
             OutputMode = JsonOutputMode.CanonicalExtendedJson,
-            Indent = true
+            Indent = true,
+            NewLineChars = "\n"
         });
 
-        await Verify(json, SnapshotSettings.Create());
+        Snapshot.Match(json);
     }
 
     [Fact]
