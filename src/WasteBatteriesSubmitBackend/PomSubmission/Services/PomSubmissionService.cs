@@ -28,6 +28,7 @@ public class PomSubmissionService(
     // TODO: Infer compliancePeriodYear from the submission window.
     public async Task<PomSubmissionModel> CreateAsync(PomSubmissionRequest request, CancellationToken cancellationToken = default)
     {
+        request = request.Trimmed();
         var result = await pomSubmissionRequestValidator.ValidateAsync(request, cancellationToken);
         var failures = new List<ValidationFailure>(result.Errors);
 

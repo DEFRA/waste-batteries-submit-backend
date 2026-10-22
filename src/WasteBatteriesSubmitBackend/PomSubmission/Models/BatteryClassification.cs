@@ -20,4 +20,13 @@ public sealed record BatteryClassification
     public string? CellType { get; init; }
 
     public string? EquipmentState { get; init; }
+
+    public BatteryClassification Trimmed() => this with
+    {
+        BatteryCategory = BatteryCategory?.Trim() ?? string.Empty,
+        Chemistry = Chemistry?.Trim() ?? string.Empty,
+        SubCategory = SubCategory?.Trim(),
+        CellType = CellType?.Trim(),
+        EquipmentState = EquipmentState?.Trim()
+    };
 }

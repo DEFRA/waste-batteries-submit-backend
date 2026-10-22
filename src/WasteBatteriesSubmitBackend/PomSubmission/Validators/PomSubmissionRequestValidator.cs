@@ -12,40 +12,39 @@ public sealed partial class PomSubmissionRequestValidator : AbstractValidator<Po
     public PomSubmissionRequestValidator()
     {
         ClassLevelCascadeMode = CascadeMode.Continue;
-        RuleLevelCascadeMode = CascadeMode.Continue;
+        // Stop after the first failure on a field. A missing value must not also report a format error.
+        RuleLevelCascadeMode = CascadeMode.Stop;
 
-        RuleFor(request => request.SchemeOrgId)
-            .NotEmpty()
+        Required(RuleFor(request => request.SchemeOrgId))
             .Must(BeAnObjectId)
             .WithMessage("schemeOrgId must be an ObjectId.");
 
-        RuleFor(request => request.MemberOrgId)
-            .NotEmpty()
+        Required(RuleFor(request => request.MemberOrgId))
             .Must(BeAnObjectId)
             .WithMessage("memberOrgId must be an ObjectId.");
 
-        RuleFor(request => request.MemberName).NotEmpty();
+        Required(RuleFor(request => request.MemberName));
 
-        RuleFor(request => request.MemberBprn)
-            .NotEmpty()
+        Required(RuleFor(request => request.MemberBprn))
             .Matches(BprnPattern())
             .WithMessage("memberBprn must match BPRN-{EA|NRW|SEPA|NIEA}-{year}-{6 digits}.");
 
         RuleFor(request => request)
             .Must(YearInBprnMatchesCompliancePeriod)
-            .When(request => BprnPattern().IsMatch(request.MemberBprn ?? string.Empty))
+            .When(request => BprnPattern().IsMatch(request.MemberBprn ?? string.Empty)
+                && request.CompliancePeriodYear is >= 1000 and <= 9999)
             .WithName("MemberBprn")
             .WithMessage("memberBprn must be the registration for compliancePeriodYear.");
 
-        RuleFor(request => request.SchemeMembershipRef).NotEmpty();
+        Required(RuleFor(request => request.SchemeMembershipRef));
 
         RuleFor(request => request.CompliancePeriodYear)
             .InclusiveBetween(1000, 9999)
             .WithMessage("compliancePeriodYear must be a calendar year.");
 
-        RuleFor(request => request.CompliancePeriodQuarter).NotEmpty();
+        Required(RuleFor(request => request.CompliancePeriodQuarter));
 
-        RuleFor(request => request.DataBasis).NotEmpty();
+        Required(RuleFor(request => request.DataBasis));
 
         RuleFor(request => request.TonnageEntries).NotEmpty();
 
@@ -54,25 +53,29 @@ public sealed partial class PomSubmissionRequestValidator : AbstractValidator<Po
             .When(request => request.TonnageEntries is { Count: > 0 })
             .WithMessage("Each classification can only be reported once in a submission.");
 
-        RuleForEach(request => request.TonnageEntries).ChildRules(entry =>
+        // Continue across entries. Rule-level Stop would otherwise report only the first failing entry.
+        RuleForEach(request => request.TonnageEntries).Cascade(CascadeMode.Continue).ChildRules(entry =>
         {
             entry.ClassLevelCascadeMode = CascadeMode.Continue;
-            entry.RuleLevelCascadeMode = CascadeMode.Continue;
+            entry.RuleLevelCascadeMode = CascadeMode.Stop;
 
-            entry.RuleFor(item => item.Tonnes)
-                .NotEmpty()
+            Required(entry.RuleFor(item => item.Tonnes))
                 .Matches(@"^\d+\.\d{3}$")
                 .WithMessage("tonnes must be a string decimal with exactly 3 digits after the decimal point.");
 
-            entry.RuleFor(item => item.Classification).NotNull();
-            entry.RuleFor(item => item.Classification.BatteryCategory)
-                .NotEmpty()
-                .When(item => item.Classification is not null);
-            entry.RuleFor(item => item.Classification.Chemistry)
-                .NotEmpty()
-                .When(item => item.Classification is not null);
+            entry.RuleFor(item => item.Classification)
+                .NotNull()
+                .DependentRules(() =>
+                {
+                    Required(entry.RuleFor(item => item.Classification.BatteryCategory));
+                    Required(entry.RuleFor(item => item.Classification.Chemistry));
+                });
         });
     }
+
+    private static IRuleBuilderOptions<T, string> Required<T>(IRuleBuilder<T, string> rule) =>
+        rule.Must(value => !string.IsNullOrWhiteSpace(value))
+            .WithMessage("'{PropertyName}' must not be empty.");
 
     private static bool BeAnObjectId(string? value) => ObjectId.TryParse(value, out _);
 

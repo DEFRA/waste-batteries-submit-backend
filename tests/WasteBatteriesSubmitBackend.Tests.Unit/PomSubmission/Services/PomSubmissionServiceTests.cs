@@ -99,6 +99,84 @@ public class PomSubmissionServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_WhenStringsHaveSurroundingWhitespace_SavesTheTrimmedSubmission()
+    {
+        // Arrange
+        var repository = Substitute.For<IPomSubmissionRepository>();
+        var logger = new CapturingLogger<PomSubmissionService>();
+        var service = Service(repository, logger);
+        var request = ValidRequest() with
+        {
+            SchemeOrgId = "  674a1b2c3d4e5f6789012345  ",
+            MemberOrgId = "  674a1b2c3d4e5f6789012346  ",
+            MemberName = "  Northwind Batteries Ltd  ",
+            MemberBprn = "  BPRN-EA-2026-000123  ",
+            SchemeMembershipRef = "  SCH-00417  ",
+            CompliancePeriodQuarter = "  Quarter 2  ",
+            DataBasis = "  Actual  ",
+            TonnageEntries =
+            [
+                new TonnageEntryBase
+                {
+                    Classification = new BatteryClassification
+                    {
+                        BatteryCategory = "  Portable  ",
+                        Chemistry = "  Alkaline  ",
+                        SubCategory = "  General use  ",
+                        CellType = null,
+                        EquipmentState = "   "
+                    },
+                    Tonnes = "  12.500  "
+                }
+            ]
+        };
+
+        // Act
+        await service.CreateAsync(request, TestContext.Current.CancellationToken);
+
+        // Assert
+        await repository.Received(1).FindCurrentAsync(
+            "674a1b2c3d4e5f6789012345",
+            "674a1b2c3d4e5f6789012346",
+            2026,
+            "Quarter 2",
+            Arg.Any<CancellationToken>());
+        await repository.Received(1).CreateAsync(
+            Arg.Is<PomSubmissionModel>(saved =>
+                saved.MemberName == "Northwind Batteries Ltd"
+                && saved.MemberBprn == "BPRN-EA-2026-000123"
+                && saved.SchemeMembershipRef == "SCH-00417"
+                && saved.DataBasis == "Actual"
+                && saved.TonnageEntries[0].Tonnes == "12.500"
+                && saved.TonnageEntries[0].Classification.BatteryCategory == "Portable"
+                && saved.TonnageEntries[0].Classification.Chemistry == "Alkaline"
+                && saved.TonnageEntries[0].Classification.SubCategory == "General use"
+                && saved.TonnageEntries[0].Classification.CellType == null
+                && saved.TonnageEntries[0].Classification.EquipmentState == string.Empty),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenMemberBprnIsWhitespace_ReturnsOnlyTheRequiredError()
+    {
+        // Arrange
+        var repository = Substitute.For<IPomSubmissionRepository>();
+        var logger = new CapturingLogger<PomSubmissionService>();
+        var service = Service(repository, logger);
+        var request = ValidRequest() with { MemberBprn = "   " };
+
+        // Act
+        var act = () => service.CreateAsync(request, TestContext.Current.CancellationToken);
+
+        // Assert
+        var exception = await Assert.ThrowsAsync<ValidationException>(act);
+        var error = Assert.Single(exception.Errors);
+        Assert.Equal("MemberBprn", error.PropertyName);
+        Assert.Equal("'Member Bprn' must not be empty.", error.ErrorMessage);
+        await repository.DidNotReceive().CreateAsync(Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task CreateAsync_WhenMemberNameIsEmpty_ThrowsValidationException()
     {
         // Arrange

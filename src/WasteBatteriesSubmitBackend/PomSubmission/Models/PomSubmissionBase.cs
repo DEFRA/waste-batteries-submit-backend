@@ -25,4 +25,6 @@ public abstract record PomSubmissionBase
     public string CompliancePeriodQuarter { get; init; } = string.Empty;
 
     public string DataBasis { get; init; } = string.Empty;
+
+    protected static string Trimmed(string? value) => value?.Trim() ?? string.Empty;
 }

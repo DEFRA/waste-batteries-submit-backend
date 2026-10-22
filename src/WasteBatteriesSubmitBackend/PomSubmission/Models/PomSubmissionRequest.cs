@@ -8,4 +8,16 @@ namespace WasteBatteriesSubmitBackend.PomSubmission.Models;
 public sealed record PomSubmissionRequest : PomSubmissionBase
 {
     public List<TonnageEntryBase> TonnageEntries { get; init; } = [];
+
+    public PomSubmissionRequest Trimmed() => this with
+    {
+        SchemeOrgId = Trimmed(SchemeOrgId),
+        MemberOrgId = Trimmed(MemberOrgId),
+        MemberName = Trimmed(MemberName),
+        MemberBprn = Trimmed(MemberBprn),
+        SchemeMembershipRef = Trimmed(SchemeMembershipRef),
+        CompliancePeriodQuarter = Trimmed(CompliancePeriodQuarter),
+        DataBasis = Trimmed(DataBasis),
+        TonnageEntries = TonnageEntries?.ConvertAll(entry => entry is null ? null! : entry.Trimmed())!
+    };
 }

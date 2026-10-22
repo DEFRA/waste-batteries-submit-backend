@@ -14,6 +14,12 @@ public record TonnageEntryBase
     [BsonSerializer(typeof(StringDecimal128Serializer))]
     public string Tonnes { get; init; } = string.Empty;
 
+    public TonnageEntryBase Trimmed() => this with
+    {
+        Tonnes = Tonnes?.Trim() ?? string.Empty,
+        Classification = Classification?.Trimmed()!
+    };
+
     public TonnageEntry ToStoredEntry(string id, string activity) => new()
     {
         Id = id,
