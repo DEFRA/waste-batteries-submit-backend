@@ -1,10 +1,31 @@
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Validators;
+using WasteBatteriesSubmitBackend.Tests.Unit.Utils.Validation;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Validators;
 
 public class PomSubmissionRequestValidatorTests
 {
+    private const string SchemeOrgIdRequired = "'Scheme Org Id' must not be empty.";
+    private const string SchemeOrgIdObjectId = "schemeOrgId must be an ObjectId.";
+    private const string MemberOrgIdRequired = "'Member Org Id' must not be empty.";
+    private const string MemberOrgIdObjectId = "memberOrgId must be an ObjectId.";
+    private const string MemberNameRequired = "'Member Name' must not be empty.";
+    private const string MemberBprnRequired = "'Member Bprn' must not be empty.";
+    private const string MemberBprnFormat = "memberBprn must match BPRN-{EA|NRW|SEPA|NIEA}-{year}-{6 digits}.";
+    private const string MemberBprnYear = "memberBprn must be the registration for compliancePeriodYear.";
+    private const string SchemeMembershipRefRequired = "'Scheme Membership Ref' must not be empty.";
+    private const string CompliancePeriodYearRange = "compliancePeriodYear must be a calendar year.";
+    private const string CompliancePeriodQuarterRequired = "'Compliance Period Quarter' must not be empty.";
+    private const string DataBasisRequired = "'Data Basis' must not be empty.";
+    private const string TonnageEntriesRequired = "'Tonnage Entries' must not be empty.";
+    private const string ClassificationRepeated = "Each classification can only be reported once in a submission.";
+    private const string TonnesRequired = "'Tonnes' must not be empty.";
+    private const string TonnesFormat = "tonnes must be a string decimal with exactly 3 digits after the decimal point.";
+    private const string ClassificationRequired = "'Classification' must not be empty.";
+    private const string BatteryCategoryRequired = "'Classification Battery Category' must not be empty.";
+    private const string ChemistryRequired = "'Classification Chemistry' must not be empty.";
+
     [Fact]
     public async Task ValidateAsync_WhenSubmissionIsComplete_ReturnsValid()
     {
@@ -45,26 +66,26 @@ public class PomSubmissionRequestValidatorTests
         // Assert
         (string PropertyName, string ErrorMessage)[] expected =
         [
-            ("SchemeOrgId", "schemeOrgId must be an ObjectId."),
-            ("MemberOrgId", "'Member Org Id' must not be empty."),
-            ("MemberName", "'Member Name' must not be empty."),
-            ("MemberBprn", "memberBprn must match BPRN-{EA|NRW|SEPA|NIEA}-{year}-{6 digits}."),
-            ("SchemeMembershipRef", "'Scheme Membership Ref' must not be empty."),
-            ("CompliancePeriodYear", "compliancePeriodYear must be a calendar year."),
-            ("CompliancePeriodQuarter", "'Compliance Period Quarter' must not be empty."),
-            ("DataBasis", "'Data Basis' must not be empty."),
-            ("TonnageEntries", "Each classification can only be reported once in a submission."),
-            ("TonnageEntries[0].Tonnes", "tonnes must be a string decimal with exactly 3 digits after the decimal point."),
-            ("TonnageEntries[0].Classification.BatteryCategory", "'Classification Battery Category' must not be empty."),
-            ("TonnageEntries[0].Classification.Chemistry", "'Classification Chemistry' must not be empty."),
-            ("TonnageEntries[1].Tonnes", "tonnes must be a string decimal with exactly 3 digits after the decimal point."),
-            ("TonnageEntries[1].Classification.BatteryCategory", "'Classification Battery Category' must not be empty."),
-            ("TonnageEntries[1].Classification.Chemistry", "'Classification Chemistry' must not be empty.")
+            ("SchemeOrgId", SchemeOrgIdObjectId),
+            ("MemberOrgId", MemberOrgIdRequired),
+            ("MemberName", MemberNameRequired),
+            ("MemberBprn", MemberBprnFormat),
+            ("SchemeMembershipRef", SchemeMembershipRefRequired),
+            ("CompliancePeriodYear", CompliancePeriodYearRange),
+            ("CompliancePeriodQuarter", CompliancePeriodQuarterRequired),
+            ("DataBasis", DataBasisRequired),
+            ("TonnageEntries", ClassificationRepeated),
+            ("TonnageEntries[0].Tonnes", TonnesFormat),
+            ("TonnageEntries[0].Classification.BatteryCategory", BatteryCategoryRequired),
+            ("TonnageEntries[0].Classification.Chemistry", ChemistryRequired),
+            ("TonnageEntries[1].Tonnes", TonnesFormat),
+            ("TonnageEntries[1].Classification.BatteryCategory", BatteryCategoryRequired),
+            ("TonnageEntries[1].Classification.Chemistry", ChemistryRequired)
         ];
         Assert.Equal(
             expected.OrderBy(error => error.PropertyName, StringComparer.Ordinal)
                 .ThenBy(error => error.ErrorMessage, StringComparer.Ordinal),
-            Messages(result));
+            ValidationAssert.Messages(result));
     }
 
     [Theory]
@@ -73,10 +94,11 @@ public class PomSubmissionRequestValidatorTests
     [InlineData("   ")]
     public async Task ValidateAsync_WhenSchemeOrgIdIsMissing_ReturnsOnlyTheRequiredError(string? value)
     {
-        await AssertOnly(
+        await ValidationAssert.AssertOnly(
+            Validator(),
             ValidRequest() with { SchemeOrgId = value! },
             "SchemeOrgId",
-            "'Scheme Org Id' must not be empty.");
+            SchemeOrgIdRequired);
     }
 
     [Theory]
@@ -85,10 +107,11 @@ public class PomSubmissionRequestValidatorTests
     [InlineData("   ")]
     public async Task ValidateAsync_WhenMemberOrgIdIsMissing_ReturnsOnlyTheRequiredError(string? value)
     {
-        await AssertOnly(
+        await ValidationAssert.AssertOnly(
+            Validator(),
             ValidRequest() with { MemberOrgId = value! },
             "MemberOrgId",
-            "'Member Org Id' must not be empty.");
+            MemberOrgIdRequired);
     }
 
     [Theory]
@@ -97,10 +120,11 @@ public class PomSubmissionRequestValidatorTests
     [InlineData("   ")]
     public async Task ValidateAsync_WhenMemberNameIsMissing_ReturnsOnlyTheRequiredError(string? value)
     {
-        await AssertOnly(
+        await ValidationAssert.AssertOnly(
+            Validator(),
             ValidRequest() with { MemberName = value! },
             "MemberName",
-            "'Member Name' must not be empty.");
+            MemberNameRequired);
     }
 
     [Theory]
@@ -109,10 +133,11 @@ public class PomSubmissionRequestValidatorTests
     [InlineData("   ")]
     public async Task ValidateAsync_WhenMemberBprnIsMissing_ReturnsOnlyTheRequiredError(string? value)
     {
-        await AssertOnly(
+        await ValidationAssert.AssertOnly(
+            Validator(),
             ValidRequest() with { MemberBprn = value! },
             "MemberBprn",
-            "'Member Bprn' must not be empty.");
+            MemberBprnRequired);
     }
 
     [Theory]
@@ -121,10 +146,11 @@ public class PomSubmissionRequestValidatorTests
     [InlineData("   ")]
     public async Task ValidateAsync_WhenSchemeMembershipRefIsMissing_ReturnsOnlyTheRequiredError(string? value)
     {
-        await AssertOnly(
+        await ValidationAssert.AssertOnly(
+            Validator(),
             ValidRequest() with { SchemeMembershipRef = value! },
             "SchemeMembershipRef",
-            "'Scheme Membership Ref' must not be empty.");
+            SchemeMembershipRefRequired);
     }
 
     [Theory]
@@ -133,10 +159,11 @@ public class PomSubmissionRequestValidatorTests
     [InlineData("   ")]
     public async Task ValidateAsync_WhenCompliancePeriodQuarterIsMissing_ReturnsOnlyTheRequiredError(string? value)
     {
-        await AssertOnly(
+        await ValidationAssert.AssertOnly(
+            Validator(),
             ValidRequest() with { CompliancePeriodQuarter = value! },
             "CompliancePeriodQuarter",
-            "'Compliance Period Quarter' must not be empty.");
+            CompliancePeriodQuarterRequired);
     }
 
     [Theory]
@@ -145,10 +172,11 @@ public class PomSubmissionRequestValidatorTests
     [InlineData("   ")]
     public async Task ValidateAsync_WhenDataBasisIsMissing_ReturnsOnlyTheRequiredError(string? value)
     {
-        await AssertOnly(
+        await ValidationAssert.AssertOnly(
+            Validator(),
             ValidRequest() with { DataBasis = value! },
             "DataBasis",
-            "'Data Basis' must not be empty.");
+            DataBasisRequired);
     }
 
     [Theory]
@@ -159,7 +187,11 @@ public class PomSubmissionRequestValidatorTests
     {
         var request = WithEntry(ValidRequest().TonnageEntries[0] with { Tonnes = value! });
 
-        await AssertOnly(request, "TonnageEntries[0].Tonnes", "'Tonnes' must not be empty.");
+        await ValidationAssert.AssertOnly(
+            Validator(),
+            request,
+            "TonnageEntries[0].Tonnes",
+            TonnesRequired);
     }
 
     [Theory]
@@ -174,10 +206,11 @@ public class PomSubmissionRequestValidatorTests
             Classification = entry.Classification with { BatteryCategory = value! }
         });
 
-        await AssertOnly(
+        await ValidationAssert.AssertOnly(
+            Validator(),
             request,
             "TonnageEntries[0].Classification.BatteryCategory",
-            "'Classification Battery Category' must not be empty.");
+            BatteryCategoryRequired);
     }
 
     [Theory]
@@ -192,46 +225,51 @@ public class PomSubmissionRequestValidatorTests
             Classification = entry.Classification with { Chemistry = value! }
         });
 
-        await AssertOnly(
+        await ValidationAssert.AssertOnly(
+            Validator(),
             request,
             "TonnageEntries[0].Classification.Chemistry",
-            "'Classification Chemistry' must not be empty.");
+            ChemistryRequired);
     }
 
     [Fact]
     public async Task ValidateAsync_WhenSchemeOrgIdIsNotAnObjectId_ReturnsOnlyTheObjectIdError()
     {
-        await AssertOnly(
+        await ValidationAssert.AssertOnly(
+            Validator(),
             ValidRequest() with { SchemeOrgId = "not-an-id" },
             "SchemeOrgId",
-            "schemeOrgId must be an ObjectId.");
+            SchemeOrgIdObjectId);
     }
 
     [Fact]
     public async Task ValidateAsync_WhenMemberOrgIdIsNotAnObjectId_ReturnsOnlyTheObjectIdError()
     {
-        await AssertOnly(
+        await ValidationAssert.AssertOnly(
+            Validator(),
             ValidRequest() with { MemberOrgId = "not-an-id" },
             "MemberOrgId",
-            "memberOrgId must be an ObjectId.");
+            MemberOrgIdObjectId);
     }
 
     [Fact]
     public async Task ValidateAsync_WhenMemberBprnFormatIsWrong_ReturnsOnlyTheFormatError()
     {
-        await AssertOnly(
+        await ValidationAssert.AssertOnly(
+            Validator(),
             ValidRequest() with { MemberBprn = "not-a-bprn" },
             "MemberBprn",
-            "memberBprn must match BPRN-{EA|NRW|SEPA|NIEA}-{year}-{6 digits}.");
+            MemberBprnFormat);
     }
 
     [Fact]
     public async Task ValidateAsync_WhenBprnYearDiffers_ReturnsOnlyTheYearError()
     {
-        await AssertOnly(
+        await ValidationAssert.AssertOnly(
+            Validator(),
             ValidRequest() with { MemberBprn = "BPRN-NRW-2025-000123" },
             "MemberBprn",
-            "memberBprn must be the registration for compliancePeriodYear.");
+            MemberBprnYear);
     }
 
     [Theory]
@@ -239,10 +277,11 @@ public class PomSubmissionRequestValidatorTests
     [InlineData(10000)]
     public async Task ValidateAsync_WhenCompliancePeriodYearIsOutOfRange_ReturnsOnlyTheYearError(int year)
     {
-        await AssertOnly(
+        await ValidationAssert.AssertOnly(
+            Validator(),
             ValidRequest() with { CompliancePeriodYear = year },
             "CompliancePeriodYear",
-            "compliancePeriodYear must be a calendar year.");
+            CompliancePeriodYearRange);
     }
 
     [Fact]
@@ -250,10 +289,11 @@ public class PomSubmissionRequestValidatorTests
     {
         var request = WithEntry(ValidRequest().TonnageEntries[0] with { Tonnes = "12.5" });
 
-        await AssertOnly(
+        await ValidationAssert.AssertOnly(
+            Validator(),
             request,
             "TonnageEntries[0].Tonnes",
-            "tonnes must be a string decimal with exactly 3 digits after the decimal point.");
+            TonnesFormat);
     }
 
     [Theory]
@@ -266,7 +306,11 @@ public class PomSubmissionRequestValidatorTests
             TonnageEntries = marker is null ? null! : []
         };
 
-        await AssertOnly(request, "TonnageEntries", "'Tonnage Entries' must not be empty.");
+        await ValidationAssert.AssertOnly(
+            Validator(),
+            request,
+            "TonnageEntries",
+            TonnageEntriesRequired);
     }
 
     [Fact]
@@ -274,7 +318,11 @@ public class PomSubmissionRequestValidatorTests
     {
         var request = WithEntry(ValidRequest().TonnageEntries[0] with { Classification = null! });
 
-        await AssertOnly(request, "TonnageEntries[0].Classification", "'Classification' must not be empty.");
+        await ValidationAssert.AssertOnly(
+            Validator(),
+            request,
+            "TonnageEntries[0].Classification",
+            ClassificationRequired);
     }
 
     [Fact]
@@ -283,26 +331,12 @@ public class PomSubmissionRequestValidatorTests
         var request = ValidRequest();
         request = request with { TonnageEntries = [request.TonnageEntries[0], request.TonnageEntries[0]] };
 
-        await AssertOnly(
+        await ValidationAssert.AssertOnly(
+            Validator(),
             request,
             "TonnageEntries",
-            "Each classification can only be reported once in a submission.");
+            ClassificationRepeated);
     }
-
-    private static async Task AssertOnly(PomSubmissionRequest request, string propertyName, string message)
-    {
-        var result = await Validator().ValidateAsync(request, TestContext.Current.CancellationToken);
-        var error = Assert.Single(result.Errors);
-        Assert.Equal(propertyName, error.PropertyName);
-        Assert.Equal(message, error.ErrorMessage);
-    }
-
-    private static List<(string PropertyName, string ErrorMessage)> Messages(FluentValidation.Results.ValidationResult result) =>
-        result.Errors
-            .Select(error => (error.PropertyName, error.ErrorMessage))
-            .OrderBy(error => error.PropertyName, StringComparer.Ordinal)
-            .ThenBy(error => error.ErrorMessage, StringComparer.Ordinal)
-            .ToList();
 
     private static PomSubmissionRequest WithEntry(TonnageEntryBase entry) =>
         ValidRequest() with { TonnageEntries = [entry] };

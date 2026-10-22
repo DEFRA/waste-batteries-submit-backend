@@ -9,7 +9,8 @@ using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
 using WasteBatteriesSubmitBackend.PomSubmission.Validators;
-using WasteBatteriesSubmitBackend.Utils.Time;
+using WasteBatteriesSubmitBackend.Tests.Unit.Utils.Logging;
+using WasteBatteriesSubmitBackend.Tests.Unit.Utils.Time;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Services;
 
@@ -48,11 +49,11 @@ public class PomSubmissionServiceTests
                 && saved.IsCurrent
                 && saved.CreatedAtUtc == CreatedAt),
             Arg.Any<CancellationToken>());
-        var (level, message) = Assert.Single(logger.Entries);
-        Assert.Equal(LogLevel.Information, level);
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Information, entry.Level);
         Assert.Equal(
             $"Created POM submission {submission.Id} for scheme {submission.SchemeOrgId} member {submission.MemberOrgId}",
-            message);
+            entry.Message);
     }
 
     [Fact]
@@ -154,26 +155,6 @@ public class PomSubmissionServiceTests
                 && saved.TonnageEntries[0].Classification.CellType == null
                 && saved.TonnageEntries[0].Classification.EquipmentState == string.Empty),
             Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task CreateAsync_WhenMemberBprnIsWhitespace_ReturnsOnlyTheRequiredError()
-    {
-        // Arrange
-        var repository = Substitute.For<IPomSubmissionRepository>();
-        var logger = new CapturingLogger<PomSubmissionService>();
-        var service = Service(repository, logger);
-        var request = ValidRequest() with { MemberBprn = "   " };
-
-        // Act
-        var act = () => service.CreateAsync(request, TestContext.Current.CancellationToken);
-
-        // Assert
-        var exception = await Assert.ThrowsAsync<ValidationException>(act);
-        var error = Assert.Single(exception.Errors);
-        Assert.Equal("MemberBprn", error.PropertyName);
-        Assert.Equal("'Member Bprn' must not be empty.", error.ErrorMessage);
-        await repository.DidNotReceive().CreateAsync(Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -296,26 +277,4 @@ public class PomSubmissionServiceTests
             }
         ]
     };
-
-    private sealed class FixedTime(DateTime utcNow) : ITimeProvider
-    {
-        public DateTime UtcNow => utcNow;
-    }
-
-    private sealed class CapturingLogger<T> : ILogger<T>
-    {
-        public List<(LogLevel Level, string Message)> Entries { get; } = [];
-
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-
-        public bool IsEnabled(LogLevel logLevel) => true;
-
-        public void Log<TState>(
-            LogLevel logLevel,
-            EventId eventId,
-            TState state,
-            Exception? exception,
-            Func<TState, Exception?, string> formatter) =>
-            Entries.Add((logLevel, formatter(state, exception)));
-    }
 }

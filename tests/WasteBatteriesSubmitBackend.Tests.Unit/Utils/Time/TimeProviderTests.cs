@@ -8,7 +8,7 @@ public class TimeProviderTests
     public void AsUtc_WhenInstantIsUnspecified_LabelsItUtcWithoutShifting()
     {
         // Arrange
-        ITimeProvider time = new FixedTime();
+        ITimeProvider time = new FixedTime(new DateTime(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc));
         var unspecified = new DateTime(2026, 7, 31, 23, 0, 0, DateTimeKind.Unspecified);
 
         // Act
@@ -24,7 +24,7 @@ public class TimeProviderTests
     public void AsUtc_WhenInstantIsUtc_ReturnsSameInstant()
     {
         // Arrange
-        ITimeProvider time = new FixedTime();
+        ITimeProvider time = new FixedTime(new DateTime(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc));
         var utc = new DateTime(2026, 7, 31, 23, 0, 0, DateTimeKind.Utc);
 
         // Act
@@ -38,7 +38,7 @@ public class TimeProviderTests
     public void AsUtc_WhenValueIsNull_ReturnsNull()
     {
         // Arrange
-        ITimeProvider time = new FixedTime();
+        ITimeProvider time = new FixedTime(new DateTime(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc));
 
         // Act
         var labelled = time.AsUtc(null);
@@ -60,10 +60,5 @@ public class TimeProviderTests
         // Assert
         Assert.Equal(DateTimeKind.Utc, now.Kind);
         Assert.InRange(now, before.AddSeconds(-1), DateTime.UtcNow.AddSeconds(1));
-    }
-
-    private sealed class FixedTime : ITimeProvider
-    {
-        public DateTime UtcNow => new(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc);
     }
 }

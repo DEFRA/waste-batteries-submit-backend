@@ -108,21 +108,4 @@ public class ExceptionLoggingHandlerTests
         Assert.Contains("MemberName: Member name is required.", entry.Message, StringComparison.Ordinal);
         Assert.Contains("MemberName: Member name is too long.", entry.Message, StringComparison.Ordinal);
     }
-
-    private sealed class CapturingLogger<T> : ILogger<T>
-    {
-        public List<(LogLevel Level, EventId EventId, Exception? Exception, string Message)> Entries { get; } = [];
-
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-
-        public bool IsEnabled(LogLevel logLevel) => true;
-
-        public void Log<TState>(
-            LogLevel logLevel,
-            EventId eventId,
-            TState state,
-            Exception? exception,
-            Func<TState, Exception?, string> formatter) =>
-            Entries.Add((logLevel, eventId, exception, formatter(state, exception)));
-    }
 }
