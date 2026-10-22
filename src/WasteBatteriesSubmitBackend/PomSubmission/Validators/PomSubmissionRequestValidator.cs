@@ -2,13 +2,14 @@ using System.Text.RegularExpressions;
 using FluentValidation;
 using MongoDB.Bson;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
-using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Validators;
 
+// Shape of a posted submission. Whether a current submission already exists is a create-only
+// decision and lives in the service, which reads that submission once.
 public sealed partial class PomSubmissionRequestValidator : AbstractValidator<PomSubmissionRequest>
 {
-    public PomSubmissionRequestValidator(IPomSubmissionRepository pomSubmissionRepository)
+    public PomSubmissionRequestValidator()
     {
         ClassLevelCascadeMode = CascadeMode.Continue;
         RuleLevelCascadeMode = CascadeMode.Continue;
@@ -70,21 +71,6 @@ public sealed partial class PomSubmissionRequestValidator : AbstractValidator<Po
                 .NotEmpty()
                 .When(item => item.Classification is not null);
         });
-
-        RuleFor(request => request)
-            .MustAsync(async (request, cancellationToken) =>
-            {
-                var existing = await pomSubmissionRepository.FindCurrentAsync(
-                    request.SchemeOrgId,
-                    request.MemberOrgId,
-                    request.CompliancePeriodYear,
-                    request.CompliancePeriodQuarter,
-                    cancellationToken);
-                return existing is null;
-            })
-            .When(CanLookUpCurrentSubmission)
-            .WithName("Submission")
-            .WithMessage("A current submission already exists for this scheme, member, year and quarter.");
     }
 
     private static bool BeAnObjectId(string? value) => ObjectId.TryParse(value, out _);
@@ -94,12 +80,6 @@ public sealed partial class PomSubmissionRequestValidator : AbstractValidator<Po
         var match = BprnPattern().Match(request.MemberBprn ?? string.Empty);
         return match.Success && int.Parse(match.Groups["year"].Value) == request.CompliancePeriodYear;
     }
-
-    private static bool CanLookUpCurrentSubmission(PomSubmissionRequest request) =>
-        BeAnObjectId(request.SchemeOrgId)
-        && BeAnObjectId(request.MemberOrgId)
-        && request.CompliancePeriodYear is >= 1000 and <= 9999
-        && !string.IsNullOrWhiteSpace(request.CompliancePeriodQuarter);
 
     private static bool ClassificationsAreUnique(IList<TonnageEntryBase>? entries)
     {

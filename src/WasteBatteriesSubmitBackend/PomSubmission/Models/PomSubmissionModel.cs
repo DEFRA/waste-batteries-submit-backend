@@ -13,6 +13,8 @@ public sealed record PomSubmissionModel : PomSubmissionBase
     // The shape this service writes. A new shape is a code change, so this is not configuration.
     public const int CurrentSchemaVersion = 1;
 
+    private const string SubmittedStatus = "Submitted";
+
     // MongoDB deserialises through this constructor. The other constructor is for create.
     [BsonConstructor]
     [SetsRequiredMembers]
@@ -43,7 +45,9 @@ public sealed record PomSubmissionModel : PomSubmissionBase
         SchemaVersion = CurrentSchemaVersion;
         Version = version;
         Status = status;
-        SubmittedOnUtc = createdAtUtc;
+        SubmittedOnUtc = status.Equals(SubmittedStatus, StringComparison.OrdinalIgnoreCase)
+            ? createdAtUtc
+            : null;
         IsCurrent = true;
         SupersedesSubmissionId = null;
         UpdatedAtUtc = null;

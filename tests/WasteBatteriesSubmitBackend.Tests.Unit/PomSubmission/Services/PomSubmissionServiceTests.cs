@@ -18,15 +18,24 @@ public class PomSubmissionServiceTests
     private static readonly DateTime CreatedAt = new(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc);
 
     [Fact]
-    public async Task CreateAsync_saves_the_mapped_submission_and_logs_information()
+    public async Task CreateAsync_WhenRequestIsValid_SavesSubmissionAndLogsIt()
     {
+        // Arrange
         var repository = Substitute.For<IPomSubmissionRepository>();
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger);
         var request = ValidRequest();
 
+        // Act
         var submission = await service.CreateAsync(request, TestContext.Current.CancellationToken);
 
+        // Assert
+        await repository.Received(1).FindCurrentAsync(
+            request.SchemeOrgId,
+            request.MemberOrgId,
+            request.CompliancePeriodYear,
+            request.CompliancePeriodQuarter,
+            Arg.Any<CancellationToken>());
         await repository.Received(1).CreateAsync(
             Arg.Is<PomSubmissionModel>(saved =>
                 saved.Id == submission.Id
@@ -47,8 +56,9 @@ public class PomSubmissionServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_does_not_log_when_the_save_fails()
+    public async Task CreateAsync_WhenSaveFails_DoesNotLog()
     {
+        // Arrange
         var repository = Substitute.For<IPomSubmissionRepository>();
         repository
             .CreateAsync(Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>())
@@ -56,36 +66,118 @@ public class PomSubmissionServiceTests
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.CreateAsync(ValidRequest(), TestContext.Current.CancellationToken));
+        // Act
+        var act = () => service.CreateAsync(ValidRequest(), TestContext.Current.CancellationToken);
 
+        // Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(act);
         Assert.Empty(logger.Entries);
     }
 
     [Fact]
-    public async Task CreateAsync_rejects_a_submission_with_no_tonnage_entries()
+    public async Task CreateAsync_WhenTonnageEntriesAreEmpty_ThrowsValidationException()
     {
+        // Arrange
         var repository = Substitute.For<IPomSubmissionRepository>();
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger);
+        var request = ValidRequest() with { TonnageEntries = [] };
 
-        await Assert.ThrowsAsync<ValidationException>(() =>
-            service.CreateAsync(ValidRequest() with { TonnageEntries = [] }, TestContext.Current.CancellationToken));
+        // Act
+        var act = () => service.CreateAsync(request, TestContext.Current.CancellationToken);
 
+        // Assert
+        await Assert.ThrowsAsync<ValidationException>(act);
+        await repository.Received(1).FindCurrentAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<int>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
         await repository.DidNotReceive().CreateAsync(Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>());
         Assert.Empty(logger.Entries);
     }
 
     [Fact]
-    public async Task CreateAsync_rejects_a_submission_without_a_member_name()
+    public async Task CreateAsync_WhenMemberNameIsEmpty_ThrowsValidationException()
     {
+        // Arrange
         var repository = Substitute.For<IPomSubmissionRepository>();
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger);
+        var request = ValidRequest() with { MemberName = "" };
 
-        await Assert.ThrowsAsync<ValidationException>(() =>
-            service.CreateAsync(ValidRequest() with { MemberName = "" }, TestContext.Current.CancellationToken));
+        // Act
+        var act = () => service.CreateAsync(request, TestContext.Current.CancellationToken);
 
+        // Assert
+        await Assert.ThrowsAsync<ValidationException>(act);
+        await repository.Received(1).FindCurrentAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<int>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await repository.DidNotReceive().CreateAsync(Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>());
+        Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenModelIsInvalidAndCurrentSubmissionExists_ReturnsAllErrors()
+    {
+        // Arrange
+        var repository = Substitute.For<IPomSubmissionRepository>();
+        repository
+            .FindCurrentAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<int>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new PomSubmissionModel { Id = "674a1b2c3d4e5f6789012345", CreatedAtUtc = CreatedAt });
+        var logger = new CapturingLogger<PomSubmissionService>();
+        var service = Service(repository, logger);
+        var request = ValidRequest() with { MemberName = "" };
+
+        // Act
+        var act = () => service.CreateAsync(request, TestContext.Current.CancellationToken);
+
+        // Assert
+        var exception = await Assert.ThrowsAsync<ValidationException>(act);
+        Assert.Contains(exception.Errors, error => error.PropertyName == "MemberName");
+        Assert.Contains(
+            exception.Errors,
+            error => error.PropertyName == "Submission"
+                && error.ErrorMessage == "A current submission already exists for this scheme, member, year and quarter.");
+        await repository.DidNotReceive().CreateAsync(Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>());
+        Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenCurrentSubmissionExists_ThrowsValidationException()
+    {
+        // Arrange
+        var repository = Substitute.For<IPomSubmissionRepository>();
+        repository
+            .FindCurrentAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<int>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new PomSubmissionModel { Id = "674a1b2c3d4e5f6789012345", CreatedAtUtc = CreatedAt });
+        var logger = new CapturingLogger<PomSubmissionService>();
+        var service = Service(repository, logger);
+
+        // Act
+        var act = () => service.CreateAsync(ValidRequest(), TestContext.Current.CancellationToken);
+
+        // Assert
+        var exception = await Assert.ThrowsAsync<ValidationException>(act);
+        Assert.Contains(
+            exception.Errors,
+            error => error.PropertyName == "Submission"
+                && error.ErrorMessage == "A current submission already exists for this scheme, member, year and quarter.");
         await repository.DidNotReceive().CreateAsync(Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>());
         Assert.Empty(logger.Entries);
     }
@@ -93,13 +185,14 @@ public class PomSubmissionServiceTests
     private static PomSubmissionService Service(IPomSubmissionRepository repository, CapturingLogger<PomSubmissionService> logger) =>
         new(
             repository,
-            new PomSubmissionMapper(new FixedTime(CreatedAt), Options.Create(new PomSubmissionConfig
+            new PomSubmissionMapper(Options.Create(new PomSubmissionConfig
             {
                 InitialStatus = "Submitted",
                 InitialVersion = 1,
                 InitialActivity = "Placed"
             })),
-            new PomSubmissionRequestValidator(repository),
+            new PomSubmissionRequestValidator(),
+            new FixedTime(CreatedAt),
             logger);
 
     private static PomSubmissionRequest ValidRequest() => new()

@@ -5,35 +5,59 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.Utils.Time;
 public class TimeProviderTests
 {
     [Fact]
-    public void AsUtc_labels_an_unspecified_instant_without_shifting_it()
+    public void AsUtc_WhenInstantIsUnspecified_LabelsItUtcWithoutShifting()
     {
+        // Arrange
         ITimeProvider time = new FixedTime();
         var unspecified = new DateTime(2026, 7, 31, 23, 0, 0, DateTimeKind.Unspecified);
 
+        // Act
         var labelled = time.AsUtc(unspecified);
 
+        // Assert
         Assert.NotNull(labelled);
         Assert.Equal(DateTimeKind.Utc, labelled.Value.Kind);
         Assert.Equal(unspecified.Ticks, labelled.Value.Ticks);
     }
 
     [Fact]
-    public void AsUtc_keeps_a_utc_instant_and_returns_null_for_null()
+    public void AsUtc_WhenInstantIsUtc_ReturnsSameInstant()
     {
+        // Arrange
         ITimeProvider time = new FixedTime();
         var utc = new DateTime(2026, 7, 31, 23, 0, 0, DateTimeKind.Utc);
 
-        Assert.Equal(utc, time.AsUtc(utc));
-        Assert.Null(time.AsUtc(null));
+        // Act
+        var labelled = time.AsUtc(utc);
+
+        // Assert
+        Assert.Equal(utc, labelled);
     }
 
     [Fact]
-    public void SystemTimeProvider_returns_utc_now()
+    public void AsUtc_WhenValueIsNull_ReturnsNull()
     {
+        // Arrange
+        ITimeProvider time = new FixedTime();
+
+        // Act
+        var labelled = time.AsUtc(null);
+
+        // Assert
+        Assert.Null(labelled);
+    }
+
+    [Fact]
+    public void UtcNow_WhenRead_ReturnsUtcInstant()
+    {
+        // Arrange
         var before = DateTime.UtcNow;
+        var time = new SystemTimeProvider();
 
-        var now = new SystemTimeProvider().UtcNow;
+        // Act
+        var now = time.UtcNow;
 
+        // Assert
         Assert.Equal(DateTimeKind.Utc, now.Kind);
         Assert.InRange(now, before.AddSeconds(-1), DateTime.UtcNow.AddSeconds(1));
     }

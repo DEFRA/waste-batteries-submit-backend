@@ -2,21 +2,21 @@ using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using WasteBatteriesSubmitBackend.Config;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
-using WasteBatteriesSubmitBackend.Utils.Time;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 
 public interface IPomSubmissionMapper
 {
-    PomSubmissionModel ToNewSubmission(PomSubmissionRequest request);
+    // createdAtUtc comes from the caller so a batch shares one timestamp.
+    // version replaces the configured initial version when an amendment allocates the next one.
+    PomSubmissionModel ToNewSubmission(PomSubmissionRequest request, DateTime createdAtUtc, int? version = null);
 }
 
-public sealed class PomSubmissionMapper(ITimeProvider timeProvider, IOptions<PomSubmissionConfig> options) : IPomSubmissionMapper
+public sealed class PomSubmissionMapper(IOptions<PomSubmissionConfig> options) : IPomSubmissionMapper
 {
-    public PomSubmissionModel ToNewSubmission(PomSubmissionRequest request)
+    public PomSubmissionModel ToNewSubmission(PomSubmissionRequest request, DateTime createdAtUtc, int? version = null)
     {
         var defaults = options.Value;
-        var createdAtUtc = timeProvider.UtcNow;
         var entries = (request.TonnageEntries ?? []).ConvertAll(
             entry => entry.ToStoredEntry(ObjectId.GenerateNewId().ToString(), defaults.InitialActivity));
 
@@ -26,6 +26,6 @@ public sealed class PomSubmissionMapper(ITimeProvider timeProvider, IOptions<Pom
             createdAtUtc,
             entries,
             defaults.InitialStatus,
-            defaults.InitialVersion);
+            version ?? defaults.InitialVersion);
     }
 }

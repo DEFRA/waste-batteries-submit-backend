@@ -6,13 +6,17 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.Utils.Mongo;
 public class MongoConventionsTests
 {
     [Fact]
-    public void Register_applies_camel_case_names_and_ignores_later_calls()
+    public void Register_WhenCalledMoreThanOnce_AppliesCamelCaseElementNames()
     {
-        MongoConventions.Register();
-        MongoConventions.Register();
+        // Arrange
+        // Register is idempotent, so a second call must not replace the convention pack.
 
+        // Act
+        MongoConventions.Register();
+        MongoConventions.Register();
         var conventions = ConventionRegistry.Lookup(typeof(SampleDocument));
 
+        // Assert
         Assert.Contains(conventions.Conventions, convention => convention is CamelCaseElementNameConvention);
     }
 

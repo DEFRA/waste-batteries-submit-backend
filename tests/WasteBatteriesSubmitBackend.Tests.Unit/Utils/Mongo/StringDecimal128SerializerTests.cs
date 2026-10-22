@@ -13,8 +13,9 @@ public class StringDecimal128SerializerTests
     }
 
     [Fact]
-    public void Tonnes_round_trips_as_decimal128_and_keeps_scale()
+    public void ToBsonDocument_WhenTonnesHasScale_RoundTripsAsDecimal128()
     {
+        // Arrange
         var entry = new TonnageEntry
         {
             Id = ObjectId.GenerateNewId().ToString(),
@@ -23,16 +24,20 @@ public class StringDecimal128SerializerTests
             Tonnes = "12.500"
         };
 
+        // Act
         var document = entry.ToBsonDocument();
+        var stored = BsonSerializer.Deserialize<TonnageEntry>(document);
 
+        // Assert
         Assert.Equal(BsonType.Decimal128, document["tonnes"].BsonType);
         Assert.Equal("12.500", document["tonnes"].AsDecimal128.ToString());
-        Assert.Equal("12.500", BsonSerializer.Deserialize<TonnageEntry>(document).Tonnes);
+        Assert.Equal("12.500", stored.Tonnes);
     }
 
     [Fact]
-    public void Tonnes_rejects_a_value_that_is_not_a_decimal()
+    public void ToBsonDocument_WhenTonnesIsNotADecimal_Throws()
     {
+        // Arrange
         var entry = new TonnageEntry
         {
             Id = ObjectId.GenerateNewId().ToString(),
@@ -41,6 +46,10 @@ public class StringDecimal128SerializerTests
             Tonnes = "twelve"
         };
 
-        Assert.ThrowsAny<Exception>(() => entry.ToBsonDocument());
+        // Act
+        var act = () => entry.ToBsonDocument();
+
+        // Assert
+        Assert.ThrowsAny<Exception>(act);
     }
 }

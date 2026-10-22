@@ -1,6 +1,4 @@
-using NSubstitute;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
-using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Validators;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Validators;
@@ -8,16 +6,22 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Validators;
 public class PomSubmissionRequestValidatorTests
 {
     [Fact]
-    public async Task Validate_accepts_a_complete_submission_when_none_is_current()
+    public async Task ValidateAsync_WhenSubmissionIsComplete_ReturnsValid()
     {
-        var result = await Validator().ValidateAsync(ValidRequest(), TestContext.Current.CancellationToken);
+        // Arrange
+        var request = ValidRequest();
 
+        // Act
+        var result = await Validator().ValidateAsync(request, TestContext.Current.CancellationToken);
+
+        // Assert
         Assert.True(result.IsValid);
     }
 
     [Fact]
-    public async Task Validate_returns_every_failure_together()
+    public async Task ValidateAsync_WhenRequestHasManyFailures_ReturnsEveryFailure()
     {
+        // Arrange
         var request = ValidRequest() with
         {
             MemberName = "",
@@ -48,8 +52,10 @@ public class PomSubmissionRequestValidatorTests
             ]
         };
 
+        // Act
         var result = await Validator().ValidateAsync(request, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Contains(result.Errors, error => error.PropertyName == "MemberName");
         Assert.Contains(result.Errors, error => error.PropertyName == "SchemeMembershipRef");
         Assert.Contains(result.Errors, error => error.PropertyName == "MemberBprn");
@@ -62,35 +68,19 @@ public class PomSubmissionRequestValidatorTests
     }
 
     [Fact]
-    public async Task Validate_rejects_a_bprn_for_a_different_year()
+    public async Task ValidateAsync_WhenBprnYearDiffers_ReturnsMemberBprnError()
     {
-        var result = await Validator().ValidateAsync(
-            ValidRequest() with { MemberBprn = "BPRN-NRW-2025-000123" },
-            TestContext.Current.CancellationToken);
+        // Arrange
+        var request = ValidRequest() with { MemberBprn = "BPRN-NRW-2025-000123" };
 
+        // Act
+        var result = await Validator().ValidateAsync(request, TestContext.Current.CancellationToken);
+
+        // Assert
         Assert.Contains(result.Errors, error => error.PropertyName == "MemberBprn");
     }
 
-    [Fact]
-    public async Task Validate_rejects_a_current_submission_that_already_exists()
-    {
-        var repository = Substitute.For<IPomSubmissionRepository>();
-        repository
-            .FindCurrentAsync(
-                Arg.Any<string>(),
-                Arg.Any<string>(),
-                Arg.Any<int>(),
-                Arg.Any<string>(),
-                Arg.Any<CancellationToken>())
-            .Returns(new PomSubmissionModel { Id = "674a1b2c3d4e5f6789012345", CreatedAtUtc = DateTime.UnixEpoch });
-
-        var result = await Validator(repository).ValidateAsync(ValidRequest(), TestContext.Current.CancellationToken);
-
-        Assert.Contains(result.Errors, error => error.PropertyName == "Submission");
-    }
-
-    private static PomSubmissionRequestValidator Validator(IPomSubmissionRepository? repository = null) =>
-        new(repository ?? Substitute.For<IPomSubmissionRepository>());
+    private static PomSubmissionRequestValidator Validator() => new();
 
     private static PomSubmissionRequest ValidRequest() => new()
     {

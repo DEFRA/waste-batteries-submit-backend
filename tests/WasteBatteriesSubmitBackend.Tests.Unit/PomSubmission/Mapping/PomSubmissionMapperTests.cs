@@ -6,7 +6,6 @@ using WasteBatteriesSubmitBackend.Config;
 using WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.Utils.Mongo;
-using WasteBatteriesSubmitBackend.Utils.Time;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Mapping;
 
@@ -15,8 +14,9 @@ public class PomSubmissionMapperTests
     private static readonly DateTime CreatedAt = new(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc);
 
     [Fact]
-    public void ToNewSubmission_files_the_submission_as_submitted()
+    public void ToNewSubmission_WhenRequestIsComplete_MapsSubmittedSubmission()
     {
+        // Arrange
         var request = JsonSerializer.Deserialize<PomSubmissionRequest>(
             """
             {
@@ -44,8 +44,10 @@ public class PomSubmissionMapperTests
             """,
             JsonSerializerOptions.Web);
 
-        var submission = Mapper().ToNewSubmission(request!);
+        // Act
+        var submission = Mapper().ToNewSubmission(request!, CreatedAt);
 
+        // Assert
         Assert.Equal("674a1b2c3d4e5f6789012345", submission.SchemeOrgId);
         Assert.Equal("674a1b2c3d4e5f6789012346", submission.MemberOrgId);
         Assert.Equal("Northwind Batteries Ltd", submission.MemberName);
@@ -78,8 +80,9 @@ public class PomSubmissionMapperTests
     }
 
     [Fact]
-    public void ToNewSubmission_rejects_a_submission_with_no_tonnage_entries()
+    public void ToNewSubmission_WhenTonnageEntriesAreEmpty_ThrowsArgumentException()
     {
+        // Arrange
         var request = new PomSubmissionRequest
         {
             SchemeOrgId = ObjectId.GenerateNewId().ToString(),
@@ -88,15 +91,18 @@ public class PomSubmissionMapperTests
             TonnageEntries = []
         };
 
-        var exception = Assert.Throws<ArgumentException>(() =>
-            Mapper().ToNewSubmission(request));
+        // Act
+        var act = () => Mapper().ToNewSubmission(request, CreatedAt);
 
+        // Assert
+        var exception = Assert.Throws<ArgumentException>(act);
         Assert.Equal("tonnageEntries", exception.ParamName);
     }
 
     [Fact]
-    public void ToNewSubmission_round_trips_through_bson_as_submitted()
+    public void ToNewSubmission_WhenSubmissionIsMapped_RoundTripsThroughBson()
     {
+        // Arrange
         MongoConventions.Register();
         var submission = Mapper().ToNewSubmission(new PomSubmissionRequest
         {
@@ -111,11 +117,13 @@ public class PomSubmissionMapperTests
                     Tonnes = "12.500"
                 }
             ]
-        });
+        }, CreatedAt);
 
+        // Act
         var document = submission.ToBsonDocument();
         var stored = BsonSerializer.Deserialize<PomSubmissionModel>(document);
 
+        // Assert
         Assert.Equal("Submitted", document["status"].AsString);
         Assert.Equal(1, document["version"].AsInt32);
         Assert.Equal(CreatedAt, document["submittedOnUtc"].ToUniversalTime());
@@ -133,48 +141,92 @@ public class PomSubmissionMapperTests
     }
 
     [Fact]
-    public void ToNewSubmission_uses_the_configured_initial_values()
+    public void ToNewSubmission_WhenInitialValuesAreConfigured_UsesThoseValues()
     {
-        var mapper = new PomSubmissionMapper(new FixedTime(CreatedAt), Options.Create(new PomSubmissionConfig
+        // Arrange
+        var mapper = new PomSubmissionMapper(Options.Create(new PomSubmissionConfig
         {
             InitialStatus = "Filed",
             InitialVersion = 4,
             InitialActivity = "Held"
         }));
-
-        var submission = mapper.ToNewSubmission(new PomSubmissionRequest
+        var request = new PomSubmissionRequest
         {
             TonnageEntries = [new TonnageEntryBase { Tonnes = "1.000" }]
-        });
+        };
 
+        // Act
+        var submission = mapper.ToNewSubmission(request, CreatedAt);
+
+        // Assert
         Assert.Equal("Filed", submission.Status);
         Assert.Equal(4, submission.Version);
         Assert.Equal(PomSubmissionModel.CurrentSchemaVersion, submission.SchemaVersion);
         Assert.Equal("Held", submission.TonnageEntries[0].Activity);
+        Assert.Equal(CreatedAt, submission.CreatedAtUtc);
+        Assert.Null(submission.SubmittedOnUtc);
+    }
+
+    [Fact]
+    public void ToNewSubmission_WhenStatusIsSubmittedIgnoringCase_SetsSubmittedOnUtc()
+    {
+        // Arrange
+        var mapper = new PomSubmissionMapper(Options.Create(new PomSubmissionConfig
+        {
+            InitialStatus = "sUbMiTtEd",
+            InitialVersion = 1,
+            InitialActivity = "Placed"
+        }));
+        var request = new PomSubmissionRequest
+        {
+            TonnageEntries = [new TonnageEntryBase { Tonnes = "1.000" }]
+        };
+
+        // Act
+        var submission = mapper.ToNewSubmission(request, CreatedAt);
+
+        // Assert
+        Assert.Equal("sUbMiTtEd", submission.Status);
         Assert.Equal(CreatedAt, submission.SubmittedOnUtc);
         Assert.Equal(submission.CreatedAtUtc, submission.SubmittedOnUtc);
     }
 
     [Fact]
-    public void Request_json_rejects_a_property_that_is_not_on_the_model()
+    public void ToNewSubmission_WhenVersionIsSupplied_UsesSuppliedVersion()
     {
-        var exception = Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<PomSubmissionRequest>(
-            """{"memberName":"Northwind Batteries Ltd","regulatorNote":"ignore me"}""",
-            JsonSerializerOptions.Web));
+        // Arrange
+        var request = new PomSubmissionRequest
+        {
+            TonnageEntries = [new TonnageEntryBase { Tonnes = "1.000" }]
+        };
 
+        // Act
+        var submission = Mapper().ToNewSubmission(request, CreatedAt, version: 3);
+
+        // Assert
+        Assert.Equal(3, submission.Version);
+        Assert.Equal(CreatedAt, submission.CreatedAtUtc);
+    }
+
+    [Fact]
+    public void Deserialize_WhenPropertyIsNotOnTheModel_ThrowsJsonException()
+    {
+        // Arrange
+        const string json = """{"memberName":"Northwind Batteries Ltd","regulatorNote":"ignore me"}""";
+
+        // Act
+        var act = () => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
+
+        // Assert
+        var exception = Assert.Throws<JsonException>(act);
         Assert.Contains("regulatorNote", exception.Message);
     }
 
     private static PomSubmissionMapper Mapper() =>
-        new(new FixedTime(CreatedAt), Options.Create(new PomSubmissionConfig
+        new(Options.Create(new PomSubmissionConfig
         {
             InitialStatus = "Submitted",
             InitialVersion = 1,
             InitialActivity = "Placed"
         }));
-
-    private sealed class FixedTime(DateTime utcNow) : ITimeProvider
-    {
-        public DateTime UtcNow => utcNow;
-    }
 }

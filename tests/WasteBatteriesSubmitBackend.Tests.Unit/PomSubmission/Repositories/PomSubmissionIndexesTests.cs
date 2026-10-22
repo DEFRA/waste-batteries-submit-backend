@@ -10,12 +10,17 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Repositories;
 public class PomSubmissionIndexesTests
 {
     [Fact]
-    public void Create_defines_the_submission_indexes()
+    public void Create_WhenCalled_DefinesSubmissionIndexes()
     {
+        // Arrange
         MongoConventions.Register();
-        var indexes = PomSubmissionIndexes.Create(Builders<PomSubmissionModel>.IndexKeys);
+        var indexKeys = Builders<PomSubmissionModel>.IndexKeys;
+
+        // Act
+        var indexes = PomSubmissionIndexes.Create(indexKeys);
         var args = RenderArgs();
 
+        // Assert
         Assert.Equal(6, indexes.Count);
 
         var current = indexes[0];

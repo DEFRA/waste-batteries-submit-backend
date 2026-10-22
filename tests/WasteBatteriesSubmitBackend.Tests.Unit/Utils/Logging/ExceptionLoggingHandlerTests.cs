@@ -9,21 +9,23 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.Utils.Logging;
 public class ExceptionLoggingHandlerTests
 {
     [Fact]
-    public async Task TryHandleAsync_logs_unhandled_exception_and_returns_problem_details()
+    public async Task TryHandleAsync_WhenExceptionIsUnhandled_LogsErrorAndReturnsProblemDetails()
     {
+        // Arrange
         var logger = new CapturingLogger<ExceptionLoggingHandler>();
         var problemDetailsService = Substitute.For<IProblemDetailsService>();
         ProblemDetailsContext? captured = null;
         problemDetailsService
             .TryWriteAsync(Arg.Do<ProblemDetailsContext>(context => captured = context))
             .Returns(new ValueTask<bool>(true));
-
         var handler = new ExceptionLoggingHandler(logger, problemDetailsService);
         var exception = new InvalidOperationException("secret boom");
         var httpContext = new DefaultHttpContext();
 
+        // Act
         var handled = await handler.TryHandleAsync(httpContext, exception, CancellationToken.None);
 
+        // Assert
         Assert.True(handled);
         Assert.Equal(StatusCodes.Status500InternalServerError, httpContext.Response.StatusCode);
         Assert.NotNull(captured);
@@ -36,20 +38,22 @@ public class ExceptionLoggingHandlerTests
     }
 
     [Fact]
-    public async Task TryHandleAsync_returns_bad_request_problem_details()
+    public async Task TryHandleAsync_WhenRequestIsBad_ReturnsBadRequestProblemDetails()
     {
+        // Arrange
         var logger = new CapturingLogger<ExceptionLoggingHandler>();
         var problemDetailsService = Substitute.For<IProblemDetailsService>();
         ProblemDetailsContext? captured = null;
         problemDetailsService
             .TryWriteAsync(Arg.Do<ProblemDetailsContext>(context => captured = context))
             .Returns(new ValueTask<bool>(true));
-
         var handler = new ExceptionLoggingHandler(logger, problemDetailsService);
         var httpContext = new DefaultHttpContext();
 
+        // Act
         await handler.TryHandleAsync(httpContext, new BadHttpRequestException("Malformed JSON."), CancellationToken.None);
 
+        // Assert
         Assert.Equal(StatusCodes.Status400BadRequest, httpContext.Response.StatusCode);
         Assert.NotNull(captured);
         Assert.Equal(StatusCodes.Status400BadRequest, captured.ProblemDetails.Status);
