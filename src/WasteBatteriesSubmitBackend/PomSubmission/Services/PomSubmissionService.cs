@@ -4,7 +4,9 @@ using MongoDB.Bson;
 using WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
+using WasteBatteriesSubmitBackend.PomSubmission.Validators;
 using WasteBatteriesSubmitBackend.Utils.Logging;
+using WasteBatteriesSubmitBackend.Utils.Mongo;
 using WasteBatteriesSubmitBackend.Utils.Time;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Services;
@@ -45,7 +47,7 @@ public class PomSubmissionService(
             {
                 failures.Add(new ValidationFailure(
                     "Submission",
-                    "A current submission already exists for this scheme, member, year and quarter."));
+                    PomSubmissionValidationMessages.CurrentSubmissionExists));
             }
         }
 
@@ -55,7 +57,20 @@ public class PomSubmissionService(
         }
 
         var submission = pomSubmissionMapper.ToNewSubmission(request, timeProvider.UtcNow);
-        await pomSubmissionRepository.CreateAsync(submission, cancellationToken);
+
+        try
+        {
+            await pomSubmissionRepository.CreateAsync(submission, cancellationToken);
+        }
+        catch (DuplicateKeyOnSaveException)
+        {
+            // FindCurrent above has passed, so unlikely this is hit, but this is an extra check for concurrency issues.
+            throw new ValidationException(
+            [
+                new ValidationFailure("Submission", PomSubmissionValidationMessages.CurrentSubmissionExists)
+            ]);
+        }
+
         logger.CreatedPomSubmission(submission.Id, submission.SchemeOrgId, submission.MemberOrgId);
         return submission;
     }
@@ -68,6 +83,6 @@ public class PomSubmissionService(
     private static bool CanLookUpCurrentSubmission(PomSubmissionRequest request) =>
         ObjectId.TryParse(request.SchemeOrgId, out _)
         && ObjectId.TryParse(request.MemberOrgId, out _)
-        && request.CompliancePeriodYear is >= 1000 and <= 9999
+        && CalendarYear.Contains(request.CompliancePeriodYear)
         && !string.IsNullOrWhiteSpace(request.CompliancePeriodQuarter);
 }

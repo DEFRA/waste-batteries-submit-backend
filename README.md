@@ -2,7 +2,7 @@
 
 API for battery compliance scheme placed-on-market (POM) submissions, built on the core delivery C# ASP.NET backend template.
 
-The target data model is the Compliance Scheme POM Submission page in the `waste-batteries-docs` repository, under `technology/data-architecture/compliance-scheme-pom-submission`. This page describes what this service implements.
+The target data model is the Compliance Scheme POM Submission page in the [waste-batteries-docs](https://github.com/DEFRA/waste-batteries-docs/blob/main/technology/data-architecture/compliance-scheme-pom-submission/README.md) repository. This page describes what this service implements.
 
 * [Placed-on-market submissions](#placed-on-market-submissions)
 * [Install MongoDB](#install-mongodb)
@@ -123,7 +123,7 @@ dotnet tests/WasteBatteriesSubmitBackend.Tests.Integration/bin/Debug/net10.0/Was
 
 `WasteBatteriesSubmitBackend.Tests.Unit` covers validators, mapping, the submission service and handlers without hosting the API.
 
-`WasteBatteriesSubmitBackend.Tests.Integration` hosts the API in process with `WebApplicationFactory`. The example and example-data tests substitute repositories with NSubstitute and do not start MongoDB. The placed-on-market submission tests start MongoDB 7 with Testcontainers, so Docker must be running.
+`WasteBatteriesSubmitBackend.Tests.Integration` hosts the API in process with `WebApplicationFactory`. The placed-on-market submission tests start MongoDB 7 with Testcontainers, so Docker must be running.
 
 ### Running
 

@@ -27,6 +27,8 @@ public sealed class PomSubmissionApiFixture : MongoApiFixture
 
     public PomSubmissionConfig Defaults => Factory.Services.GetRequiredService<IOptions<PomSubmissionConfig>>().Value;
 
+    public IServiceProvider Services => Factory.Services;
+
     public IMongoCollection<BsonDocument> Submissions => Collection(PomSubmissionRepository.CollectionName);
 
     protected override DateTime? FixedUtcNow => CreatedAt;

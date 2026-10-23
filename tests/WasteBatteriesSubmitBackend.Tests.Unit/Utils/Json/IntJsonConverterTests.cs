@@ -13,6 +13,20 @@ public class IntJsonConverterTests
     }
 
     [Fact]
+    public void Read_WhenValueIsANumericString_KeepsTheNumber()
+    {
+        // Arrange
+        const string json = """{ "widgetCount": "2026" }""";
+
+        // Act
+        var sample = JsonSerializer.Deserialize<Sample>(json, JsonSerializerOptions.Web);
+
+        // Assert
+        Assert.NotNull(sample);
+        Assert.Equal(2026, sample.WidgetCount);
+    }
+
+    [Fact]
     public void Read_WhenValueIsNotANumber_IncludesThePropertyName()
     {
         // Arrange

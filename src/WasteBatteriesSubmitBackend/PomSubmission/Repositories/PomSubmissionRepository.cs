@@ -25,7 +25,15 @@ public class PomSubmissionRepository(IMongoDbClientFactory connectionFactory, IL
 
     public async Task CreateAsync(PomSubmissionModel submission, CancellationToken cancellationToken = default)
     {
-        await Collection.InsertOneAsync(submission, cancellationToken: cancellationToken);
+        try
+        {
+            await Collection.InsertOneAsync(submission, cancellationToken: cancellationToken);
+        }
+        catch (MongoWriteException exception) when (exception.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            // The only unique index is one current submission per scheme, member, year and quarter.
+            throw new DuplicateKeyOnSaveException(exception);
+        }
     }
 
     public async Task<PomSubmissionModel?> FindCurrentAsync(

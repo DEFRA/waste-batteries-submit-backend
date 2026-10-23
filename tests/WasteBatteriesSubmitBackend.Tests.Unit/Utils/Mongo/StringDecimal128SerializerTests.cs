@@ -35,6 +35,25 @@ public class StringDecimal128SerializerTests
     }
 
     [Fact]
+    public void Deserialize_WhenTonnesIsNotDecimal128_Throws()
+    {
+        // Arrange
+        var document = new BsonDocument
+        {
+            { "id", ObjectId.GenerateNewId() },
+            { "classification", new BsonDocument() },
+            { "tonnes", "12.500" },
+            { "activity", "Placed" }
+        };
+
+        // Act
+        var act = () => BsonSerializer.Deserialize<TonnageEntry>(document);
+
+        // Assert
+        Assert.ThrowsAny<Exception>(act);
+    }
+
+    [Fact]
     public void ToBsonDocument_WhenTonnesIsNotADecimal_Throws()
     {
         // Arrange

@@ -2,6 +2,8 @@ using System.Runtime.CompilerServices;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 
+//This is a class to allow us to use snapshots in the tests and compare a data file (e.g. a .txt) to a test repsonse (e.g. some .json).  
+//We previously used Verify.Xunit for snapshots, but due to a package license being needed going forward this manual solution is better
 internal static class Snapshot
 {
     // One file per test method. Pass name for a theory case or a second snapshot in the same method:

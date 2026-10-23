@@ -16,7 +16,10 @@ public sealed class ExceptionLoggingHandler(
     {
         if (exception is ValidationException validationException)
         {
-            logger.RequestValidationFailed(ValidationErrors(validationException));
+            if (logger.IsEnabled(LogLevel.Information))
+            {
+                logger.RequestValidationFailed(ValidationErrors(validationException));
+            }
             await ValidationExceptionResults.ToProblem(validationException).ExecuteAsync(httpContext);
             return true;
         }

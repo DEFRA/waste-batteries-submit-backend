@@ -9,7 +9,7 @@ namespace WasteBatteriesSubmitBackend.PomSubmission.Models;
 [BsonIgnoreExtraElements]
 public sealed record PomSubmissionModel : PomSubmissionBase
 {
-    // The shape this service writes. A new shape is a code change, so this is not configuration.
+    // The shape this service writes the schema in. A new schema shape involves a code change and this version should be incremented, so this is not saved in configuration.
     public const int CurrentSchemaVersion = 1;
 
     private const string SubmittedStatus = "Submitted";
@@ -59,10 +59,11 @@ public sealed record PomSubmissionModel : PomSubmissionBase
     public required string Id { get; init; }
 
     // Returned on the API. A client uses schemaVersion to tell which vocabulary the stored
-    // texts were written against. version is the optimistic concurrency token a later write
-    // sends back. The submitter does not post either; the service sets them.
+    // texts were written against.
     public int SchemaVersion { get; init; }
 
+    //Version is the optimistic concurrency token a later write
+    // sends back.
     public int Version { get; init; }
 
     // Null on a first submission. An amendment sets this to the id of the submission it replaces.

@@ -8,8 +8,12 @@ using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
 using MongoDB.Bson.IO;
 using MongoDB.Driver;
+using Microsoft.Extensions.DependencyInjection;
+using WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
+using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.Tests.Integration.Utils;
+using WasteBatteriesSubmitBackend.Utils.Mongo;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
 
@@ -373,6 +377,57 @@ public class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture) : ICla
         });
 
         Snapshot.Match(json);
+    }
+
+    [Fact]
+    public async Task Create_WhenTheCurrentSubmissionIndexRejectsTheInsert_ThrowsDuplicateKeyOnSaveException()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        const string memberOrgId = "674a1b2c3d4e5f67890124ff";
+        var repository = fixture.Services.GetRequiredService<IPomSubmissionRepository>();
+        var mapper = fixture.Services.GetRequiredService<IPomSubmissionMapper>();
+        var request = new PomSubmissionRequest
+        {
+            SchemeOrgId = PomSubmissionApiFixture.SchemeOrgId,
+            MemberOrgId = memberOrgId,
+            MemberName = "Northwind Batteries Ltd",
+            MemberBprn = "BPRN-EA-2026-000123",
+            SchemeMembershipRef = "SCH-00417",
+            CompliancePeriodYear = 2026,
+            CompliancePeriodQuarter = "Quarter 2",
+            DataBasis = "Actual",
+            TonnageEntries =
+            [
+                new TonnageEntryBase
+                {
+                    Classification = new BatteryClassification
+                    {
+                        BatteryCategory = "Portable",
+                        Chemistry = "Alkaline"
+                    },
+                    Tonnes = "1.000"
+                }
+            ]
+        };
+        var first = mapper.ToNewSubmission(request, PomSubmissionApiFixture.CreatedAt);
+        var second = mapper.ToNewSubmission(request, PomSubmissionApiFixture.CreatedAt);
+
+        try
+        {
+            // Act
+            await repository.CreateAsync(first, cancellationToken);
+            var act = () => repository.CreateAsync(second, cancellationToken);
+
+            // Assert
+            await Assert.ThrowsAsync<DuplicateKeyOnSaveException>(act);
+        }
+        finally
+        {
+            await fixture.Submissions.DeleteManyAsync(
+                Builders<BsonDocument>.Filter.Eq("memberOrgId", ObjectId.Parse(memberOrgId)),
+                cancellationToken);
+        }
     }
 
     [Fact]

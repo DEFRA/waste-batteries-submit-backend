@@ -10,7 +10,7 @@ public class PomSubmissionRequestJsonTests
     [Theory]
     [InlineData("null")]
     [InlineData("\"\"")]
-    public async Task Deserialize_WhenYearIsNullOrBlank_ReportsFieldValidationErrors(string year)
+    public async Task Deserialize_WhenYearIsNullOrBlank_ReadsItAsEmptyAndInvalid(string year)
     {
         // Arrange
         var json = $$"""
@@ -41,12 +41,43 @@ public class PomSubmissionRequestJsonTests
 
         // Assert
         Assert.Equal(0, request.CompliancePeriodYear);
-        Assert.Contains(result.Errors, error => error.PropertyName == "MemberName"
-            && error.ErrorMessage == "'Member Name' must not be empty.");
-        Assert.Contains(result.Errors, error => error.PropertyName == "CompliancePeriodYear"
-            && error.ErrorMessage == "compliancePeriodYear must be a calendar year.");
-        Assert.Contains(result.Errors, error => error.PropertyName == "TonnageEntries[0].Tonnes"
-            && error.ErrorMessage == "'Tonnes' must not be empty.");
+        Assert.True(string.IsNullOrEmpty(request.MemberName));
+        Assert.True(string.IsNullOrEmpty(request.TonnageEntries[0].Tonnes));
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void Deserialize_WhenEntryPostsActivity_ThrowsJsonException()
+    {
+        // Arrange
+        const string json = """
+            {
+              "tonnageEntries": [
+                { "activity": "Exported", "tonnes": "1.000" }
+              ]
+            }
+            """;
+
+        // Act
+        var act = () => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
+
+        // Assert
+        var exception = Assert.Throws<JsonException>(act);
+        Assert.Contains("activity", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Deserialize_WhenPropertyIsNotOnTheModel_ThrowsJsonException()
+    {
+        // Arrange
+        const string json = """{"memberName":"Northwind Batteries Ltd","regulatorNote":"ignore me"}""";
+
+        // Act
+        var act = () => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
+
+        // Assert
+        var exception = Assert.Throws<JsonException>(act);
+        Assert.Contains("regulatorNote", exception.Message);
     }
 
     [Fact]

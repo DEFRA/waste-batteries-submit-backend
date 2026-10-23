@@ -232,20 +232,6 @@ public class PomSubmissionMapperTests
         Assert.True(submission.IsCurrent);
     }
 
-    [Fact]
-    public void Deserialize_WhenPropertyIsNotOnTheModel_ThrowsJsonException()
-    {
-        // Arrange
-        const string json = """{"memberName":"Northwind Batteries Ltd","regulatorNote":"ignore me"}""";
-
-        // Act
-        var act = () => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
-
-        // Assert
-        var exception = Assert.Throws<JsonException>(act);
-        Assert.Contains("regulatorNote", exception.Message);
-    }
-
     private static PomSubmissionMapper Mapper() =>
         new(Options.Create(new PomSubmissionConfig
         {

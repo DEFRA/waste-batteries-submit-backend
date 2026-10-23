@@ -13,6 +13,8 @@ namespace WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 
 // Host, authentication and MongoDB shared by endpoint tests. A feature fixture
 // adds its own clock, logger and collection on top.
+
+//Testcontainers.MongoDb - see https://devblogs.microsoft.com/ise/testing-with-testcontainers/ and https://dotnet.testcontainers.org/modules/mongodb/
 public abstract class MongoApiFixture : IAsyncLifetime
 {
     private readonly MongoDbContainer container = new MongoDbBuilder("mongo:7").Build();
@@ -56,12 +58,19 @@ public abstract class MongoApiFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
-        if (factory is not null)
+        try
         {
-            await factory.DisposeAsync();
-        }
+            if (factory is not null)
+            {
+                await factory.DisposeAsync();
+            }
 
-        await container.DisposeAsync();
+            await container.DisposeAsync();
+        }
+        finally
+        {
+            GC.SuppressFinalize(this);
+        }
     }
 
     private sealed class ApplicationFactory(

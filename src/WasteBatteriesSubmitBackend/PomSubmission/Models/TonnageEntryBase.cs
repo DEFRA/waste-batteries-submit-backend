@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
 using WasteBatteriesSubmitBackend.Utils.Mongo;
+using WasteBatteriesSubmitBackend.Utils.Text;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Models;
 
@@ -16,7 +17,7 @@ public record TonnageEntryBase
 
     public TonnageEntryBase Trimmed() => this with
     {
-        Tonnes = Tonnes?.Trim() ?? string.Empty,
+        Tonnes = StringValues.TrimToEmpty(Tonnes),
         Classification = Classification?.Trimmed()!
     };
 

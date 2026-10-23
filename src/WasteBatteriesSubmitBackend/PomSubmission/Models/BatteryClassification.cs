@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
+using WasteBatteriesSubmitBackend.Utils.Text;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Models;
 
@@ -23,14 +24,11 @@ public sealed record BatteryClassification
 
     public BatteryClassification Trimmed() => this with
     {
-        BatteryCategory = BatteryCategory?.Trim() ?? string.Empty,
-        Chemistry = Chemistry?.Trim() ?? string.Empty,
+        BatteryCategory = StringValues.TrimToEmpty(BatteryCategory),
+        Chemistry = StringValues.TrimToEmpty(Chemistry),
         // Omitted, null, empty and whitespace are the same absent dimension.
-        SubCategory = Absent(SubCategory),
-        CellType = Absent(CellType),
-        EquipmentState = Absent(EquipmentState)
+        SubCategory = StringValues.TrimToNull(SubCategory),
+        CellType = StringValues.TrimToNull(CellType),
+        EquipmentState = StringValues.TrimToNull(EquipmentState)
     };
-
-    private static string? Absent(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

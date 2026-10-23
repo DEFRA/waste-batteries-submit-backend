@@ -28,6 +28,7 @@ public class PomSubmissionRequestValidatorTests
     private const string MemberBprnYear = "memberBprn must be the registration for compliancePeriodYear.";
     private const string CompliancePeriodYearRange = "compliancePeriodYear must be a calendar year.";
     private const string TonnesFormat = "tonnes must be a string decimal with exactly 3 digits after the decimal point.";
+    private const string TonnageEntryRequired = "A tonnage entry must not be empty.";
 
     // Duplicate classification.
     private const string ClassificationRepeated = "Each classification can only be reported once in a submission.";
@@ -260,13 +261,48 @@ public class PomSubmissionRequestValidatorTests
             MemberOrgIdObjectId);
     }
 
-    [Fact]
-    public async Task ValidateAsync_WhenMemberBprnFormatIsWrong_ReturnsOnlyTheFormatError()
+    [Theory]
+    [InlineData("not-a-bprn")]
+    [InlineData("BPRN-XX-2026-000123")]
+    [InlineData("BPRN-EA-2026-12345")]
+    [InlineData("BPRN-EA-2026-0001234")]
+    [InlineData("bprn-ea-2026-000123")]
+    public async Task ValidateAsync_WhenMemberBprnFormatIsWrong_ReturnsOnlyTheFormatError(string memberBprn)
     {
         await AssertRequired(
             "MemberBprn",
-            request => request with { MemberBprn = "not-a-bprn" },
+            request => request with { MemberBprn = memberBprn },
             MemberBprnFormat);
+    }
+
+    [Theory]
+    [InlineData("EA")]
+    [InlineData("NRW")]
+    [InlineData("SEPA")]
+    [InlineData("NIEA")]
+    public async Task ValidateAsync_WhenBprnRegulatorIsKnown_ReturnsValid(string regulator)
+    {
+        var request = ValidRequest() with { MemberBprn = $"BPRN-{regulator}-2026-000123" };
+
+        var result = await Validator().ValidateAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Theory]
+    [InlineData(CalendarYear.Minimum)]
+    [InlineData(CalendarYear.Maximum)]
+    public async Task ValidateAsync_WhenCompliancePeriodYearIsAtTheBoundary_ReturnsValid(int year)
+    {
+        var request = ValidRequest() with
+        {
+            CompliancePeriodYear = year,
+            MemberBprn = $"BPRN-EA-{year}-000123"
+        };
+
+        var result = await Validator().ValidateAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsValid);
     }
 
     [Fact]
@@ -279,8 +315,8 @@ public class PomSubmissionRequestValidatorTests
     }
 
     [Theory]
-    [InlineData(999)]
-    [InlineData(10000)]
+    [InlineData(CalendarYear.Minimum - 1)]
+    [InlineData(CalendarYear.Maximum + 1)]
     public async Task ValidateAsync_WhenCompliancePeriodYearIsOutOfRange_ReturnsOnlyTheYearError(int year)
     {
         await AssertRequired(
@@ -291,6 +327,7 @@ public class PomSubmissionRequestValidatorTests
 
     [Theory]
     [InlineData("12.5")]
+    [InlineData("12.5000")]
     [InlineData("-1.000")]
     public async Task ValidateAsync_WhenTonnesFormatIsWrong_ReturnsOnlyTheFormatError(string tonnes)
     {
@@ -298,6 +335,98 @@ public class PomSubmissionRequestValidatorTests
             "TonnageEntries[0].Tonnes",
             request => WithEntry(request.TonnageEntries[0] with { Tonnes = tonnes }),
             TonnesFormat);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenTonnageEntryIsNull_ReturnsOnlyTheRequiredError()
+    {
+        await AssertRequired(
+            "TonnageEntries[0]",
+            request => request with { TonnageEntries = [null!] },
+            TonnageEntryRequired);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenOneEntryIsNullAndAnotherIsInvalid_ReturnsBothErrors()
+    {
+        // Arrange
+        var request = ValidRequest() with
+        {
+            TonnageEntries =
+            [
+                null!,
+                new TonnageEntryBase
+                {
+                    Classification = new BatteryClassification
+                    {
+                        BatteryCategory = "Portable",
+                        Chemistry = "Alkaline"
+                    },
+                    Tonnes = "12.5"
+                }
+            ]
+        };
+
+        // Act
+        var result = await Validator().ValidateAsync(request, TestContext.Current.CancellationToken);
+
+        // Assert
+        (string PropertyName, string ErrorMessage)[] expected =
+        [
+            ("TonnageEntries[0]", TonnageEntryRequired),
+            ("TonnageEntries[1].Tonnes", TonnesFormat)
+        ];
+        Assert.Equal(
+            expected.OrderBy(error => error.PropertyName, StringComparer.Ordinal)
+                .ThenBy(error => error.ErrorMessage, StringComparer.Ordinal),
+            ValidationAssert.Messages(result));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenOnlyCellTypeDiffers_ReturnsValid()
+    {
+        // Arrange
+        var entry = ValidRequest().TonnageEntries[0];
+        var request = ValidRequest() with
+        {
+            TonnageEntries =
+            [
+                entry with { Classification = entry.Classification with { CellType = "Primary" } },
+                entry with
+                {
+                    Tonnes = "1.000",
+                    Classification = entry.Classification with { CellType = "Secondary" }
+                }
+            ]
+        };
+
+        // Act
+        var result = await Validator().ValidateAsync(request, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenOptionalDimensionIsNullOrEmpty_ReturnsOnlyTheUniquenessError()
+    {
+        // Arrange
+        var entry = ValidRequest().TonnageEntries[0];
+        var request = ValidRequest() with
+        {
+            TonnageEntries =
+            [
+                entry with { Classification = entry.Classification with { SubCategory = null } },
+                entry with
+                {
+                    Tonnes = "1.000",
+                    Classification = entry.Classification with { SubCategory = string.Empty }
+                }
+            ]
+        };
+
+        // Act
+        await ValidationAssert.AssertOnly(Validator(), request, "TonnageEntries", ClassificationRepeated);
     }
 
     [Fact]

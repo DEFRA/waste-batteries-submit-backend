@@ -10,6 +10,7 @@ using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
 using WasteBatteriesSubmitBackend.PomSubmission.Validators;
 using WasteBatteriesSubmitBackend.Tests.Unit.Utils.Logging;
+using WasteBatteriesSubmitBackend.Utils.Mongo;
 using WasteBatteriesSubmitBackend.Tests.Unit.Utils.Time;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Services;
@@ -157,27 +158,112 @@ public class PomSubmissionServiceTests
             Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public async Task CreateAsync_WhenMemberNameIsEmpty_ThrowsValidationException()
+    [Theory]
+    [InlineData("  not-an-id  ", "674a1b2c3d4e5f6789012346", 2026, "Quarter 2")]
+    [InlineData("674a1b2c3d4e5f6789012345", "not-an-id", 2026, "Quarter 2")]
+    [InlineData("674a1b2c3d4e5f6789012345", "674a1b2c3d4e5f6789012346", 0, "Quarter 2")]
+    [InlineData("674a1b2c3d4e5f6789012345", "674a1b2c3d4e5f6789012346", 2026, "   ")]
+    public async Task CreateAsync_WhenCurrentSubmissionKeyIsNotWellFormed_DoesNotLookItUp(
+        string schemeOrgId,
+        string memberOrgId,
+        int year,
+        string quarter)
     {
         // Arrange
         var repository = Substitute.For<IPomSubmissionRepository>();
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger);
-        var request = ValidRequest() with { MemberName = "" };
+        var request = ValidRequest() with
+        {
+            SchemeOrgId = schemeOrgId,
+            MemberOrgId = memberOrgId,
+            CompliancePeriodYear = year,
+            CompliancePeriodQuarter = quarter
+        };
 
         // Act
         var act = () => service.CreateAsync(request, TestContext.Current.CancellationToken);
 
         // Assert
         await Assert.ThrowsAsync<ValidationException>(act);
-        await repository.Received(1).FindCurrentAsync(
+        await repository.DidNotReceive().FindCurrentAsync(
             Arg.Any<string>(),
             Arg.Any<string>(),
             Arg.Any<int>(),
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
         await repository.DidNotReceive().CreateAsync(Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>());
+        Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenOptionalDimensionsDifferOnlyByBlankText_ThrowsValidationException()
+    {
+        // Arrange
+        var repository = Substitute.For<IPomSubmissionRepository>();
+        var logger = new CapturingLogger<PomSubmissionService>();
+        var service = Service(repository, logger);
+        var request = ValidRequest() with
+        {
+            TonnageEntries =
+            [
+                new TonnageEntryBase
+                {
+                    Classification = new BatteryClassification
+                    {
+                        BatteryCategory = "Portable",
+                        Chemistry = "Alkaline",
+                        SubCategory = "   ",
+                        EquipmentState = " "
+                    },
+                    Tonnes = "1.000"
+                },
+                new TonnageEntryBase
+                {
+                    Classification = new BatteryClassification
+                    {
+                        BatteryCategory = "Portable",
+                        Chemistry = "Alkaline"
+                    },
+                    Tonnes = "2.000"
+                }
+            ]
+        };
+
+        // Act
+        var act = () => service.CreateAsync(request, TestContext.Current.CancellationToken);
+
+        // Assert
+        var exception = await Assert.ThrowsAsync<ValidationException>(act);
+        Assert.Contains(
+            exception.Errors,
+            error => error.PropertyName == "TonnageEntries"
+                && error.ErrorMessage == "Each classification can only be reported once in a submission.");
+        await repository.DidNotReceive().CreateAsync(Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>());
+        Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenCurrentSlotIsTakenDuringSave_ThrowsValidationException()
+    {
+        // Arrange
+        var repository = Substitute.For<IPomSubmissionRepository>();
+        repository
+            .CreateAsync(Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new DuplicateKeyOnSaveException(new InvalidOperationException("duplicate key")));
+        var logger = new CapturingLogger<PomSubmissionService>();
+        var service = Service(repository, logger);
+
+        // Act
+        var act = () => service.CreateAsync(ValidRequest(), TestContext.Current.CancellationToken);
+
+        // Assert
+        var exception = await Assert.ThrowsAsync<ValidationException>(act);
+        var error = Assert.Single(exception.Errors);
+        Assert.Equal("Submission", error.PropertyName);
+        Assert.Equal(
+            "A current submission already exists for this scheme, member, year and quarter.",
+            error.ErrorMessage);
         Assert.Empty(logger.Entries);
     }
 
