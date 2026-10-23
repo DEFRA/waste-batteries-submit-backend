@@ -1,0 +1,26 @@
+<Project>
+  <!--
+    PackageReference Update in a csproj overwrites a pin from Directory.Build.props.
+    That is what the NuGet Package Manager writes when an update is applied, so the
+    pin would otherwise be ignored on the next restore.
+  -->
+  <Target Name="RejectPinnedPackageOverrides" BeforeTargets="Restore;Build">
+    <ItemGroup>
+      <_PinnedPackageOverride Include="@(PackageReference)"
+        Condition="'%(Identity)' == 'Snappier' and '%(Version)' != '$(PinnedSnappierVersion)'">
+        <PinnedVersion>$(PinnedSnappierVersion)</PinnedVersion>
+      </_PinnedPackageOverride>
+      <_PinnedPackageOverride Include="@(PackageReference)"
+        Condition="'%(Identity)' == 'SharpCompress' and '%(Version)' != '$(PinnedSharpCompressVersion)'">
+        <PinnedVersion>$(PinnedSharpCompressVersion)</PinnedVersion>
+      </_PinnedPackageOverride>
+      <_PinnedPackageOverride Include="@(PackageReference)"
+        Condition="'%(Identity)' == 'Microsoft.OpenApi' and '%(Version)' != '$(PinnedMicrosoftOpenApiVersion)'">
+        <PinnedVersion>$(PinnedMicrosoftOpenApiVersion)</PinnedVersion>
+      </_PinnedPackageOverride>
+    </ItemGroup>
+    <Error
+      Condition="'@(_PinnedPackageOverride)' != ''"
+      Text="Package %(_PinnedPackageOverride.Identity) is pinned to %(_PinnedPackageOverride.PinnedVersion) in Directory.Build.props, but a project sets %(_PinnedPackageOverride.Version). The NuGet Package Manager writes that override into the csproj and restore ignores the pin. Delete the PackageReference version from the csproj. Change the pin in Directory.Build.props only when the update is intended." />
+  </Target>
+</Project>

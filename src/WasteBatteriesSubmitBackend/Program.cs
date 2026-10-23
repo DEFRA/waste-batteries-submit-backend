@@ -3,12 +3,14 @@ using WasteBatteriesSubmitBackend.Authentication;
 using WasteBatteriesSubmitBackend.Endpoints;
 using WasteBatteriesSubmitBackend.Example;
 using WasteBatteriesSubmitBackend.ExampleData;
+using WasteBatteriesSubmitBackend.PomSubmission;
 using WasteBatteriesSubmitBackend.OpenApi;
 using WasteBatteriesSubmitBackend.Utils;
 using WasteBatteriesSubmitBackend.Utils.Health;
 using WasteBatteriesSubmitBackend.Utils.Http;
 using WasteBatteriesSubmitBackend.Utils.Logging;
 using WasteBatteriesSubmitBackend.Utils.Mongo;
+using WasteBatteriesSubmitBackend.Utils.Time;
 using Serilog;
 
 var app = BuildApp(args);
@@ -57,6 +59,8 @@ static void ConfigureServices(WebApplicationBuilder builder)
     services.AddHealth();
     services.AddApiOpenApi();
 
+    services.AddTimeProvider();
+    services.AddPomSubmissionServices(configuration);
     services.AddExampleServices();
     services.AddExampleDataServices();
 }
@@ -64,8 +68,9 @@ static void ConfigureServices(WebApplicationBuilder builder)
 [ExcludeFromCodeCoverage]
 static void ConfigureMiddleware(WebApplication app)
 {
-    // First, so an exception from any later middleware becomes problem details
-    // and is logged once as a structured error.
+    // First, so an exception from any later middleware becomes problem details.
+    // Unexpected exceptions are logged as errors. Validation failures are logged
+    // as information and returned as a validation problem.
     app.UseExceptionHandler();
     // TODO: Call UseStatusCodePages() immediately after UseExceptionHandler, as the
     // EPR backend does, so a status with no body (such as an unknown route) is written

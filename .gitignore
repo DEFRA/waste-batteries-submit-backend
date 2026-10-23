@@ -280,3 +280,7 @@ coverage.cobertura.xml
 sonar-issues.json
 sonar-issues.md
 zap-reports/
+
+# Snapshot diffs
+*.received.*
+*.received.txt
