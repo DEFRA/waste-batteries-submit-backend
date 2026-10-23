@@ -123,6 +123,49 @@ public class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture) : ICla
         await AssertNothingStored(cancellationToken);
     }
 
+    [Theory]
+    [InlineData("null")]
+    [InlineData("\"\"")]
+    public async Task Create_WhenRequiredYearIsNullOrBlank_ReturnsValidationErrors(string year)
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = fixture.CreateClient();
+        var classification = year == "null"
+            ? "null"
+            : """{ "batteryCategory": "", "chemistry": "" }""";
+        var body = $$"""
+            {
+              "schemeOrgId": {{year}},
+              "memberOrgId": {{year}},
+              "memberName": {{year}},
+              "memberBprn": {{year}},
+              "schemeMembershipRef": {{year}},
+              "compliancePeriodYear": {{year}},
+              "compliancePeriodQuarter": {{year}},
+              "dataBasis": {{year}},
+              "tonnageEntries": [
+                {
+                  "classification": {{classification}},
+                  "tonnes": {{year}}
+                }
+              ]
+            }
+            """;
+
+        // Act
+        var response = await client.PostAsync("/pom-submissions", Json(body), cancellationToken);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.NotNull(problem);
+        Assert.Contains("'Member Name' must not be empty.", problem.Errors["MemberName"]);
+        Assert.Contains("compliancePeriodYear must be a calendar year.", problem.Errors["CompliancePeriodYear"]);
+        Assert.Contains("'Tonnes' must not be empty.", problem.Errors["TonnageEntries[0].Tonnes"]);
+        await AssertNothingStored(cancellationToken);
+    }
+
     [Fact]
     public async Task Create_WhenRequestHasManyFailures_ReturnsEveryValidationError()
     {
@@ -314,7 +357,7 @@ public class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture) : ICla
 
         var log = Assert.Single(fixture.Logger.Entries, entry => entry.Message.Contains(id!, StringComparison.Ordinal));
         Assert.Equal(LogLevel.Information, log.Level);
-        Assert.Equal(7, log.EventId.Id);
+        Assert.Equal(4, log.EventId.Id);
         Assert.Equal(
             $"Created POM submission {id} for scheme {PomSubmissionApiFixture.SchemeOrgId} member {PomSubmissionApiFixture.MemberOrgId}",
             log.Message);
@@ -409,7 +452,7 @@ public class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture) : ICla
         var count = await fixture.Submissions.CountDocumentsAsync(
             Builders<BsonDocument>.Filter.Empty,
             cancellationToken: cancellationToken);
-        var created = fixture.Logger.Entries.Count(entry => entry.EventId.Id == 7);
+        var created = fixture.Logger.Entries.Count(entry => entry.EventId.Id == 4);
         Assert.Equal(created, count);
     }
 

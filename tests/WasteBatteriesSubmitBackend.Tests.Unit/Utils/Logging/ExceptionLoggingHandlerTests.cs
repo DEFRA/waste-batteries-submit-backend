@@ -85,8 +85,8 @@ public class ExceptionLoggingHandlerTests
         };
         var exception = new ValidationException(
         [
-            new ValidationFailure("MemberName", "Member name is required."),
-            new ValidationFailure("MemberName", "Member name is too long.")
+            new ValidationFailure("FieldA", "FieldA is the wrong format."),
+            new ValidationFailure("FieldA", "FieldA is too long.")
         ]);
 
         // Act
@@ -97,15 +97,15 @@ public class ExceptionLoggingHandlerTests
         Assert.Equal(StatusCodes.Status400BadRequest, httpContext.Response.StatusCode);
         body.Position = 0;
         using var json = await JsonDocument.ParseAsync(body, cancellationToken: TestContext.Current.CancellationToken);
-        var messages = json.RootElement.GetProperty("errors").GetProperty("MemberName").EnumerateArray()
+        var messages = json.RootElement.GetProperty("errors").GetProperty("FieldA").EnumerateArray()
             .Select(message => message.GetString())
             .ToArray();
-        Assert.Equal(["Member name is required.", "Member name is too long."], messages);
+        Assert.Equal(["FieldA is the wrong format.", "FieldA is too long."], messages);
         var entry = Assert.Single(logger.Entries);
         Assert.Equal(LogLevel.Information, entry.Level);
-        Assert.Equal(8, entry.EventId.Id);
+        Assert.Equal(3, entry.EventId.Id);
         Assert.Null(entry.Exception);
-        Assert.Contains("MemberName: Member name is required.", entry.Message, StringComparison.Ordinal);
-        Assert.Contains("MemberName: Member name is too long.", entry.Message, StringComparison.Ordinal);
+        Assert.Contains("FieldA: FieldA is the wrong format.", entry.Message, StringComparison.Ordinal);
+        Assert.Contains("FieldA: FieldA is too long.", entry.Message, StringComparison.Ordinal);
     }
 }

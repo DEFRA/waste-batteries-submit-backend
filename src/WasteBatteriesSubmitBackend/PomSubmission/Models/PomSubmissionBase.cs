@@ -1,5 +1,6 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
+using WasteBatteriesSubmitBackend.Utils.Json;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Models;
 
@@ -20,6 +21,7 @@ public abstract record PomSubmissionBase
 
     public string SchemeMembershipRef { get; init; } = string.Empty;
 
+    [IntJsonConverter("compliancePeriodYear")]
     public int CompliancePeriodYear { get; init; }
 
     public string CompliancePeriodQuarter { get; init; } = string.Empty;
