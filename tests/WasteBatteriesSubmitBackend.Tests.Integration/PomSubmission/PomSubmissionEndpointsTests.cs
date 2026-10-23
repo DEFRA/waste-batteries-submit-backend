@@ -196,25 +196,38 @@ public class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture) : ICla
     }
 
     [Fact]
-    public async Task Create_WhenOptionalPropertyIsOmitted_StoresItAsNull()
+    public async Task Create_WhenOptionalTextIsOmittedNullEmptyOrWhitespace_StoresTheSameNulls()
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = fixture.CreateClient();
+        (string MemberOrgId, string Form)[] forms =
+        [
+            ("674a1b2c3d4e5f6789012349", "omitted"),
+            ("674a1b2c3d4e5f678901234a", "null"),
+            ("674a1b2c3d4e5f678901234b", "empty"),
+            ("674a1b2c3d4e5f678901234c", "whitespace")
+        ];
 
         // Act
-        var missing = await client.PostAsync("/pom-submissions", Json(OptionalBody("674a1b2c3d4e5f6789012349", includeNulls: false)), cancellationToken);
-        var withNull = await client.PostAsync("/pom-submissions", Json(OptionalBody("674a1b2c3d4e5f678901234a", includeNulls: true)), cancellationToken);
-        var omitted = await FindByMember("674a1b2c3d4e5f6789012349", cancellationToken);
-        var explicitNull = await FindByMember("674a1b2c3d4e5f678901234a", cancellationToken);
+        var stored = new List<BsonDocument>();
+        foreach (var (memberOrgId, form) in forms)
+        {
+            var response = await client.PostAsync(
+                "/pom-submissions",
+                Json(OptionalBody(memberOrgId, form)),
+                cancellationToken);
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            stored.Add(await FindByMember(memberOrgId, cancellationToken));
+        }
 
         // Assert
-        Assert.Equal(HttpStatusCode.Created, missing.StatusCode);
-        Assert.Equal(HttpStatusCode.Created, withNull.StatusCode);
-        Assert.Equal(Canonical(omitted), Canonical(explicitNull));
-        Assert.Equal(BsonNull.Value, omitted["tonnageEntries"][0]["classification"]["subCategory"]);
-        Assert.Equal(BsonNull.Value, omitted["tonnageEntries"][0]["classification"]["cellType"]);
-        Assert.Equal(BsonNull.Value, omitted["tonnageEntries"][0]["classification"]["equipmentState"]);
+        var canonical = Canonical(stored[0]);
+        Assert.All(stored, document => Assert.Equal(canonical, Canonical(document)));
+        var classification = stored[0]["tonnageEntries"][0]["classification"].AsBsonDocument;
+        Assert.Equal(BsonNull.Value, classification["subCategory"]);
+        Assert.Equal(BsonNull.Value, classification["cellType"]);
+        Assert.Equal(BsonNull.Value, classification["equipmentState"]);
     }
 
     [Fact]
@@ -417,20 +430,37 @@ public class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture) : ICla
         return copy.ToJson(new JsonWriterSettings { OutputMode = JsonOutputMode.CanonicalExtendedJson });
     }
 
-    private static string OptionalBody(string memberOrgId, bool includeNulls)
+    private static string OptionalBody(string memberOrgId, string form)
     {
-        var classification = includeNulls
-            ? """
+        var classification = form switch
+        {
+            "omitted" => """
+              "batteryCategory": "Portable",
+              "chemistry": "Alkaline"
+              """,
+            "null" => """
               "batteryCategory": "Portable",
               "chemistry": "Alkaline",
               "subCategory": null,
               "cellType": null,
               "equipmentState": null
-              """
-            : """
+              """,
+            "empty" => """
               "batteryCategory": "Portable",
-              "chemistry": "Alkaline"
-              """;
+              "chemistry": "Alkaline",
+              "subCategory": "",
+              "cellType": "",
+              "equipmentState": ""
+              """,
+            "whitespace" => """
+              "batteryCategory": "Portable",
+              "chemistry": "Alkaline",
+              "subCategory": "   ",
+              "cellType": " \t ",
+              "equipmentState": "  "
+              """,
+            _ => throw new ArgumentOutOfRangeException(nameof(form), form, "Unknown optional text form.")
+        };
         return $$"""
             {
               "schemeOrgId": "674a1b2c3d4e5f6789012345",

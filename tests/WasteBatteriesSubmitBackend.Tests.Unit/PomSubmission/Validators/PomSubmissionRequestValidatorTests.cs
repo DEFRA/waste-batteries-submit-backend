@@ -6,25 +6,31 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Validators;
 
 public class PomSubmissionRequestValidatorTests
 {
+    // Required fields. Null and blank are separate: a missing value and a blank value
+    // both fail the required rule, and neither also reports a format error.
     private const string SchemeOrgIdRequired = "'Scheme Org Id' must not be empty.";
-    private const string SchemeOrgIdObjectId = "schemeOrgId must be an ObjectId.";
     private const string MemberOrgIdRequired = "'Member Org Id' must not be empty.";
-    private const string MemberOrgIdObjectId = "memberOrgId must be an ObjectId.";
     private const string MemberNameRequired = "'Member Name' must not be empty.";
     private const string MemberBprnRequired = "'Member Bprn' must not be empty.";
-    private const string MemberBprnFormat = "memberBprn must match BPRN-{EA|NRW|SEPA|NIEA}-{year}-{6 digits}.";
-    private const string MemberBprnYear = "memberBprn must be the registration for compliancePeriodYear.";
     private const string SchemeMembershipRefRequired = "'Scheme Membership Ref' must not be empty.";
-    private const string CompliancePeriodYearRange = "compliancePeriodYear must be a calendar year.";
     private const string CompliancePeriodQuarterRequired = "'Compliance Period Quarter' must not be empty.";
     private const string DataBasisRequired = "'Data Basis' must not be empty.";
     private const string TonnageEntriesRequired = "'Tonnage Entries' must not be empty.";
-    private const string ClassificationRepeated = "Each classification can only be reported once in a submission.";
-    private const string TonnesRequired = "'Tonnes' must not be empty.";
-    private const string TonnesFormat = "tonnes must be a string decimal with exactly 3 digits after the decimal point.";
     private const string ClassificationRequired = "'Classification' must not be empty.";
     private const string BatteryCategoryRequired = "'Classification Battery Category' must not be empty.";
     private const string ChemistryRequired = "'Classification Chemistry' must not be empty.";
+    private const string TonnesRequired = "'Tonnes' must not be empty.";
+
+    // Format. These run only when the required rule has passed.
+    private const string SchemeOrgIdObjectId = "schemeOrgId must be an ObjectId.";
+    private const string MemberOrgIdObjectId = "memberOrgId must be an ObjectId.";
+    private const string MemberBprnFormat = "memberBprn must match BPRN-{EA|NRW|SEPA|NIEA}-{year}-{6 digits}.";
+    private const string MemberBprnYear = "memberBprn must be the registration for compliancePeriodYear.";
+    private const string CompliancePeriodYearRange = "compliancePeriodYear must be a calendar year.";
+    private const string TonnesFormat = "tonnes must be a string decimal with exactly 3 digits after the decimal point.";
+
+    // Duplicate classification.
+    private const string ClassificationRepeated = "Each classification can only be reported once in a submission.";
 
     [Fact]
     public async Task ValidateAsync_WhenSubmissionIsComplete_ReturnsValid()
@@ -37,6 +43,270 @@ public class PomSubmissionRequestValidatorTests
 
         // Assert
         Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenSchemeOrgIdIsNull_ReturnsOnlyTheRequiredError()
+    {
+        await AssertRequired("SchemeOrgId", request => request with { SchemeOrgId = null! }, SchemeOrgIdRequired);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenMemberOrgIdIsNull_ReturnsOnlyTheRequiredError()
+    {
+        await AssertRequired("MemberOrgId", request => request with { MemberOrgId = null! }, MemberOrgIdRequired);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenMemberNameIsNull_ReturnsOnlyTheRequiredError()
+    {
+        await AssertRequired("MemberName", request => request with { MemberName = null! }, MemberNameRequired);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenMemberBprnIsNull_ReturnsOnlyTheRequiredError()
+    {
+        await AssertRequired("MemberBprn", request => request with { MemberBprn = null! }, MemberBprnRequired);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenSchemeMembershipRefIsNull_ReturnsOnlyTheRequiredError()
+    {
+        await AssertRequired(
+            "SchemeMembershipRef",
+            request => request with { SchemeMembershipRef = null! },
+            SchemeMembershipRefRequired);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenCompliancePeriodQuarterIsNull_ReturnsOnlyTheRequiredError()
+    {
+        await AssertRequired(
+            "CompliancePeriodQuarter",
+            request => request with { CompliancePeriodQuarter = null! },
+            CompliancePeriodQuarterRequired);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenDataBasisIsNull_ReturnsOnlyTheRequiredError()
+    {
+        await AssertRequired("DataBasis", request => request with { DataBasis = null! }, DataBasisRequired);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenTonnageEntriesAreNull_ReturnsOnlyTheRequiredError()
+    {
+        await AssertRequired(
+            "TonnageEntries",
+            request => request with { TonnageEntries = null! },
+            TonnageEntriesRequired);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenClassificationIsNull_ReturnsOnlyTheRequiredError()
+    {
+        await AssertRequired(
+            "TonnageEntries[0].Classification",
+            request => WithEntry(request.TonnageEntries[0] with { Classification = null! }),
+            ClassificationRequired);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenBatteryCategoryIsNull_ReturnsOnlyTheRequiredError()
+    {
+        await AssertRequired(
+            "TonnageEntries[0].Classification.BatteryCategory",
+            request => WithClassification(request, classification => classification with { BatteryCategory = null! }),
+            BatteryCategoryRequired);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenChemistryIsNull_ReturnsOnlyTheRequiredError()
+    {
+        await AssertRequired(
+            "TonnageEntries[0].Classification.Chemistry",
+            request => WithClassification(request, classification => classification with { Chemistry = null! }),
+            ChemistryRequired);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenTonnesIsNull_ReturnsOnlyTheRequiredError()
+    {
+        await AssertRequired(
+            "TonnageEntries[0].Tonnes",
+            request => WithEntry(request.TonnageEntries[0] with { Tonnes = null! }),
+            TonnesRequired);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ValidateAsync_WhenSchemeOrgIdIsBlank_ReturnsOnlyTheRequiredError(string value)
+    {
+        await AssertRequired("SchemeOrgId", request => request with { SchemeOrgId = value }, SchemeOrgIdRequired);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ValidateAsync_WhenMemberOrgIdIsBlank_ReturnsOnlyTheRequiredError(string value)
+    {
+        await AssertRequired("MemberOrgId", request => request with { MemberOrgId = value }, MemberOrgIdRequired);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ValidateAsync_WhenMemberNameIsBlank_ReturnsOnlyTheRequiredError(string value)
+    {
+        await AssertRequired("MemberName", request => request with { MemberName = value }, MemberNameRequired);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ValidateAsync_WhenMemberBprnIsBlank_ReturnsOnlyTheRequiredError(string value)
+    {
+        await AssertRequired("MemberBprn", request => request with { MemberBprn = value }, MemberBprnRequired);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ValidateAsync_WhenSchemeMembershipRefIsBlank_ReturnsOnlyTheRequiredError(string value)
+    {
+        await AssertRequired(
+            "SchemeMembershipRef",
+            request => request with { SchemeMembershipRef = value },
+            SchemeMembershipRefRequired);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ValidateAsync_WhenCompliancePeriodQuarterIsBlank_ReturnsOnlyTheRequiredError(string value)
+    {
+        await AssertRequired(
+            "CompliancePeriodQuarter",
+            request => request with { CompliancePeriodQuarter = value },
+            CompliancePeriodQuarterRequired);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ValidateAsync_WhenDataBasisIsBlank_ReturnsOnlyTheRequiredError(string value)
+    {
+        await AssertRequired("DataBasis", request => request with { DataBasis = value }, DataBasisRequired);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenTonnageEntriesAreEmpty_ReturnsOnlyTheRequiredError()
+    {
+        await AssertRequired(
+            "TonnageEntries",
+            request => request with { TonnageEntries = [] },
+            TonnageEntriesRequired);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ValidateAsync_WhenBatteryCategoryIsBlank_ReturnsOnlyTheRequiredError(string value)
+    {
+        await AssertRequired(
+            "TonnageEntries[0].Classification.BatteryCategory",
+            request => WithClassification(request, classification => classification with { BatteryCategory = value }),
+            BatteryCategoryRequired);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ValidateAsync_WhenChemistryIsBlank_ReturnsOnlyTheRequiredError(string value)
+    {
+        await AssertRequired(
+            "TonnageEntries[0].Classification.Chemistry",
+            request => WithClassification(request, classification => classification with { Chemistry = value }),
+            ChemistryRequired);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ValidateAsync_WhenTonnesIsBlank_ReturnsOnlyTheRequiredError(string value)
+    {
+        await AssertRequired(
+            "TonnageEntries[0].Tonnes",
+            request => WithEntry(request.TonnageEntries[0] with { Tonnes = value }),
+            TonnesRequired);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenSchemeOrgIdIsNotAnObjectId_ReturnsOnlyTheObjectIdError()
+    {
+        await AssertRequired(
+            "SchemeOrgId",
+            request => request with { SchemeOrgId = "not-an-id" },
+            SchemeOrgIdObjectId);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenMemberOrgIdIsNotAnObjectId_ReturnsOnlyTheObjectIdError()
+    {
+        await AssertRequired(
+            "MemberOrgId",
+            request => request with { MemberOrgId = "not-an-id" },
+            MemberOrgIdObjectId);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenMemberBprnFormatIsWrong_ReturnsOnlyTheFormatError()
+    {
+        await AssertRequired(
+            "MemberBprn",
+            request => request with { MemberBprn = "not-a-bprn" },
+            MemberBprnFormat);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenBprnYearDiffers_ReturnsOnlyTheYearError()
+    {
+        await AssertRequired(
+            "MemberBprn",
+            request => request with { MemberBprn = "BPRN-NRW-2025-000123" },
+            MemberBprnYear);
+    }
+
+    [Theory]
+    [InlineData(999)]
+    [InlineData(10000)]
+    public async Task ValidateAsync_WhenCompliancePeriodYearIsOutOfRange_ReturnsOnlyTheYearError(int year)
+    {
+        await AssertRequired(
+            "CompliancePeriodYear",
+            request => request with { CompliancePeriodYear = year },
+            CompliancePeriodYearRange);
+    }
+
+    [Theory]
+    [InlineData("12.5")]
+    [InlineData("-1.000")]
+    public async Task ValidateAsync_WhenTonnesFormatIsWrong_ReturnsOnlyTheFormatError(string tonnes)
+    {
+        await AssertRequired(
+            "TonnageEntries[0].Tonnes",
+            request => WithEntry(request.TonnageEntries[0] with { Tonnes = tonnes }),
+            TonnesFormat);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenClassificationIsRepeated_ReturnsOnlyTheUniquenessError()
+    {
+        await AssertRequired(
+            "TonnageEntries",
+            request => request with { TonnageEntries = [request.TonnageEntries[0], request.TonnageEntries[0]] },
+            ClassificationRepeated);
     }
 
     [Fact]
@@ -88,258 +358,24 @@ public class PomSubmissionRequestValidatorTests
             ValidationAssert.Messages(result));
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task ValidateAsync_WhenSchemeOrgIdIsMissing_ReturnsOnlyTheRequiredError(string? value)
+    private static async Task AssertRequired(
+        string propertyName,
+        Func<PomSubmissionRequest, PomSubmissionRequest> mutate,
+        string message)
     {
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            ValidRequest() with { SchemeOrgId = value! },
-            "SchemeOrgId",
-            SchemeOrgIdRequired);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task ValidateAsync_WhenMemberOrgIdIsMissing_ReturnsOnlyTheRequiredError(string? value)
-    {
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            ValidRequest() with { MemberOrgId = value! },
-            "MemberOrgId",
-            MemberOrgIdRequired);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task ValidateAsync_WhenMemberNameIsMissing_ReturnsOnlyTheRequiredError(string? value)
-    {
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            ValidRequest() with { MemberName = value! },
-            "MemberName",
-            MemberNameRequired);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task ValidateAsync_WhenMemberBprnIsMissing_ReturnsOnlyTheRequiredError(string? value)
-    {
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            ValidRequest() with { MemberBprn = value! },
-            "MemberBprn",
-            MemberBprnRequired);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task ValidateAsync_WhenSchemeMembershipRefIsMissing_ReturnsOnlyTheRequiredError(string? value)
-    {
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            ValidRequest() with { SchemeMembershipRef = value! },
-            "SchemeMembershipRef",
-            SchemeMembershipRefRequired);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task ValidateAsync_WhenCompliancePeriodQuarterIsMissing_ReturnsOnlyTheRequiredError(string? value)
-    {
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            ValidRequest() with { CompliancePeriodQuarter = value! },
-            "CompliancePeriodQuarter",
-            CompliancePeriodQuarterRequired);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task ValidateAsync_WhenDataBasisIsMissing_ReturnsOnlyTheRequiredError(string? value)
-    {
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            ValidRequest() with { DataBasis = value! },
-            "DataBasis",
-            DataBasisRequired);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task ValidateAsync_WhenTonnesIsMissing_ReturnsOnlyTheRequiredError(string? value)
-    {
-        var request = WithEntry(ValidRequest().TonnageEntries[0] with { Tonnes = value! });
-
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            request,
-            "TonnageEntries[0].Tonnes",
-            TonnesRequired);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task ValidateAsync_WhenBatteryCategoryIsMissing_ReturnsOnlyTheRequiredError(string? value)
-    {
-        var entry = ValidRequest().TonnageEntries[0];
-        var request = WithEntry(entry with
-        {
-            Classification = entry.Classification with { BatteryCategory = value! }
-        });
-
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            request,
-            "TonnageEntries[0].Classification.BatteryCategory",
-            BatteryCategoryRequired);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task ValidateAsync_WhenChemistryIsMissing_ReturnsOnlyTheRequiredError(string? value)
-    {
-        var entry = ValidRequest().TonnageEntries[0];
-        var request = WithEntry(entry with
-        {
-            Classification = entry.Classification with { Chemistry = value! }
-        });
-
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            request,
-            "TonnageEntries[0].Classification.Chemistry",
-            ChemistryRequired);
-    }
-
-    [Fact]
-    public async Task ValidateAsync_WhenSchemeOrgIdIsNotAnObjectId_ReturnsOnlyTheObjectIdError()
-    {
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            ValidRequest() with { SchemeOrgId = "not-an-id" },
-            "SchemeOrgId",
-            SchemeOrgIdObjectId);
-    }
-
-    [Fact]
-    public async Task ValidateAsync_WhenMemberOrgIdIsNotAnObjectId_ReturnsOnlyTheObjectIdError()
-    {
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            ValidRequest() with { MemberOrgId = "not-an-id" },
-            "MemberOrgId",
-            MemberOrgIdObjectId);
-    }
-
-    [Fact]
-    public async Task ValidateAsync_WhenMemberBprnFormatIsWrong_ReturnsOnlyTheFormatError()
-    {
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            ValidRequest() with { MemberBprn = "not-a-bprn" },
-            "MemberBprn",
-            MemberBprnFormat);
-    }
-
-    [Fact]
-    public async Task ValidateAsync_WhenBprnYearDiffers_ReturnsOnlyTheYearError()
-    {
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            ValidRequest() with { MemberBprn = "BPRN-NRW-2025-000123" },
-            "MemberBprn",
-            MemberBprnYear);
-    }
-
-    [Theory]
-    [InlineData(999)]
-    [InlineData(10000)]
-    public async Task ValidateAsync_WhenCompliancePeriodYearIsOutOfRange_ReturnsOnlyTheYearError(int year)
-    {
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            ValidRequest() with { CompliancePeriodYear = year },
-            "CompliancePeriodYear",
-            CompliancePeriodYearRange);
-    }
-
-    [Fact]
-    public async Task ValidateAsync_WhenTonnesFormatIsWrong_ReturnsOnlyTheFormatError()
-    {
-        var request = WithEntry(ValidRequest().TonnageEntries[0] with { Tonnes = "12.5" });
-
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            request,
-            "TonnageEntries[0].Tonnes",
-            TonnesFormat);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    public async Task ValidateAsync_WhenTonnageEntriesAreMissing_ReturnsOnlyTheRequiredError(string? marker)
-    {
-        var request = ValidRequest() with
-        {
-            TonnageEntries = marker is null ? null! : []
-        };
-
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            request,
-            "TonnageEntries",
-            TonnageEntriesRequired);
-    }
-
-    [Fact]
-    public async Task ValidateAsync_WhenClassificationIsNull_ReturnsOnlyTheRequiredError()
-    {
-        var request = WithEntry(ValidRequest().TonnageEntries[0] with { Classification = null! });
-
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            request,
-            "TonnageEntries[0].Classification",
-            ClassificationRequired);
-    }
-
-    [Fact]
-    public async Task ValidateAsync_WhenClassificationIsRepeated_ReturnsOnlyTheUniquenessError()
-    {
-        var request = ValidRequest();
-        request = request with { TonnageEntries = [request.TonnageEntries[0], request.TonnageEntries[0]] };
-
-        await ValidationAssert.AssertOnly(
-            Validator(),
-            request,
-            "TonnageEntries",
-            ClassificationRepeated);
+        await ValidationAssert.AssertOnly(Validator(), mutate(ValidRequest()), propertyName, message);
     }
 
     private static PomSubmissionRequest WithEntry(TonnageEntryBase entry) =>
         ValidRequest() with { TonnageEntries = [entry] };
+
+    private static PomSubmissionRequest WithClassification(
+        PomSubmissionRequest request,
+        Func<BatteryClassification, BatteryClassification> mutate)
+    {
+        var entry = request.TonnageEntries[0];
+        return WithEntry(entry with { Classification = mutate(entry.Classification) });
+    }
 
     private static PomSubmissionRequestValidator Validator() => new();
 

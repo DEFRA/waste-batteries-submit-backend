@@ -1,3 +1,4 @@
+using System.Text.Json;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Models;
@@ -72,7 +73,7 @@ public class PomSubmissionRequestTrimTests
                     {
                         BatteryCategory = null!,
                         Chemistry = null!,
-                        SubCategory = "   ",
+                        SubCategory = null,
                         CellType = null,
                         EquipmentState = null
                     }
@@ -90,7 +91,7 @@ public class PomSubmissionRequestTrimTests
         Assert.Equal(string.Empty, trimmed.TonnageEntries[0].Tonnes);
         Assert.Equal(string.Empty, trimmed.TonnageEntries[0].Classification.BatteryCategory);
         Assert.Equal(string.Empty, trimmed.TonnageEntries[0].Classification.Chemistry);
-        Assert.Equal(string.Empty, trimmed.TonnageEntries[0].Classification.SubCategory);
+        Assert.Null(trimmed.TonnageEntries[0].Classification.SubCategory);
         Assert.Null(trimmed.TonnageEntries[0].Classification.CellType);
         Assert.Null(trimmed.TonnageEntries[0].Classification.EquipmentState);
         Assert.Null(trimmed.TonnageEntries[1]);
@@ -108,5 +109,64 @@ public class PomSubmissionRequestTrimTests
 
         // Assert
         Assert.Null(trimmed.TonnageEntries);
+    }
+
+    [Fact]
+    public void Trimmed_WhenOptionalClassificationIsOmittedNullEmptyOrWhitespace_StoresNull()
+    {
+        // Arrange
+        const string header = """
+            {
+              "tonnageEntries": [
+                {
+                  "classification": {
+                    "batteryCategory": "Portable",
+                    "chemistry": "Alkaline"
+            """;
+        string[] optionalText =
+        [
+            "",
+            """
+            ,
+                    "subCategory": null,
+                    "cellType": null,
+                    "equipmentState": null
+            """,
+            """
+            ,
+                    "subCategory": "",
+                    "cellType": "",
+                    "equipmentState": ""
+            """,
+            """
+            ,
+                    "subCategory": "   ",
+                    "cellType": " \t ",
+                    "equipmentState": "  "
+            """
+        ];
+
+        // Act
+        var stored = optionalText.Select(text =>
+        {
+            var json = header + text + """
+                  },
+                  "tonnes": "1.000"
+                }
+              ]
+            }
+            """;
+            var request = JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
+            return request!.Trimmed().TonnageEntries[0].Classification;
+        }).ToList();
+
+        // Assert
+        Assert.All(stored, classification =>
+        {
+            Assert.Null(classification.SubCategory);
+            Assert.Null(classification.CellType);
+            Assert.Null(classification.EquipmentState);
+        });
+        Assert.All(stored, classification => Assert.Equal(stored[0], classification));
     }
 }

@@ -25,8 +25,12 @@ public sealed record BatteryClassification
     {
         BatteryCategory = BatteryCategory?.Trim() ?? string.Empty,
         Chemistry = Chemistry?.Trim() ?? string.Empty,
-        SubCategory = SubCategory?.Trim(),
-        CellType = CellType?.Trim(),
-        EquipmentState = EquipmentState?.Trim()
+        // Omitted, null, empty and whitespace are the same absent dimension.
+        SubCategory = Absent(SubCategory),
+        CellType = Absent(CellType),
+        EquipmentState = Absent(EquipmentState)
     };
+
+    private static string? Absent(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

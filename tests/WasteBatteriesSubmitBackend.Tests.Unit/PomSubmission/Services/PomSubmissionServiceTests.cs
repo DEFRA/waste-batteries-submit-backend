@@ -153,7 +153,7 @@ public class PomSubmissionServiceTests
                 && saved.TonnageEntries[0].Classification.Chemistry == "Alkaline"
                 && saved.TonnageEntries[0].Classification.SubCategory == "General use"
                 && saved.TonnageEntries[0].Classification.CellType == null
-                && saved.TonnageEntries[0].Classification.EquipmentState == string.Empty),
+                && saved.TonnageEntries[0].Classification.EquipmentState == null),
             Arg.Any<CancellationToken>());
     }
 
