@@ -1,5 +1,4 @@
 using MongoDB.Bson;
-using MongoDB.Bson.IO;
 using MongoDB.Driver;
 using System.Net;
 using System.Text;
@@ -23,11 +22,7 @@ public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture
           "tonnageEntries": [
             {
               "classification": {
-                "batteryCategory": "Portable",
-                "chemistry": "Alkaline",
-                "subCategory": "General use",
-                "cellType": "Primary",
-                "equipmentState": "In equipment"
+                "chemistry": "Alkaline"
               },
               "tonnes": "12.500"
             }
@@ -70,6 +65,9 @@ public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture
         Assert.Equal(fixture.Defaults.InitialActivity, entry["activity"].AsString);
         Assert.Equal("Portable", entry["classification"]["batteryCategory"].AsString);
         Assert.Equal("Alkaline", entry["classification"]["chemistry"].AsString);
+        Assert.False(entry["classification"].AsBsonDocument.Contains("subCategory"));
+        Assert.False(entry["classification"].AsBsonDocument.Contains("cellType"));
+        Assert.False(entry["classification"].AsBsonDocument.Contains("equipmentState"));
     }
 
     private static BsonDocument Index(List<BsonDocument> indexes, string name)
@@ -85,76 +83,6 @@ public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture
             cancellationToken: cancellationToken);
         var created = fixture.Logger.Entries.Count(entry => entry.EventId.Id == 4);
         Assert.Equal(created, count);
-    }
-
-    private async Task<BsonDocument> FindByMember(string memberOrgId, CancellationToken cancellationToken)
-    {
-        var documents = await fixture.Submissions.Find(
-            Builders<BsonDocument>.Filter.Eq("memberOrgId", ObjectId.Parse(memberOrgId)))
-            .ToListAsync(cancellationToken);
-        return Assert.Single(documents);
-    }
-
-    private static string Canonical(BsonDocument document)
-    {
-        var copy = document.DeepClone().AsBsonDocument;
-        copy["_id"] = ObjectId.Empty;
-        copy["memberOrgId"] = ObjectId.Empty;
-        copy["tonnageEntries"][0].AsBsonDocument["id"] = ObjectId.Empty;
-        return copy.ToJson(new JsonWriterSettings { OutputMode = JsonOutputMode.CanonicalExtendedJson });
-    }
-
-    private static string OptionalBody(string memberOrgId, string form)
-    {
-        var classification = form switch
-        {
-            "omitted" => """
-              "batteryCategory": "Portable",
-              "chemistry": "Alkaline"
-              """,
-            "null" => """
-              "batteryCategory": "Portable",
-              "chemistry": "Alkaline",
-              "subCategory": null,
-              "cellType": null,
-              "equipmentState": null
-              """,
-            "empty" => """
-              "batteryCategory": "Portable",
-              "chemistry": "Alkaline",
-              "subCategory": "",
-              "cellType": "",
-              "equipmentState": ""
-              """,
-            "whitespace" => """
-              "batteryCategory": "Portable",
-              "chemistry": "Alkaline",
-              "subCategory": "   ",
-              "cellType": " \t ",
-              "equipmentState": "  "
-              """,
-            _ => throw new ArgumentOutOfRangeException(nameof(form), form, "Unknown optional text form.")
-        };
-        return $$"""
-            {
-              "schemeOrgId": "674a1b2c3d4e5f6789012345",
-              "memberOrgId": "{{memberOrgId}}",
-              "memberName": "Northwind Batteries Ltd",
-              "memberBprn": "BPRN-EA-2026-000123",
-              "schemeMembershipRef": "SCH-00417",
-              "compliancePeriodYear": 2026,
-              "compliancePeriodQuarter": "Quarter 2",
-              "dataBasis": "Actual",
-              "tonnageEntries": [
-                {
-                  "classification": {
-                    {{classification}}
-                  },
-                  "tonnes": "1.000"
-                }
-              ]
-            }
-            """;
     }
 
     private async Task<CreatedSubmission> CreateSubmission(

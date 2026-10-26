@@ -26,7 +26,7 @@ public class PomSubmissionRequestJsonTests
               "dataBasis": {{year}},
               "tonnageEntries": [
                 {
-                  "classification": {{(year == "null" ? "null" : """{ "batteryCategory": "", "chemistry": "" }""")}},
+                  "classification": {{(year == "null" ? "null" : """{ "chemistry": "" }""")}},
                   "tonnes": {{year}}
                 }
               ]
@@ -128,5 +128,94 @@ public class PomSubmissionRequestJsonTests
             expected.OrderBy(error => error.PropertyName, StringComparer.Ordinal)
                 .ThenBy(error => error.ErrorMessage, StringComparer.Ordinal),
             ValidationAssert.Messages(result));
+    }
+
+    [Fact]
+    public void Deserialize_WhenBatteryCategoryIsOmitted_DefaultsItToPortable()
+    {
+        // Arrange
+        const string json = """
+            {
+              "tonnageEntries": [
+                {
+                  "classification": { "chemistry": "Alkaline" },
+                  "tonnes": "1.000"
+                }
+              ]
+            }
+            """;
+
+        // Act
+        var request = JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
+
+        // Assert
+        Assert.NotNull(request);
+        Assert.Equal("Portable", request.TonnageEntries[0].Classification.BatteryCategory);
+        Assert.Equal("Alkaline", request.TonnageEntries[0].Classification.Chemistry);
+    }
+
+    [Theory]
+    [InlineData("\"Portable\"")]
+    [InlineData("\"\"")]
+    [InlineData("null")]
+    public void Deserialize_WhenBatteryCategoryIsPosted_ThrowsJsonException(string batteryCategory)
+    {
+        // Arrange
+        var json = $$"""
+            {
+              "tonnageEntries": [
+                {
+                  "classification": { "batteryCategory": {{batteryCategory}}, "chemistry": "Alkaline" },
+                  "tonnes": "1.000"
+                }
+              ]
+            }
+            """;
+
+        // Act
+        var act = () => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
+
+        // Assert
+        var exception = Assert.Throws<JsonException>(act);
+        Assert.Contains("batteryCategory", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("subCategory")]
+    [InlineData("cellType")]
+    [InlineData("equipmentState")]
+    public void Deserialize_WhenRemovedClassificationPropertyIsPosted_ThrowsJsonException(string property)
+    {
+        // Arrange
+        var json = $$"""
+            {
+              "tonnageEntries": [
+                {
+                  "classification": { "chemistry": "Alkaline", "{{property}}": "General use" },
+                  "tonnes": "1.000"
+                }
+              ]
+            }
+            """;
+
+        // Act
+        var act = () => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
+
+        // Assert
+        var exception = Assert.Throws<JsonException>(act);
+        Assert.Contains(property, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Serialize_WhenClassificationIsWritten_IncludesTheDefaultBatteryCategory()
+    {
+        // Arrange
+        var classification = new BatteryClassification { Chemistry = "Alkaline" };
+
+        // Act
+        var json = JsonSerializer.Serialize(classification, JsonSerializerOptions.Web);
+
+        // Assert
+        Assert.Equal("""{"batteryCategory":"Portable","chemistry":"Alkaline"}""", json);
     }
 }

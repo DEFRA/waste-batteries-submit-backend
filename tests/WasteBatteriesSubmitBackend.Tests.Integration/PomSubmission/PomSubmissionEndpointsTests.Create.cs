@@ -56,6 +56,10 @@ public partial class PomSubmissionEndpointsTests
     [InlineData("{")]
     [InlineData("""{"tonnageEntries":{"activity":"Placed"}}""")]
     [InlineData("""{"tonnageEntries":[{"activity":"Placed","tonnes":12.5}]}""")]
+    [InlineData("""{"tonnageEntries":[{"classification":{"batteryCategory":"Portable","chemistry":"Alkaline"},"tonnes":"1.000"}]}""")]
+    [InlineData("""{"tonnageEntries":[{"classification":{"chemistry":"Alkaline","subCategory":"General use"},"tonnes":"1.000"}]}""")]
+    [InlineData("""{"tonnageEntries":[{"classification":{"chemistry":"Alkaline","cellType":"Primary"},"tonnes":"1.000"}]}""")]
+    [InlineData("""{"tonnageEntries":[{"classification":{"chemistry":"Alkaline","equipmentState":"In equipment"},"tonnes":"1.000"}]}""")]
     public async Task Create_WhenJsonDoesNotMatchRequestShape_ReturnsBadRequest(string body)
     {
         // Arrange
@@ -98,7 +102,7 @@ public partial class PomSubmissionEndpointsTests
         using var client = fixture.CreateClient();
         var classification = year == "null"
             ? "null"
-            : """{ "batteryCategory": "", "chemistry": "" }""";
+            : """{ "chemistry": "" }""";
         var body = $$"""
             {
               "schemeOrgId": {{year}},
@@ -149,7 +153,7 @@ public partial class PomSubmissionEndpointsTests
               "dataBasis": "",
               "tonnageEntries": [
                 {
-                  "classification": { "batteryCategory": "", "chemistry": "" },
+                  "classification": { "chemistry": "" },
                   "tonnes": "12.5"
                 }
               ]
@@ -171,7 +175,6 @@ public partial class PomSubmissionEndpointsTests
         Assert.Contains("CompliancePeriodQuarter", problem.Errors.Keys);
         Assert.Contains("DataBasis", problem.Errors.Keys);
         Assert.Contains(problem.Errors.Keys, key => key.Contains("Tonnes"));
-        Assert.Contains(problem.Errors.Keys, key => key.Contains("BatteryCategory"));
         Assert.Contains(problem.Errors.Keys, key => key.Contains("Chemistry"));
         await AssertNothingStored(cancellationToken);
     }
@@ -201,41 +204,6 @@ public partial class PomSubmissionEndpointsTests
         Assert.NotNull(problem);
         Assert.Contains("Submission", problem.Errors.Keys);
         Assert.Single(stored);
-    }
-
-    [Fact]
-    public async Task Create_WhenOptionalTextIsOmittedNullEmptyOrWhitespace_StoresTheSameNulls()
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = fixture.CreateClient();
-        (string MemberOrgId, string Form)[] forms =
-        [
-            ("674a1b2c3d4e5f6789012349", "omitted"),
-            ("674a1b2c3d4e5f678901234a", "null"),
-            ("674a1b2c3d4e5f678901234b", "empty"),
-            ("674a1b2c3d4e5f678901234c", "whitespace")
-        ];
-
-        // Act
-        var stored = new List<BsonDocument>();
-        foreach (var (memberOrgId, form) in forms)
-        {
-            var response = await client.PostAsync(
-                "/pom-submissions",
-                Json(OptionalBody(memberOrgId, form)),
-                cancellationToken);
-            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-            stored.Add(await FindByMember(memberOrgId, cancellationToken));
-        }
-
-        // Assert
-        var canonical = Canonical(stored[0]);
-        Assert.All(stored, document => Assert.Equal(canonical, Canonical(document)));
-        var classification = stored[0]["tonnageEntries"][0]["classification"].AsBsonDocument;
-        Assert.Equal(BsonNull.Value, classification["subCategory"]);
-        Assert.Equal(BsonNull.Value, classification["cellType"]);
-        Assert.Equal(BsonNull.Value, classification["equipmentState"]);
     }
 
     [Fact]
@@ -313,6 +281,12 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal(PomSubmissionModel.CurrentSchemaVersion, created.GetProperty("schemaVersion").GetInt32());
         Assert.Equal(fixture.Defaults.InitialVersion, created.GetProperty("version").GetInt32());
         Assert.Equal("12.500", created.GetProperty("tonnageEntries")[0].GetProperty("tonnes").GetString());
+        var classification = created.GetProperty("tonnageEntries")[0].GetProperty("classification");
+        Assert.Equal("Portable", classification.GetProperty("batteryCategory").GetString());
+        Assert.Equal("Alkaline", classification.GetProperty("chemistry").GetString());
+        Assert.False(classification.TryGetProperty("subCategory", out _));
+        Assert.False(classification.TryGetProperty("cellType", out _));
+        Assert.False(classification.TryGetProperty("equipmentState", out _));
         Assert.Equal(PomSubmissionApiFixture.CreatedAt, created.GetProperty("createdAtUtc").GetDateTime().ToUniversalTime());
         Assert.Equal(PomSubmissionApiFixture.SchemeOrgId, created.GetProperty("schemeOrgId").GetString());
         Assert.Equal(PomSubmissionApiFixture.MemberOrgId, created.GetProperty("memberOrgId").GetString());

@@ -20,7 +20,7 @@ The target data model is the Compliance Scheme POM Submission page in the [waste
 
 `GET /pom-submissions` returns a page of those same submission objects. A single submission is read with `GET /pom-submissions/{id}`. List filters are combined with AND: `schemeOrgId`, `memberOrgId`, repeated `compliancePeriodYears`, repeated `compliancePeriodQuarters`, and `isCurrent`. At least one of `schemeOrgId`, `memberOrgId`, `compliancePeriodYears` or `compliancePeriodQuarters` is required. `isCurrent` does not satisfy that rule and defaults to true. A year list or a quarter list matches any of the supplied values. Omit `pageSize` to return every match (`pageNumber` 1 and `pageSize` equal to the count). Set `pageSize` to page the results; `pageNumber` then defaults to 1. A page past the end returns the last page. The body has `items`, `pageNumber`, `pageSize`, `totalPages`, `totalCount`, `hasPreviousPage` and `hasNextPage`. No match is `200` with an empty `items` array. A missing filter, or a bad organisation id, year, quarter or page, is a `400` validation problem. The same bearer token is required.
 
-The caller posts `schemeOrgId`, `memberOrgId`, `memberName`, `memberBprn`, `schemeMembershipRef`, `compliancePeriodYear`, `compliancePeriodQuarter`, `dataBasis` and at least one `tonnageEntries` item. `schemeOrgId` and `memberOrgId` are ObjectIds. `memberBprn` matches `BPRN-{EA|NRW|SEPA|NIEA}-{year}-{6 digits}`, and that year equals `compliancePeriodYear`. `compliancePeriodYear` is a four-digit year on the request. `tonnes` is a string with exactly three digits after the decimal point, stored as `Decimal128` and returned as that string. A property the request model does not declare is a bad request and is logged as an error.
+The caller posts `schemeOrgId`, `memberOrgId`, `memberName`, `memberBprn`, `schemeMembershipRef`, `compliancePeriodYear`, `compliancePeriodQuarter`, `dataBasis` and at least one `tonnageEntries` item. `schemeOrgId` and `memberOrgId` are ObjectIds. `memberBprn` matches `BPRN-{EA|NRW|SEPA|NIEA}-{year}-{6 digits}`, and that year equals `compliancePeriodYear`. `compliancePeriodYear` is a four-digit year on the request. Each entry posts `chemistry` and `tonnes`. `tonnes` is a string with exactly three digits after the decimal point, stored as `Decimal128` and returned as that string. `batteryCategory` is required on the stored classification. The request must not include it, and posting it is a bad request. The service sets it to `Portable` for every submission. `subCategory`, `cellType` and `equipmentState` are not on the classification. Posting one of them, or any other property the request model does not declare, is a bad request and is logged as an error.
 
 ```json
 {
@@ -35,11 +35,7 @@ The caller posts `schemeOrgId`, `memberOrgId`, `memberName`, `memberBprn`, `sche
   "tonnageEntries": [
     {
       "classification": {
-        "batteryCategory": "Portable",
-        "chemistry": "Alkaline",
-        "subCategory": "General use",
-        "cellType": "Primary",
-        "equipmentState": "In equipment"
+        "chemistry": "Alkaline"
       },
       "tonnes": "12.500"
     }
@@ -47,13 +43,13 @@ The caller posts `schemeOrgId`, `memberOrgId`, `memberName`, `memberBprn`, `sche
 }
 ```
 
-The service sets `id`, `schemaVersion`, `version`, `status`, `isCurrent`, `submittedOnUtc`, `createdAtUtc`, `updatedAtUtc`, `supersedesSubmissionId`, and each entry's `id` and `activity`. A first submission returns `schemaVersion` `1` and `version` `1`. `schemaVersion` is a constant. `version`, `status` and `activity` come from the `PomSubmission` configuration, and the defaults are `1`, `Submitted` and `Placed`. `submittedOnUtc` equals `createdAtUtc` when the status is `Submitted`. `supersedesSubmissionId` and `updatedAtUtc` are null. Both `schemaVersion` and `version` are on the response. `schemaVersion` says which vocabulary the stored texts use. `version` is the concurrency token a later write sends back. Create does not check it. The declaration is omitted.
+The service sets `id`, `schemaVersion`, `version`, `status`, `isCurrent`, `submittedOnUtc`, `createdAtUtc`, `updatedAtUtc`, `supersedesSubmissionId`, each entry's `id` and `activity`, and `batteryCategory` (`Portable`). A first submission returns `schemaVersion` `2` and `version` `1`. `schemaVersion` is a constant. `2` is the classification that stores `batteryCategory` and `chemistry` only. `version`, `status` and `activity` come from the `PomSubmission` configuration, and the defaults are `1`, `Submitted` and `Placed`. `submittedOnUtc` equals `createdAtUtc` when the status is `Submitted`. `supersedesSubmissionId` and `updatedAtUtc` are null. Both `schemaVersion` and `version` are on the response. `schemaVersion` says which vocabulary the stored texts use. `version` is the concurrency token a later write sends back. Create does not check it. The declaration is omitted.
 
-A repeated classification is rejected. The comparison is `batteryCategory`, `chemistry`, `subCategory`, `cellType` and `equipmentState`. Activity is not part of that key. A second submission is rejected while a current submission already exists for the same scheme, member, year and quarter. That lookup runs when those key fields are well formed, and it reads the collection once. Field failures, including that duplicate, are `400` validation problems and are logged at information.
+A repeated classification is rejected. The comparison is `batteryCategory` and `chemistry`. Activity is not part of that key. A second submission is rejected while a current submission already exists for the same scheme, member, year and quarter. That lookup runs when those key fields are well formed, and it reads the collection once. Field failures, including that duplicate, are `400` validation problems and are logged at information.
 
 The unique index is `schemeOrgId`, `memberOrgId`, `compliancePeriodYear` and `compliancePeriodQuarter`, partial on `isCurrent: true`. A submission with `isCurrent` false can share that key. The other indexes are not unique: scheme plus year plus quarter, member plus year where `isCurrent` is true, `memberBprn`, chemistry plus battery category on the entries, and a sparse index on `supersedesSubmissionId`.
 
-Not built yet: amendments, the declaration, checking quarter, category, chemistry, sub-category, cell type, equipment state and activity against the closed vocabularies, resolving the member from the BPRN, inferring the compliance year, and checking `version` on write. The mapper can already set `supersedesSubmissionId` and a supplied `version`. The create path does not.
+Not built yet: amendments, the declaration, checking quarter, chemistry and activity against the closed vocabularies, resolving the member from the BPRN, inferring the compliance year, and checking `version` on write. The mapper can already set `supersedesSubmissionId` and a supplied `version`. The create path does not.
 
 
 ### Docker Compose

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 
@@ -26,11 +25,8 @@ public class PomSubmissionRequestTrimTests
                 {
                     Classification = new BatteryClassification
                     {
-                        BatteryCategory = "  Portable  ",
-                        Chemistry = "  Alkaline  ",
-                        SubCategory = "  General use  ",
-                        CellType = "  Primary  ",
-                        EquipmentState = "  In equipment  "
+                        BatteryCategory = "Industrial",
+                        Chemistry = "  Alkaline  "
                     },
                     Tonnes = "  12.500  "
                 }
@@ -53,9 +49,6 @@ public class PomSubmissionRequestTrimTests
         Assert.Equal("12.500", entry.Tonnes);
         Assert.Equal("Portable", entry.Classification.BatteryCategory);
         Assert.Equal("Alkaline", entry.Classification.Chemistry);
-        Assert.Equal("General use", entry.Classification.SubCategory);
-        Assert.Equal("Primary", entry.Classification.CellType);
-        Assert.Equal("In equipment", entry.Classification.EquipmentState);
     }
 
     [Fact]
@@ -73,10 +66,7 @@ public class PomSubmissionRequestTrimTests
                     Classification = new BatteryClassification
                     {
                         BatteryCategory = null!,
-                        Chemistry = null!,
-                        SubCategory = null,
-                        CellType = null,
-                        EquipmentState = null
+                        Chemistry = null!
                     }
                 },
                 null!,
@@ -90,11 +80,8 @@ public class PomSubmissionRequestTrimTests
         // Assert
         Assert.Equal(string.Empty, trimmed.MemberName);
         Assert.Equal(string.Empty, trimmed.TonnageEntries[0].Tonnes);
-        Assert.Equal(string.Empty, trimmed.TonnageEntries[0].Classification.BatteryCategory);
+        Assert.Equal("Portable", trimmed.TonnageEntries[0].Classification.BatteryCategory);
         Assert.Equal(string.Empty, trimmed.TonnageEntries[0].Classification.Chemistry);
-        Assert.Null(trimmed.TonnageEntries[0].Classification.SubCategory);
-        Assert.Null(trimmed.TonnageEntries[0].Classification.CellType);
-        Assert.Null(trimmed.TonnageEntries[0].Classification.EquipmentState);
         Assert.Null(trimmed.TonnageEntries[1]);
         Assert.Null(trimmed.TonnageEntries[2].Classification);
     }
@@ -110,64 +97,5 @@ public class PomSubmissionRequestTrimTests
 
         // Assert
         Assert.Null(trimmed.TonnageEntries);
-    }
-
-    [Fact]
-    public void Trimmed_WhenOptionalClassificationIsOmittedNullEmptyOrWhitespace_StoresNull()
-    {
-        // Arrange
-        const string header = """
-            {
-              "tonnageEntries": [
-                {
-                  "classification": {
-                    "batteryCategory": "Portable",
-                    "chemistry": "Alkaline"
-            """;
-        string[] optionalText =
-        [
-            "",
-            """
-            ,
-                    "subCategory": null,
-                    "cellType": null,
-                    "equipmentState": null
-            """,
-            """
-            ,
-                    "subCategory": "",
-                    "cellType": "",
-                    "equipmentState": ""
-            """,
-            """
-            ,
-                    "subCategory": "   ",
-                    "cellType": " \t ",
-                    "equipmentState": "  "
-            """
-        ];
-
-        // Act
-        var stored = optionalText.Select(text =>
-        {
-            var json = header + text + """
-                  },
-                  "tonnes": "1.000"
-                }
-              ]
-            }
-            """;
-            var request = JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
-            return request!.Trimmed().TonnageEntries[0].Classification;
-        }).ToList();
-
-        // Assert
-        Assert.All(stored, classification =>
-        {
-            Assert.Null(classification.SubCategory);
-            Assert.Null(classification.CellType);
-            Assert.Null(classification.EquipmentState);
-        });
-        Assert.All(stored, classification => Assert.Equal(stored[0], classification));
     }
 }
