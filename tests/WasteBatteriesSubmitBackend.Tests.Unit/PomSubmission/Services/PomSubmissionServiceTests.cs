@@ -122,11 +122,8 @@ public class PomSubmissionServiceTests
                 {
                     Classification = new BatteryClassification
                     {
-                        BatteryCategory = "  Portable  ",
-                        Chemistry = "  Alkaline  ",
-                        SubCategory = "  General use  ",
-                        CellType = null,
-                        EquipmentState = "   "
+                        BatteryCategory = "Industrial",
+                        Chemistry = "  Alkaline  "
                     },
                     Tonnes = "  12.500  "
                 }
@@ -151,10 +148,7 @@ public class PomSubmissionServiceTests
                 && saved.DataBasis == "Actual"
                 && saved.TonnageEntries[0].Tonnes == "12.500"
                 && saved.TonnageEntries[0].Classification.BatteryCategory == "Portable"
-                && saved.TonnageEntries[0].Classification.Chemistry == "Alkaline"
-                && saved.TonnageEntries[0].Classification.SubCategory == "General use"
-                && saved.TonnageEntries[0].Classification.CellType == null
-                && saved.TonnageEntries[0].Classification.EquipmentState == null),
+                && saved.TonnageEntries[0].Classification.Chemistry == "Alkaline"),
             Arg.Any<CancellationToken>());
     }
 
@@ -197,7 +191,7 @@ public class PomSubmissionServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_WhenOptionalDimensionsDifferOnlyByBlankText_ThrowsValidationException()
+    public async Task CreateAsync_WhenChemistryDiffersOnlyByBlankText_ThrowsValidationException()
     {
         // Arrange
         var repository = Substitute.For<IPomSubmissionRepository>();
@@ -211,10 +205,7 @@ public class PomSubmissionServiceTests
                 {
                     Classification = new BatteryClassification
                     {
-                        BatteryCategory = "Portable",
-                        Chemistry = "Alkaline",
-                        SubCategory = "   ",
-                        EquipmentState = " "
+                        Chemistry = "  Alkaline  "
                     },
                     Tonnes = "1.000"
                 },
@@ -222,7 +213,6 @@ public class PomSubmissionServiceTests
                 {
                     Classification = new BatteryClassification
                     {
-                        BatteryCategory = "Portable",
                         Chemistry = "Alkaline"
                     },
                     Tonnes = "2.000"
@@ -356,7 +346,6 @@ public class PomSubmissionServiceTests
             {
                 Classification = new BatteryClassification
                 {
-                    BatteryCategory = "Portable",
                     Chemistry = "Alkaline"
                 },
                 Tonnes = "12.500"

@@ -31,11 +31,7 @@ public class PomSubmissionMapperTests
               "tonnageEntries": [
                 {
                   "classification": {
-                    "batteryCategory": "Portable",
-                    "chemistry": "Alkaline",
-                    "subCategory": "General use",
-                    "cellType": "Primary",
-                    "equipmentState": "In equipment"
+                    "chemistry": "Alkaline"
                   },
                   "tonnes": "12.500"
                 }
@@ -72,9 +68,6 @@ public class PomSubmissionMapperTests
         Assert.NotEqual(submission.Id, entry.Id);
         Assert.Equal("Portable", entry.Classification.BatteryCategory);
         Assert.Equal("Alkaline", entry.Classification.Chemistry);
-        Assert.Equal("General use", entry.Classification.SubCategory);
-        Assert.Equal("Primary", entry.Classification.CellType);
-        Assert.Equal("In equipment", entry.Classification.EquipmentState);
         Assert.Equal("Placed", entry.Activity);
         Assert.Equal("12.500", entry.Tonnes);
     }

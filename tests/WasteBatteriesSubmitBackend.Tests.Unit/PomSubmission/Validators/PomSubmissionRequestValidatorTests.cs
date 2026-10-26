@@ -383,7 +383,7 @@ public class PomSubmissionRequestValidatorTests
     }
 
     [Fact]
-    public async Task ValidateAsync_WhenOnlyCellTypeDiffers_ReturnsValid()
+    public async Task ValidateAsync_WhenChemistryDiffers_ReturnsValid()
     {
         // Arrange
         var entry = ValidRequest().TonnageEntries[0];
@@ -391,11 +391,11 @@ public class PomSubmissionRequestValidatorTests
         {
             TonnageEntries =
             [
-                entry with { Classification = entry.Classification with { CellType = "Primary" } },
+                entry,
                 entry with
                 {
                     Tonnes = "1.000",
-                    Classification = entry.Classification with { CellType = "Secondary" }
+                    Classification = entry.Classification with { Chemistry = "Lithium" }
                 }
             ]
         };
@@ -405,28 +405,6 @@ public class PomSubmissionRequestValidatorTests
 
         // Assert
         Assert.True(result.IsValid);
-    }
-
-    [Fact]
-    public async Task ValidateAsync_WhenOptionalDimensionIsNullOrEmpty_ReturnsOnlyTheUniquenessError()
-    {
-        // Arrange
-        var entry = ValidRequest().TonnageEntries[0];
-        var request = ValidRequest() with
-        {
-            TonnageEntries =
-            [
-                entry with { Classification = entry.Classification with { SubCategory = null } },
-                entry with
-                {
-                    Tonnes = "1.000",
-                    Classification = entry.Classification with { SubCategory = string.Empty }
-                }
-            ]
-        };
-
-        // Act
-        await ValidationAssert.AssertOnly(Validator(), request, "TonnageEntries", ClassificationRepeated);
     }
 
     [Fact]
@@ -534,11 +512,7 @@ public class PomSubmissionRequestValidatorTests
             {
                 Classification = new BatteryClassification
                 {
-                    BatteryCategory = "Portable",
-                    Chemistry = "Alkaline",
-                    SubCategory = null,
-                    CellType = null,
-                    EquipmentState = null
+                    Chemistry = "Alkaline"
                 },
                 Tonnes = "12.500"
             }

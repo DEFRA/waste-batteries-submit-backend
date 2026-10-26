@@ -112,10 +112,7 @@ public sealed class PomSubmissionRequestValidator : AbstractValidator<PomSubmiss
             var key = string.Join(
                 '\u001f',
                 classification.BatteryCategory ?? string.Empty,
-                classification.Chemistry ?? string.Empty,
-                classification.SubCategory ?? string.Empty,
-                classification.CellType ?? string.Empty,
-                classification.EquipmentState ?? string.Empty);
+                classification.Chemistry ?? string.Empty);
             if (!seen.Add(key))
             {
                 return false;
