@@ -2,6 +2,7 @@ using System.Globalization;
 using FluentValidation;
 using MongoDB.Bson;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Validators;
 

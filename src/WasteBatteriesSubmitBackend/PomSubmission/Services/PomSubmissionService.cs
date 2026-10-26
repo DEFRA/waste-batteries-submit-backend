@@ -1,12 +1,16 @@
 using FluentValidation;
 using FluentValidation.Results;
 using MongoDB.Bson;
+using WasteBatteriesSubmitBackend.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Queries;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Validators;
 using WasteBatteriesSubmitBackend.Utils.Logging;
 using WasteBatteriesSubmitBackend.Utils.Mongo;
+using WasteBatteriesSubmitBackend.Utils.Text;
 using WasteBatteriesSubmitBackend.Utils.Time;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Services;
@@ -14,12 +18,19 @@ namespace WasteBatteriesSubmitBackend.PomSubmission.Services;
 public interface IPomSubmissionService
 {
     Task<PomSubmissionModel> CreateAsync(PomSubmissionRequest request, CancellationToken cancellationToken = default);
+
+    Task<PomSubmissionModel?> GetAsync(string id, CancellationToken cancellationToken = default);
+
+    Task<PaginatedList<PomSubmissionModel>> GetAsync(
+        PomSubmissionListRequest request,
+        CancellationToken cancellationToken = default);
 }
 
 public class PomSubmissionService(
     IPomSubmissionRepository pomSubmissionRepository,
     IPomSubmissionMapper pomSubmissionMapper,
     IValidator<PomSubmissionRequest> pomSubmissionRequestValidator,
+    IValidator<PomSubmissionListRequest> pomSubmissionListRequestValidator,
     ITimeProvider timeProvider,
     ILogger<PomSubmissionService> logger) : IPomSubmissionService
 {
@@ -36,12 +47,16 @@ public class PomSubmissionService(
 
         if (CanLookUpCurrentSubmission(request))
         {
-            var current = await pomSubmissionRepository.FindCurrentAsync(
-                request.SchemeOrgId,
-                request.MemberOrgId,
-                request.CompliancePeriodYear,
-                request.CompliancePeriodQuarter,
+            var matches = await GetAsync(
+                new PomSubmissionListRequest
+                {
+                    SchemeOrgId = request.SchemeOrgId,
+                    MemberOrgId = request.MemberOrgId,
+                    CompliancePeriodYears = [request.CompliancePeriodYear],
+                    CompliancePeriodQuarters = [request.CompliancePeriodQuarter]
+                },
                 cancellationToken);
+            var current = matches.Items.Count == 0 ? null : matches.Items[0];
 
             if (current is not null)
             {
@@ -64,7 +79,7 @@ public class PomSubmissionService(
         }
         catch (DuplicateKeyOnSaveException)
         {
-            // FindCurrent above has passed, so unlikely this is hit, but this is an extra check for concurrency issues.
+            // The current-submission read above has passed, so this is the concurrent-create check.
             throw new ValidationException(
             [
                 new ValidationFailure("Submission", PomSubmissionValidationMessages.CurrentSubmissionExists)
@@ -74,6 +89,58 @@ public class PomSubmissionService(
         logger.CreatedPomSubmission(submission.Id, submission.SchemeOrgId, submission.MemberOrgId);
         return submission;
     }
+
+    // Returns the stored submission, or null when the id is not in the collection.
+    public async Task<PomSubmissionModel?> GetAsync(string id, CancellationToken cancellationToken = default)
+    {
+        id = StringValues.TrimToEmpty(id);
+        if (!ObjectId.TryParse(id, out _))
+        {
+            throw new ValidationException(
+            [
+                new ValidationFailure(nameof(PomSubmissionModel.Id), PomSubmissionValidationMessages.IdObjectId)
+            ]);
+        }
+
+        var matches = await pomSubmissionRepository.FindAsync(
+            new PomSubmissionQuery { Id = id, IsCurrent = null },
+            new PageRequest(),
+            cancellationToken);
+        return matches.Items.Count == 0 ? null : matches.Items[0];
+    }
+
+    // Returns the submissions that match every supplied filter.
+    // IsCurrent on the query defaults to true. A caller who sets it replaces that default.
+    // A single submission, including one that is no longer current, is read by id on the document route.
+    // PageSize omitted returns every match.
+    public async Task<PaginatedList<PomSubmissionModel>> GetAsync(
+        PomSubmissionListRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        request = request.Trimmed();
+        await pomSubmissionListRequestValidator.ValidateAndThrowAsync(request, cancellationToken);
+
+        var query = new PomSubmissionQuery
+        {
+            SchemeOrgId = request.SchemeOrgId,
+            MemberOrgId = request.MemberOrgId,
+            CompliancePeriodYears = Present(request.CompliancePeriodYears),
+            CompliancePeriodQuarters = Present(request.CompliancePeriodQuarters)
+        };
+
+        if (request.IsCurrent is bool isCurrent)
+        {
+            query = query with { IsCurrent = isCurrent };
+        }
+
+        return await pomSubmissionRepository.FindAsync(
+            query,
+            new PageRequest { PageNumber = request.PageNumber, PageSize = request.PageSize },
+            cancellationToken);
+    }
+
+    private static IReadOnlyList<T>? Present<T>(IReadOnlyList<T>? values) =>
+        values is { Count: > 0 } ? values : null;
 
     // TODO: An amendment loads the current submission once, rejects when it is missing, writes a new
     // submission with SupersedesSubmissionId and the next version, and clears isCurrent and sets

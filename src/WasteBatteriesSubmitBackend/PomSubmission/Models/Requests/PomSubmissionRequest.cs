@@ -1,7 +1,8 @@
 using System.Text.Json.Serialization;
+using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.Utils.Text;
 
-namespace WasteBatteriesSubmitBackend.PomSubmission.Models;
+namespace WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 
 // Posted fields for a new submission or a later amendment. The service assigns ids,
 // version, status and timestamps when it writes the document.

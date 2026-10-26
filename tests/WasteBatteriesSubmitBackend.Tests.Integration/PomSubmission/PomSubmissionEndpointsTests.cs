@@ -1,23 +1,14 @@
-using System.Net;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Text;
-using System.Text.Json;
-using Microsoft.Extensions.Logging;
-using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
 using MongoDB.Bson.IO;
 using MongoDB.Driver;
-using Microsoft.Extensions.DependencyInjection;
-using WasteBatteriesSubmitBackend.PomSubmission.Mapping;
+using System.Net;
+using System.Text;
+using System.Text.Json;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
-using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
-using WasteBatteriesSubmitBackend.Tests.Integration.Utils;
-using WasteBatteriesSubmitBackend.Utils.Mongo;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
 
-public class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture) : IClassFixture<PomSubmissionApiFixture>
+public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture) : IClassFixture<PomSubmissionApiFixture>
 {
     private const string CreateBody = """
         {
@@ -43,421 +34,6 @@ public class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture) : ICla
           ]
         }
         """;
-
-    [Fact]
-    public async Task Get_WhenSubmissionIsUnknown_ReturnsNotFound()
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = fixture.CreateClient();
-
-        // Act
-        var response = await client.GetAsync("/pom-submissions/674a1b2c3d4e5f6789012345", cancellationToken);
-
-        // Assert
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Create_WhenCredentialsAreMissing_ReturnsUnauthorized()
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = fixture.CreateAnonymousClient();
-
-        // Act
-        var response = await client.PostAsync("/pom-submissions", Json(CreateBody), cancellationToken);
-
-        // Assert
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        await AssertNothingStored(cancellationToken);
-    }
-
-    [Fact]
-    public async Task Create_WhenTokenIsRejected_ReturnsUnauthorized()
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = fixture.CreateAnonymousClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "not-the-test-token");
-
-        // Act
-        var response = await client.PostAsync("/pom-submissions", Json(CreateBody), cancellationToken);
-
-        // Assert
-        // RequireAuthorization only checks that a principal exists. A token this API
-        // does not accept is challenged with 401. There is no role policy that returns 403.
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        await AssertNothingStored(cancellationToken);
-    }
-
-    [Theory]
-    [InlineData("{")]
-    [InlineData("""{"tonnageEntries":{"activity":"Placed"}}""")]
-    [InlineData("""{"tonnageEntries":[{"activity":"Placed","tonnes":12.5}]}""")]
-    public async Task Create_WhenJsonDoesNotMatchRequestShape_ReturnsBadRequest(string body)
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = fixture.CreateClient();
-
-        // Act
-        var response = await client.PostAsync("/pom-submissions", Json(body), cancellationToken);
-
-        // Assert
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        await AssertNothingStored(cancellationToken);
-    }
-
-    [Theory]
-    [InlineData("""{"memberName":"Northwind Batteries Ltd","tonnageEntries":[]}""")]
-    [InlineData("""{"memberName":"Northwind Batteries Ltd"}""")]
-    [InlineData("""{"memberName":" ","tonnageEntries":[{"tonnes":"1.000"}]}""")]
-    public async Task Create_WhenMemberNameOrTonnageIsMissing_ReturnsBadRequest(string body)
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = fixture.CreateClient();
-
-        // Act
-        var response = await client.PostAsync("/pom-submissions", Json(body), cancellationToken);
-
-        // Assert
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        await AssertNothingStored(cancellationToken);
-    }
-
-    [Theory]
-    [InlineData("null")]
-    [InlineData("\"\"")]
-    public async Task Create_WhenRequiredYearIsNullOrBlank_ReturnsValidationErrors(string year)
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = fixture.CreateClient();
-        var classification = year == "null"
-            ? "null"
-            : """{ "batteryCategory": "", "chemistry": "" }""";
-        var body = $$"""
-            {
-              "schemeOrgId": {{year}},
-              "memberOrgId": {{year}},
-              "memberName": {{year}},
-              "memberBprn": {{year}},
-              "schemeMembershipRef": {{year}},
-              "compliancePeriodYear": {{year}},
-              "compliancePeriodQuarter": {{year}},
-              "dataBasis": {{year}},
-              "tonnageEntries": [
-                {
-                  "classification": {{classification}},
-                  "tonnes": {{year}}
-                }
-              ]
-            }
-            """;
-
-        // Act
-        var response = await client.PostAsync("/pom-submissions", Json(body), cancellationToken);
-        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
-
-        // Assert
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.NotNull(problem);
-        Assert.Contains("'Member Name' must not be empty.", problem.Errors["MemberName"]);
-        Assert.Contains("compliancePeriodYear must be a calendar year.", problem.Errors["CompliancePeriodYear"]);
-        Assert.Contains("'Tonnes' must not be empty.", problem.Errors["TonnageEntries[0].Tonnes"]);
-        await AssertNothingStored(cancellationToken);
-    }
-
-    [Fact]
-    public async Task Create_WhenRequestHasManyFailures_ReturnsEveryValidationError()
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = fixture.CreateClient();
-        var body = """
-            {
-              "schemeOrgId": "not-an-id",
-              "memberOrgId": "674a1b2c3d4e5f6789012346",
-              "memberName": "",
-              "memberBprn": "BPRN-XX-2026-1",
-              "schemeMembershipRef": "",
-              "compliancePeriodYear": 0,
-              "compliancePeriodQuarter": "",
-              "dataBasis": "",
-              "tonnageEntries": [
-                {
-                  "classification": { "batteryCategory": "", "chemistry": "" },
-                  "tonnes": "12.5"
-                }
-              ]
-            }
-            """;
-
-        // Act
-        var response = await client.PostAsync("/pom-submissions", Json(body), cancellationToken);
-        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
-
-        // Assert
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.NotNull(problem);
-        Assert.Contains("SchemeOrgId", problem.Errors.Keys);
-        Assert.Contains("MemberName", problem.Errors.Keys);
-        Assert.Contains("MemberBprn", problem.Errors.Keys);
-        Assert.Contains("SchemeMembershipRef", problem.Errors.Keys);
-        Assert.Contains("CompliancePeriodYear", problem.Errors.Keys);
-        Assert.Contains("CompliancePeriodQuarter", problem.Errors.Keys);
-        Assert.Contains("DataBasis", problem.Errors.Keys);
-        Assert.Contains(problem.Errors.Keys, key => key.Contains("Tonnes"));
-        Assert.Contains(problem.Errors.Keys, key => key.Contains("BatteryCategory"));
-        Assert.Contains(problem.Errors.Keys, key => key.Contains("Chemistry"));
-        await AssertNothingStored(cancellationToken);
-    }
-
-    [Fact]
-    public async Task Create_WhenCurrentSubmissionAlreadyExists_ReturnsBadRequest()
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = fixture.CreateClient();
-        var body = CreateBody.Replace(
-            PomSubmissionApiFixture.MemberOrgId,
-            "674a1b2c3d4e5f6789012348",
-            StringComparison.Ordinal);
-
-        // Act
-        var first = await client.PostAsync("/pom-submissions", Json(body), cancellationToken);
-        var second = await client.PostAsync("/pom-submissions", Json(body), cancellationToken);
-        var problem = await second.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
-        var stored = await fixture.Submissions.Find(
-            Builders<BsonDocument>.Filter.Eq("memberOrgId", ObjectId.Parse("674a1b2c3d4e5f6789012348")))
-            .ToListAsync(cancellationToken);
-
-        // Assert
-        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
-        Assert.NotNull(problem);
-        Assert.Contains("Submission", problem.Errors.Keys);
-        Assert.Single(stored);
-    }
-
-    [Fact]
-    public async Task Create_WhenOptionalTextIsOmittedNullEmptyOrWhitespace_StoresTheSameNulls()
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = fixture.CreateClient();
-        (string MemberOrgId, string Form)[] forms =
-        [
-            ("674a1b2c3d4e5f6789012349", "omitted"),
-            ("674a1b2c3d4e5f678901234a", "null"),
-            ("674a1b2c3d4e5f678901234b", "empty"),
-            ("674a1b2c3d4e5f678901234c", "whitespace")
-        ];
-
-        // Act
-        var stored = new List<BsonDocument>();
-        foreach (var (memberOrgId, form) in forms)
-        {
-            var response = await client.PostAsync(
-                "/pom-submissions",
-                Json(OptionalBody(memberOrgId, form)),
-                cancellationToken);
-            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-            stored.Add(await FindByMember(memberOrgId, cancellationToken));
-        }
-
-        // Assert
-        var canonical = Canonical(stored[0]);
-        Assert.All(stored, document => Assert.Equal(canonical, Canonical(document)));
-        var classification = stored[0]["tonnageEntries"][0]["classification"].AsBsonDocument;
-        Assert.Equal(BsonNull.Value, classification["subCategory"]);
-        Assert.Equal(BsonNull.Value, classification["cellType"]);
-        Assert.Equal(BsonNull.Value, classification["equipmentState"]);
-    }
-
-    [Fact]
-    public async Task Create_WhenRequiredFieldIsMissing_ReturnsBadRequest()
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = fixture.CreateClient();
-        var body = CreateBody.Replace("\"memberName\": \"Northwind Batteries Ltd\",", string.Empty, StringComparison.Ordinal);
-
-        // Act
-        var response = await client.PostAsync("/pom-submissions", Json(body), cancellationToken);
-        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
-
-        // Assert
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.NotNull(problem);
-        Assert.Contains("MemberName", problem.Errors.Keys);
-        await AssertNothingStored(cancellationToken);
-    }
-
-    [Fact]
-    public async Task Create_WhenPropertyIsNotOnTheModel_ReturnsBadRequest()
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = fixture.CreateClient();
-        var body = CreateBody.Replace(
-            "\"dataBasis\": \"Actual\",",
-            "\"dataBasis\": \"Actual\", \"regulatorNote\": \"ignore me\",",
-            StringComparison.Ordinal);
-
-        // Act
-        var response = await client.PostAsync("/pom-submissions", Json(body), cancellationToken);
-        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
-
-        // Assert
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal("Bad request", problem.RootElement.GetProperty("title").GetString());
-        Assert.Contains("JSON", problem.RootElement.GetProperty("detail").GetString());
-        Assert.False(problem.RootElement.TryGetProperty("errors", out _));
-        await AssertNothingStored(cancellationToken);
-    }
-
-    [Fact]
-    public async Task Create_WhenSubmissionIsValid_SavesItAndLogsIt()
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = fixture.CreateClient();
-
-        // Act
-        var response = await client.PostAsync("/pom-submissions", Json(CreateBody), cancellationToken);
-        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-        using var responseDocument = JsonDocument.Parse(responseJson);
-        var created = responseDocument.RootElement;
-        var id = created.GetProperty("id").GetString();
-        var storedDocuments = await fixture.Submissions.Find(
-            Builders<BsonDocument>.Filter.Eq("_id", ObjectId.Parse(id!)))
-            .ToListAsync(cancellationToken);
-
-        // Assert
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        Assert.Equal($"/pom-submissions/{id}", response.Headers.Location?.OriginalString);
-        Assert.Equal(fixture.Defaults.InitialStatus, created.GetProperty("status").GetString());
-        Assert.Equal("Northwind Batteries Ltd", created.GetProperty("memberName").GetString());
-        Assert.Equal(PomSubmissionApiFixture.CreatedAt, created.GetProperty("submittedOnUtc").GetDateTime().ToUniversalTime());
-        Assert.Equal(
-            created.GetProperty("createdAtUtc").GetDateTime().ToUniversalTime(),
-            created.GetProperty("submittedOnUtc").GetDateTime().ToUniversalTime());
-        Assert.Equal(fixture.Defaults.InitialActivity, created.GetProperty("tonnageEntries")[0].GetProperty("activity").GetString());
-        Assert.True(created.GetProperty("isCurrent").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, created.GetProperty("supersedesSubmissionId").ValueKind);
-        Assert.Equal(JsonValueKind.Null, created.GetProperty("updatedAtUtc").ValueKind);
-        Assert.Equal(PomSubmissionModel.CurrentSchemaVersion, created.GetProperty("schemaVersion").GetInt32());
-        Assert.Equal(fixture.Defaults.InitialVersion, created.GetProperty("version").GetInt32());
-        Assert.Equal("12.500", created.GetProperty("tonnageEntries")[0].GetProperty("tonnes").GetString());
-        Assert.Equal(PomSubmissionApiFixture.CreatedAt, created.GetProperty("createdAtUtc").GetDateTime().ToUniversalTime());
-        Assert.Equal(PomSubmissionApiFixture.SchemeOrgId, created.GetProperty("schemeOrgId").GetString());
-        Assert.Equal(PomSubmissionApiFixture.MemberOrgId, created.GetProperty("memberOrgId").GetString());
-
-        var stored = Assert.Single(storedDocuments);
-        AssertStoredShape(stored, id!);
-
-        var log = Assert.Single(fixture.Logger.Entries, entry => entry.Message.Contains(id!, StringComparison.Ordinal));
-        Assert.Equal(LogLevel.Information, log.Level);
-        Assert.Equal(4, log.EventId.Id);
-        Assert.Equal(
-            $"Created POM submission {id} for scheme {PomSubmissionApiFixture.SchemeOrgId} member {PomSubmissionApiFixture.MemberOrgId}",
-            log.Message);
-
-        var snapshot = stored.DeepClone().AsBsonDocument;
-        snapshot["_id"] = ObjectId.Parse("000000000000000000000001");
-        snapshot["tonnageEntries"][0].AsBsonDocument["id"] = ObjectId.Parse("000000000000000000000002");
-        var json = snapshot.ToJson(new JsonWriterSettings
-        {
-            OutputMode = JsonOutputMode.CanonicalExtendedJson,
-            Indent = true,
-            NewLineChars = "\n"
-        });
-
-        Snapshot.Match(json);
-    }
-
-    [Fact]
-    public async Task Create_WhenTheCurrentSubmissionIndexRejectsTheInsert_ThrowsDuplicateKeyOnSaveException()
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        const string memberOrgId = "674a1b2c3d4e5f67890124ff";
-        var repository = fixture.Services.GetRequiredService<IPomSubmissionRepository>();
-        var mapper = fixture.Services.GetRequiredService<IPomSubmissionMapper>();
-        var request = new PomSubmissionRequest
-        {
-            SchemeOrgId = PomSubmissionApiFixture.SchemeOrgId,
-            MemberOrgId = memberOrgId,
-            MemberName = "Northwind Batteries Ltd",
-            MemberBprn = "BPRN-EA-2026-000123",
-            SchemeMembershipRef = "SCH-00417",
-            CompliancePeriodYear = 2026,
-            CompliancePeriodQuarter = "Quarter 2",
-            DataBasis = "Actual",
-            TonnageEntries =
-            [
-                new TonnageEntryBase
-                {
-                    Classification = new BatteryClassification
-                    {
-                        BatteryCategory = "Portable",
-                        Chemistry = "Alkaline"
-                    },
-                    Tonnes = "1.000"
-                }
-            ]
-        };
-        var first = mapper.ToNewSubmission(request, PomSubmissionApiFixture.CreatedAt);
-        var second = mapper.ToNewSubmission(request, PomSubmissionApiFixture.CreatedAt);
-
-        try
-        {
-            // Act
-            await repository.CreateAsync(first, cancellationToken);
-            var act = () => repository.CreateAsync(second, cancellationToken);
-
-            // Assert
-            await Assert.ThrowsAsync<DuplicateKeyOnSaveException>(act);
-        }
-        finally
-        {
-            await fixture.Submissions.DeleteManyAsync(
-                Builders<BsonDocument>.Filter.Eq("memberOrgId", ObjectId.Parse(memberOrgId)),
-                cancellationToken);
-        }
-    }
-
-    [Fact]
-    public async Task List_WhenApplicationHasStarted_DefinesExpectedIndexes()
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-
-        // Act
-        var indexes = await fixture.Submissions.Indexes.List(cancellationToken).ToListAsync(cancellationToken);
-
-        // Assert
-        Assert.DoesNotContain(indexes, index => index.Contains("expireAfterSeconds"));
-
-        var current = Index(indexes, "schemeOrgId_1_memberOrgId_1_compliancePeriodYear_1_compliancePeriodQuarter_1");
-        Assert.True(current["unique"].AsBoolean);
-        Assert.True(current["partialFilterExpression"]["isCurrent"].AsBoolean);
-
-        Index(indexes, "schemeOrgId_1_compliancePeriodYear_1_compliancePeriodQuarter_1");
-
-        var memberHistory = Index(indexes, "memberOrgId_1_compliancePeriodYear_1");
-        Assert.True(memberHistory["partialFilterExpression"]["isCurrent"].AsBoolean);
-        Assert.False(memberHistory.Contains("unique"));
-
-        Index(indexes, "memberBprn_1");
-        Index(indexes, "tonnageEntries.classification.chemistry_1_tonnageEntries.classification.batteryCategory_1");
-
-        var supersedes = Index(indexes, "supersedesSubmissionId_1");
-        Assert.True(supersedes["sparse"].AsBoolean);
-    }
 
     private void AssertStoredShape(BsonDocument stored, string id)
     {
@@ -580,6 +156,84 @@ public class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture) : ICla
             }
             """;
     }
+
+    private async Task<CreatedSubmission> CreateSubmission(
+        HttpClient client,
+        string schemeOrgId,
+        string memberOrgId,
+        int year,
+        string quarter,
+        CancellationToken cancellationToken)
+    {
+        var body = CreateBody
+            .Replace(PomSubmissionApiFixture.SchemeOrgId, schemeOrgId, StringComparison.Ordinal)
+            .Replace(PomSubmissionApiFixture.MemberOrgId, memberOrgId, StringComparison.Ordinal)
+            .Replace("BPRN-EA-2026-", $"BPRN-EA-{year}-", StringComparison.Ordinal)
+            .Replace("\"compliancePeriodYear\": 2026", $"\"compliancePeriodYear\": {year}", StringComparison.Ordinal)
+            .Replace("\"compliancePeriodQuarter\": \"Quarter 2\"", $"\"compliancePeriodQuarter\": \"{quarter}\"", StringComparison.Ordinal);
+        var response = await client.PostAsync("/pom-submissions", Json(body), cancellationToken);
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var document = JsonDocument.Parse(json);
+        return new CreatedSubmission(document.RootElement.GetProperty("id").GetString()!, json);
+    }
+
+    private async Task SetCurrent(string id, bool isCurrent, CancellationToken cancellationToken)
+    {
+        await fixture.Submissions.UpdateOneAsync(
+            Builders<BsonDocument>.Filter.Eq("_id", ObjectId.Parse(id)),
+            Builders<BsonDocument>.Update.Set("isCurrent", isCurrent),
+            cancellationToken: cancellationToken);
+    }
+
+    private static async Task<JsonDocument> ReadPage(
+        HttpClient client,
+        CancellationToken cancellationToken,
+        params (string Key, string Value)[] query)
+    {
+        var response = await client.GetAsync(SubmissionsUrl(query), cancellationToken);
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return JsonDocument.Parse(json);
+    }
+
+    private static string SubmissionsUrl(params (string Key, string Value)[] query)
+    {
+        if (query.Length == 0)
+        {
+            return "/pom-submissions";
+        }
+
+        var text = string.Join(
+            "&",
+            query.Select(pair => $"{Uri.EscapeDataString(pair.Key)}={Uri.EscapeDataString(pair.Value)}"));
+        return $"/pom-submissions?{text}";
+    }
+
+    private static void AssertPage(
+        JsonElement page,
+        int pageNumber,
+        int pageSize,
+        int totalPages,
+        int totalCount,
+        bool hasPrevious,
+        bool hasNext,
+        params string[] ids)
+    {
+        Assert.Equal(pageNumber, page.GetProperty("pageNumber").GetInt32());
+        Assert.Equal(pageSize, page.GetProperty("pageSize").GetInt32());
+        Assert.Equal(totalPages, page.GetProperty("totalPages").GetInt32());
+        Assert.Equal(totalCount, page.GetProperty("totalCount").GetInt32());
+        Assert.Equal(hasPrevious, page.GetProperty("hasPreviousPage").GetBoolean());
+        Assert.Equal(hasNext, page.GetProperty("hasNextPage").GetBoolean());
+        var actual = page.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetString()).ToArray();
+        Assert.Equal(ids, actual);
+    }
+
+    private static JsonElement Item(JsonElement page, string id) =>
+        page.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("id").GetString() == id);
+
+    private sealed record CreatedSubmission(string Id, string Json);
 
     private static StringContent Json(string body) => new(body, Encoding.UTF8, "application/json");
 }
