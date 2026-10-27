@@ -40,11 +40,6 @@ public sealed class PomSubmissionListRequestValidator : AbstractValidator<PomSub
             .When(request => request.PageSize is not null)
             .WithMessage(PomSubmissionValidationMessages.PageSizeMinimum);
 
-        RuleFor(request => request.PageNumber)
-            .Must(_ => false)
-            .When(request => request.PageNumber is not null && request.PageSize is null)
-            .WithMessage(PomSubmissionValidationMessages.PageSizeRequired);
-
         RuleFor(request => request)
             .Must(HasBusinessFilter)
             .WithName("Filters")

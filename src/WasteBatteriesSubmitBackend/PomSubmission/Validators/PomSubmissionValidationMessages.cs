@@ -32,8 +32,6 @@ public static class PomSubmissionValidationMessages
 
     public const string PageSizeMinimum = "pageSize must be at least 1.";
 
-    public const string PageSizeRequired = "pageSize is required when pageNumber is set.";
-
     public const string FilterRequired =
         "At least one of schemeOrgId, memberOrgId, compliancePeriodYears or compliancePeriodQuarters is required.";
 }

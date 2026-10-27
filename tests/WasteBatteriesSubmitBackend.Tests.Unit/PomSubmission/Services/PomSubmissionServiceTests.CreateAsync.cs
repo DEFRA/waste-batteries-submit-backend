@@ -41,7 +41,7 @@ public partial class PomSubmissionServiceTests
                 && query.CompliancePeriodQuarters != null
                 && query.CompliancePeriodQuarters.SequenceEqual(new[] { request.CompliancePeriodQuarter })
                 && query.IsCurrent == true),
-            new PageRequest(),
+            new PageRequest { PageSize = MaxPageSize },
             Arg.Any<CancellationToken>());
         await repository.Received(1).CreateAsync(
             Arg.Is<PomSubmissionModel>(saved =>
@@ -149,7 +149,7 @@ public partial class PomSubmissionServiceTests
                 && query.CompliancePeriodQuarters != null
                 && query.CompliancePeriodQuarters.SequenceEqual(TrimmedCompliancePeriodQuarter)
                 && query.IsCurrent == true),
-            new PageRequest(),
+            new PageRequest { PageSize = MaxPageSize },
             Arg.Any<CancellationToken>());
         await repository.Received(1).CreateAsync(
             Arg.Is<PomSubmissionModel>(saved =>

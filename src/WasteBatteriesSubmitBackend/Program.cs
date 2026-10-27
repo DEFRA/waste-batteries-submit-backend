@@ -60,6 +60,7 @@ static void ConfigureServices(WebApplicationBuilder builder)
     services.AddApiOpenApi();
 
     services.AddTimeProvider();
+    services.AddPomSubmissionResponseCompression();
     services.AddPomSubmissionServices(configuration);
     services.AddExampleServices();
     services.AddExampleDataServices();
@@ -72,6 +73,7 @@ static void ConfigureMiddleware(WebApplication app)
     // Unexpected exceptions are logged as errors. Validation failures are logged
     // as information and returned as a validation problem.
     app.UseExceptionHandler();
+    app.UsePomSubmissionResponseCompression();
     // TODO: Call UseStatusCodePages() immediately after UseExceptionHandler, as the
     // EPR backend does, so a status with no body (such as an unknown route) is written
     // as problem details. Check that /health, Swagger UI, and the JWT challenge still

@@ -27,6 +27,7 @@ public partial class PomSubmissionServiceTests
         // Act
         var act = () => service.GetAsync(
             new PomSubmissionListRequest { IsCurrent = false },
+            false,
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -63,6 +64,7 @@ public partial class PomSubmissionServiceTests
                 CompliancePeriodQuarters = ["  Quarter 2  ", "Quarter 1"],
                 PageSize = 2
             },
+            false,
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -102,6 +104,7 @@ public partial class PomSubmissionServiceTests
                 SchemeOrgId = schemeOrgId,
                 MemberOrgId = memberOrgId
             },
+            false,
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -131,12 +134,14 @@ public partial class PomSubmissionServiceTests
             {
                 CompliancePeriodYears = [2026]
             },
+            false,
             TestContext.Current.CancellationToken);
         await service.GetAsync(
             new PomSubmissionListRequest
             {
                 CompliancePeriodQuarters = ["Quarter 2"]
             },
+            false,
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -170,6 +175,7 @@ public partial class PomSubmissionServiceTests
                 PageNumber = 2,
                 PageSize = 10
             },
+            false,
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -197,7 +203,7 @@ public partial class PomSubmissionServiceTests
         };
 
         // Act
-        var act = () => service.GetAsync(request, TestContext.Current.CancellationToken);
+        var act = () => service.GetAsync(request, false, TestContext.Current.CancellationToken);
 
         // Assert
         var exception = await Assert.ThrowsAsync<ValidationException>(act);
@@ -215,26 +221,137 @@ public partial class PomSubmissionServiceTests
     }
 
     [Fact]
-    public async Task GetAsync_WhenPageNumberIsSetWithoutPageSize_ThrowsValidationException()
+    public async Task GetAsync_WhenPageSizeIsOmitted_LimitsThePageToTheConfiguredMaximum()
     {
         // Arrange
         var repository = Substitute.For<IPomSubmissionRepository>();
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger);
+        ReturnNoSubmissions(repository);
 
         // Act
-        var act = () => service.GetAsync(
+        await service.GetAsync(
+            new PomSubmissionListRequest { SchemeOrgId = "674a1b2c3d4e5f6789012346" },
+            false,
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        await repository.Received(1).FindAsync(
+            Arg.Any<PomSubmissionQuery>(),
+            new PageRequest { PageSize = MaxPageSize },
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetAsync_WhenPageSizeExceedsTheConfiguredMaximum_LimitsThePage()
+    {
+        // Arrange
+        var repository = Substitute.For<IPomSubmissionRepository>();
+        var logger = new CapturingLogger<PomSubmissionService>();
+        var service = Service(repository, logger);
+        ReturnNoSubmissions(repository);
+
+        // Act
+        await service.GetAsync(
+            new PomSubmissionListRequest
+            {
+                SchemeOrgId = "674a1b2c3d4e5f6789012346",
+                PageNumber = 3,
+                PageSize = MaxPageSize + 100
+            },
+            false,
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        await repository.Received(1).FindAsync(
+            Arg.Any<PomSubmissionQuery>(),
+            new PageRequest { PageNumber = 3, PageSize = MaxPageSize },
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetAsync_WhenPageNumberIsSetWithoutPageSize_LimitsThePageToTheConfiguredMaximum()
+    {
+        // Arrange
+        var repository = Substitute.For<IPomSubmissionRepository>();
+        var logger = new CapturingLogger<PomSubmissionService>();
+        var service = Service(repository, logger);
+        ReturnNoSubmissions(repository);
+
+        // Act
+        await service.GetAsync(
             new PomSubmissionListRequest
             {
                 SchemeOrgId = "674a1b2c3d4e5f6789012346",
                 PageNumber = 2
             },
+            false,
             TestContext.Current.CancellationToken);
 
         // Assert
-        var exception = await Assert.ThrowsAsync<ValidationException>(act);
-        var error = Assert.Single(exception.Errors);
-        Assert.Equal("PageNumber", error.PropertyName);
-        Assert.Equal("pageSize is required when pageNumber is set.", error.ErrorMessage);
+        await repository.Received(1).FindAsync(
+            Arg.Any<PomSubmissionQuery>(),
+            new PageRequest { PageNumber = 2, PageSize = MaxPageSize },
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetAsync_WhenGzipIsAcceptedAndPageSizeIsOmitted_UsesTheLargerLimit()
+    {
+        // Arrange
+        var repository = Substitute.For<IPomSubmissionRepository>();
+        var logger = new CapturingLogger<PomSubmissionService>();
+        var service = Service(repository, logger);
+        ReturnNoSubmissions(repository);
+
+        // Act
+        await service.GetAsync(
+            new PomSubmissionListRequest { SchemeOrgId = "674a1b2c3d4e5f6789012346" },
+            gzipResponse: true,
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        await repository.Received(1).FindAsync(
+            Arg.Any<PomSubmissionQuery>(),
+            new PageRequest { PageSize = MaxGzipPageSize },
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetAsync_WhenGzipIsAccepted_KeepsAPageSizeBetweenTheTwoLimits()
+    {
+        // Arrange
+        var repository = Substitute.For<IPomSubmissionRepository>();
+        var logger = new CapturingLogger<PomSubmissionService>();
+        var service = Service(repository, logger);
+        ReturnNoSubmissions(repository);
+
+        // Act
+        await service.GetAsync(
+            new PomSubmissionListRequest
+            {
+                SchemeOrgId = "674a1b2c3d4e5f6789012346",
+                PageSize = MaxPageSize + 5
+            },
+            gzipResponse: true,
+            TestContext.Current.CancellationToken);
+        await service.GetAsync(
+            new PomSubmissionListRequest
+            {
+                SchemeOrgId = "674a1b2c3d4e5f6789012346",
+                PageSize = MaxGzipPageSize + 5
+            },
+            gzipResponse: true,
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        await repository.Received(1).FindAsync(
+            Arg.Any<PomSubmissionQuery>(),
+            new PageRequest { PageSize = MaxPageSize + 5 },
+            Arg.Any<CancellationToken>());
+        await repository.Received(1).FindAsync(
+            Arg.Any<PomSubmissionQuery>(),
+            new PageRequest { PageSize = MaxGzipPageSize },
+            Arg.Any<CancellationToken>());
     }
 }

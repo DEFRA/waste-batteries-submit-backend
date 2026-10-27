@@ -71,22 +71,21 @@ public partial class PomSubmissionEndpointsTests
     }
 
     [Fact]
-    public async Task List_WhenPageNumberIsSetWithoutPageSize_ReturnsValidationError()
+    public async Task List_WhenPageNumberIsSetWithoutPageSize_LimitsThePage()
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = fixture.CreateClient();
 
         // Act
-        var response = await client.GetAsync(
-            "/pom-submissions?schemeOrgId=674a1b2c3d4e5f6789012345&pageNumber=2",
-            cancellationToken);
-        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(cancellationToken);
+        using var page = await ReadPage(
+            client,
+            cancellationToken,
+            ("schemeOrgId", "674a1b2c3d4e5f6789012999"),
+            ("pageNumber", "2"));
 
         // Assert
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.NotNull(problem);
-        Assert.Contains("pageSize is required when pageNumber is set.", problem.Errors["PageNumber"]);
+        AssertPage(page.RootElement, 1, fixture.Defaults.MaxPageSize, 0, 0, false, false);
     }
 
     [Fact]
@@ -136,10 +135,11 @@ public partial class PomSubmissionEndpointsTests
             ("memberOrgId", member2));
 
         // Assert
+        var maximum = fixture.Defaults.MaxPageSize;
         AssertPage(
             current.RootElement,
             pageNumber: 1,
-            pageSize: 5,
+            pageSize: maximum,
             totalPages: 1,
             totalCount: 5,
             hasPrevious: false,
@@ -150,12 +150,12 @@ public partial class PomSubmissionEndpointsTests
             secondQuarter.Id,
             firstQuarter.Id);
         Assert.Equal(firstQuarter.Json, Item(current.RootElement, firstQuarter.Id).GetRawText());
-        AssertPage(memberOnly.RootElement, 1, 4, 1, 4, false, false, fourthQuarter.Id, thirdQuarter.Id, secondQuarter.Id, firstQuarter.Id);
-        AssertPage(memberYearAndQuarter.RootElement, 1, 2, 1, 2, false, false, thirdQuarter.Id, secondQuarter.Id);
-        AssertPage(eitherQuarter.RootElement, 1, 2, 1, 2, false, false, fourthQuarter.Id, firstQuarter.Id);
-        AssertPage(history.RootElement, 1, 1, 1, 1, false, false, previous.Id);
+        AssertPage(memberOnly.RootElement, 1, maximum, 1, 4, false, false, fourthQuarter.Id, thirdQuarter.Id, secondQuarter.Id, firstQuarter.Id);
+        AssertPage(memberYearAndQuarter.RootElement, 1, maximum, 1, 2, false, false, thirdQuarter.Id, secondQuarter.Id);
+        AssertPage(eitherQuarter.RootElement, 1, maximum, 1, 2, false, false, fourthQuarter.Id, firstQuarter.Id);
+        AssertPage(history.RootElement, 1, maximum, 1, 1, false, false, previous.Id);
         Assert.False(Item(history.RootElement, previous.Id).GetProperty("isCurrent").GetBoolean());
-        AssertPage(currentOtherMember.RootElement, 1, 1, 1, 1, false, false, otherMember.Id);
+        AssertPage(currentOtherMember.RootElement, 1, maximum, 1, 1, false, false, otherMember.Id);
     }
 
     [Fact]
@@ -188,6 +188,11 @@ public partial class PomSubmissionEndpointsTests
             ("pageNumber", "9"),
             ("pageSize", "2"));
         using var all = await ReadPage(client, cancellationToken, ("schemeOrgId", schemeOrgId));
+        using var oversized = await ReadPage(
+            client,
+            cancellationToken,
+            ("schemeOrgId", schemeOrgId),
+            ("pageSize", (fixture.Defaults.MaxPageSize + 50).ToString()));
         using var none = await ReadPage(
             client,
             cancellationToken,
@@ -199,7 +204,8 @@ public partial class PomSubmissionEndpointsTests
         AssertPage(firstPage.RootElement, 1, 2, 2, 3, false, true, third.Id, second.Id);
         AssertPage(secondPage.RootElement, 2, 2, 2, 3, true, false, first.Id);
         AssertPage(pastTheEnd.RootElement, 2, 2, 2, 3, true, false, first.Id);
-        AssertPage(all.RootElement, 1, 3, 1, 3, false, false, third.Id, second.Id, first.Id);
+        AssertPage(all.RootElement, 1, fixture.Defaults.MaxPageSize, 1, 3, false, false, third.Id, second.Id, first.Id);
+        AssertPage(oversized.RootElement, 1, fixture.Defaults.MaxPageSize, 1, 3, false, false, third.Id, second.Id, first.Id);
         AssertPage(none.RootElement, 1, 2, 0, 0, false, false);
     }
 }

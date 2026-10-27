@@ -88,16 +88,16 @@ public class PomSubmissionListRequestValidatorTests
     }
 
     [Fact]
-    public async Task ValidateAsync_WhenPageNumberIsSetWithoutPageSize_ReturnsThatError()
+    public async Task ValidateAsync_WhenPageNumberIsSetWithoutPageSize_IsValid()
     {
-        await ValidationAssert.AssertOnly(
-            validator,
+        var result = await validator.ValidateAsync(
             new PomSubmissionListRequest
             {
                 SchemeOrgId = "674a1b2c3d4e5f6789012346",
                 PageNumber = 2
             },
-            "PageNumber",
-            "pageSize is required when pageNumber is set.");
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsValid);
     }
 }

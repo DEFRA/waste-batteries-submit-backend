@@ -1,6 +1,8 @@
 using FluentValidation;
 using FluentValidation.Results;
+using Microsoft.Extensions.Options;
 using MongoDB.Bson;
+using WasteBatteriesSubmitBackend.Config;
 using WasteBatteriesSubmitBackend.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
@@ -21,14 +23,17 @@ public interface IPomSubmissionService
 
     Task<PomSubmissionModel?> GetAsync(string id, CancellationToken cancellationToken = default);
 
+    // gzipResponse selects the larger page limit. The list route sets it when the caller accepts gzip.
     Task<PaginatedList<PomSubmissionModel>> GetAsync(
         PomSubmissionListRequest request,
+        bool gzipResponse,
         CancellationToken cancellationToken = default);
 }
 
 public class PomSubmissionService(
     IPomSubmissionRepository pomSubmissionRepository,
     IPomSubmissionMapper pomSubmissionMapper,
+    IOptions<PomSubmissionConfig> pomSubmissionConfig,
     IValidator<PomSubmissionRequest> pomSubmissionRequestValidator,
     IValidator<PomSubmissionListRequest> pomSubmissionListRequestValidator,
     ITimeProvider timeProvider,
@@ -55,6 +60,7 @@ public class PomSubmissionService(
                     CompliancePeriodYears = [request.CompliancePeriodYear],
                     CompliancePeriodQuarters = [request.CompliancePeriodQuarter]
                 },
+                gzipResponse: false,
                 cancellationToken);
             var current = matches.Items.Count == 0 ? null : matches.Items[0];
 
@@ -112,9 +118,11 @@ public class PomSubmissionService(
     // Returns the submissions that match every supplied filter.
     // IsCurrent on the query defaults to true. A caller who sets it replaces that default.
     // A single submission, including one that is no longer current, is read by id on the document route.
-    // PageSize omitted returns every match.
+    // A missing page size, or one above the maximum for this response, is limited to that maximum.
+    // The maximum is the gzip page size when the response will be gzipped, and the plain page size otherwise.
     public async Task<PaginatedList<PomSubmissionModel>> GetAsync(
         PomSubmissionListRequest request,
+        bool gzipResponse,
         CancellationToken cancellationToken = default)
     {
         request = request.Trimmed();
@@ -135,8 +143,19 @@ public class PomSubmissionService(
 
         return await pomSubmissionRepository.FindAsync(
             query,
-            new PageRequest { PageNumber = request.PageNumber, PageSize = request.PageSize },
+            new PageRequest
+            {
+                PageNumber = request.PageNumber,
+                PageSize = LimitedPageSize(request.PageSize, gzipResponse)
+            },
             cancellationToken);
+    }
+
+    private int LimitedPageSize(int? pageSize, bool gzipResponse)
+    {
+        var limits = pomSubmissionConfig.Value;
+        var maximum = gzipResponse ? limits.MaxGzipPageSize : limits.MaxPageSize;
+        return pageSize is null || pageSize.Value > maximum ? maximum : pageSize.Value;
     }
 
     private static IReadOnlyList<T>? Present<T>(IReadOnlyList<T>? values) =>

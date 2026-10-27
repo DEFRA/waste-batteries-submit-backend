@@ -16,6 +16,10 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Services;
 
 public partial class PomSubmissionServiceTests
 {
+    private const int MaxPageSize = 25;
+
+    private const int MaxGzipPageSize = 40;
+
     private static readonly DateTime CreatedAt = new(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc);
 
     private static void ReturnNoSubmissions(IPomSubmissionRepository repository) =>
@@ -30,8 +34,18 @@ public partial class PomSubmissionServiceTests
             {
                 InitialStatus = "Submitted",
                 InitialVersion = 1,
-                InitialActivity = "Placed"
+                InitialActivity = "Placed",
+                MaxPageSize = MaxPageSize,
+                MaxGzipPageSize = MaxGzipPageSize
             })),
+            Options.Create(new PomSubmissionConfig
+            {
+                InitialStatus = "Submitted",
+                InitialVersion = 1,
+                InitialActivity = "Placed",
+                MaxPageSize = MaxPageSize,
+                MaxGzipPageSize = MaxGzipPageSize
+            }),
             new PomSubmissionRequestValidator(),
             new PomSubmissionListRequestValidator(),
             new FixedTime(CreatedAt),

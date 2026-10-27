@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using WasteBatteriesSubmitBackend.Models;
+using WasteBatteriesSubmitBackend.PomSubmission;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
@@ -58,10 +59,14 @@ public static class PomSubmissionEndpoints
 
     private static async Task<Ok<PaginatedList<PomSubmissionModel>>> GetList(
         [AsParameters] PomSubmissionListRequest request,
+        HttpRequest httpRequest,
         [FromServices] IPomSubmissionService pomSubmissionService,
         CancellationToken cancellationToken)
     {
-        var page = await pomSubmissionService.GetAsync(request, cancellationToken);
+        var page = await pomSubmissionService.GetAsync(
+            request,
+            PomSubmissionResponseCompression.ClientAcceptsGzip(httpRequest),
+            cancellationToken);
         return TypedResults.Ok(page);
     }
 }
