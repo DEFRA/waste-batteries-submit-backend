@@ -8,8 +8,10 @@ using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Models;
 
-// MaxPageSize is 750. MaxGzipPageSize is 17500. Both are rounded down from the pages that fit in 10 MiB.
-// Recalculate them when PomSubmissionModel changes.
+// MaxPageSize is 750, rounded down from 772 uncompressed submissions.
+// The in-memory gzip ceiling is 17696. The list endpoint fits fewer: see the README.
+// MaxGzipPageSize is 17000, rounded down from that endpoint measurement.
+// Recalculate both when PomSubmissionModel changes.
 public class PomSubmissionPageBudgetTests
 {
     private const int TonnageEntries = 80;
@@ -20,7 +22,7 @@ public class PomSubmissionPageBudgetTests
 
     private const int LargestGzipPage = 17696;
 
-    private const int RoundedGzipPageSize = 17500;
+    private const int RoundedGzipPageSize = 17000;
 
     private const int CdpPayloadLimitBytes = 10 * 1024 * 1024;
 

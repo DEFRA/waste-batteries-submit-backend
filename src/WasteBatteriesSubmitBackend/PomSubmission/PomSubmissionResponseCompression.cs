@@ -5,7 +5,7 @@ using WasteBatteriesSubmitBackend.PomSubmission.Endpoints;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission;
 
-// Gzip for the POM submission reads. The list body is the response that can reach the CDP payload limit.
+// Gzip for the POM submission list. A single submission is plain JSON. The list is the response that can reach the CDP payload limit.
 [ExcludeFromCodeCoverage]
 public static class PomSubmissionResponseCompression
 {
@@ -29,12 +29,13 @@ public static class PomSubmissionResponseCompression
 
     public static void UsePomSubmissionResponseCompression(this WebApplication app)
     {
-        app.UseWhen(IsPomSubmissionGet, branch => branch.UseResponseCompression());
+        app.UseWhen(IsPomSubmissionList, branch => branch.UseResponseCompression());
     }
 
-    private static bool IsPomSubmissionGet(HttpContext context) =>
+    // The document route is /pom-submissions/{id}. Only the collection path is compressed.
+    private static bool IsPomSubmissionList(HttpContext context) =>
         HttpMethods.IsGet(context.Request.Method)
-        && context.Request.Path.StartsWithSegments(PomSubmissionEndpoints.RoutePrefix);
+        && context.Request.Path == PomSubmissionEndpoints.RoutePrefix;
 
     // The list page limit uses this same decision. gzip;q=0 refuses gzip. * accepts it.
     internal static bool ClientAcceptsGzip(HttpRequest request)

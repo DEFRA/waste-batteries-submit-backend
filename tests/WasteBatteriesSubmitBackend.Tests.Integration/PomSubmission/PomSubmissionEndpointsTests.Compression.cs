@@ -9,7 +9,7 @@ namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
 public partial class PomSubmissionEndpointsTests
 {
     [Fact]
-    public async Task Get_WhenTheClientAcceptsGzip_ReturnsAGzipBody()
+    public async Task Get_WhenTheClientAcceptsGzip_CompressesTheListOnly()
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -29,8 +29,8 @@ public partial class PomSubmissionEndpointsTests
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, byId.StatusCode);
-        Assert.Equal("gzip", Assert.Single(byId.Content.Headers.ContentEncoding));
-        Assert.Contains(created.Id, await Gunzip(byId, cancellationToken));
+        Assert.Empty(byId.Content.Headers.ContentEncoding);
+        Assert.Contains(created.Id, await byId.Content.ReadAsStringAsync(cancellationToken));
         Assert.Equal(HttpStatusCode.OK, list.StatusCode);
         Assert.Equal("gzip", Assert.Single(list.Content.Headers.ContentEncoding));
         var listJson = await Gunzip(list, cancellationToken);
