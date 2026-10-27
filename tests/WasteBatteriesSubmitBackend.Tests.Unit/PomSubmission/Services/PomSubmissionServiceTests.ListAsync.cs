@@ -12,6 +12,10 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Services;
 
 public partial class PomSubmissionServiceTests
 {
+    private static readonly int[] CombinedCompliancePeriodYears = [2024, 2025, 2026];
+
+    private static readonly string[] CombinedCompliancePeriodQuarters = ["Quarter 2", "Quarter 1"];
+
     [Fact]
     public async Task GetAsync_WhenNoBusinessFilterIsSet_ThrowsValidationException()
     {
@@ -69,9 +73,9 @@ public partial class PomSubmissionServiceTests
                 && query.MemberOrgId == "674a1b2c3d4e5f6789012347"
                 && query.IsCurrent == true
                 && query.CompliancePeriodYears != null
-                && query.CompliancePeriodYears.SequenceEqual(new[] { 2024, 2025, 2026 })
+                && query.CompliancePeriodYears.SequenceEqual(CombinedCompliancePeriodYears)
                 && query.CompliancePeriodQuarters != null
-                && query.CompliancePeriodQuarters.SequenceEqual(new[] { "Quarter 2", "Quarter 1" })),
+                && query.CompliancePeriodQuarters.SequenceEqual(CombinedCompliancePeriodQuarters)),
             new PageRequest { PageSize = 2 },
             Arg.Any<CancellationToken>());
     }

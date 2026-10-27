@@ -14,6 +14,10 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Services;
 
 public partial class PomSubmissionServiceTests
 {
+    private static readonly int[] TrimmedCompliancePeriodYear = [2026];
+
+    private static readonly string[] TrimmedCompliancePeriodQuarter = ["Quarter 2"];
+
     [Fact]
     public async Task CreateAsync_WhenRequestIsValid_SavesSubmissionAndLogsIt()
     {
@@ -141,9 +145,9 @@ public partial class PomSubmissionServiceTests
                 query.SchemeOrgId == "674a1b2c3d4e5f6789012345"
                 && query.MemberOrgId == "674a1b2c3d4e5f6789012346"
                 && query.CompliancePeriodYears != null
-                && query.CompliancePeriodYears.SequenceEqual(new[] { 2026 })
+                && query.CompliancePeriodYears.SequenceEqual(TrimmedCompliancePeriodYear)
                 && query.CompliancePeriodQuarters != null
-                && query.CompliancePeriodQuarters.SequenceEqual(new[] { "Quarter 2" })
+                && query.CompliancePeriodQuarters.SequenceEqual(TrimmedCompliancePeriodQuarter)
                 && query.IsCurrent == true),
             new PageRequest(),
             Arg.Any<CancellationToken>());

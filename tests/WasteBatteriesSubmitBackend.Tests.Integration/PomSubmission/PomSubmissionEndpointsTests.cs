@@ -85,7 +85,7 @@ public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture
         Assert.Equal(created, count);
     }
 
-    private async Task<CreatedSubmission> CreateSubmission(
+    private async static Task<CreatedSubmission> CreateSubmission(
         HttpClient client,
         string schemeOrgId,
         string memberOrgId,

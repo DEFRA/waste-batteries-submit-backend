@@ -57,29 +57,11 @@ public static class PomSubmissionEndpoints
     }
 
     private static async Task<Ok<PaginatedList<PomSubmissionModel>>> GetList(
-        [FromQuery] string? schemeOrgId,
-        [FromQuery] string? memberOrgId,
-        [FromQuery] int[]? compliancePeriodYears,
-        [FromQuery] string[]? compliancePeriodQuarters,
-        [FromQuery] bool? isCurrent,
-        [FromQuery] int? pageNumber,
-        [FromQuery] int? pageSize,
+        [AsParameters] PomSubmissionListRequest request,
         [FromServices] IPomSubmissionService pomSubmissionService,
         CancellationToken cancellationToken)
     {
-        var page = await pomSubmissionService.GetAsync(
-            new PomSubmissionListRequest
-            {
-                SchemeOrgId = schemeOrgId,
-                MemberOrgId = memberOrgId,
-                CompliancePeriodYears = compliancePeriodYears,
-                CompliancePeriodQuarters = compliancePeriodQuarters,
-                IsCurrent = isCurrent,
-                PageNumber = pageNumber,
-                PageSize = pageSize
-            },
-            cancellationToken);
-
+        var page = await pomSubmissionService.GetAsync(request, cancellationToken);
         return TypedResults.Ok(page);
     }
 }
