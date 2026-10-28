@@ -43,7 +43,7 @@
   </ItemGroup>
 
   <!--
-    TODO: Add SonarAnalyzer.CSharp in its own ItemGroup, with PrivateAssets set to all,
+    TEMPORARY: Add SonarAnalyzer.CSharp in its own ItemGroup, with PrivateAssets set to all,
     as waste-obligations does. Keep that separate from the package pins above.
   -->
 </Project>

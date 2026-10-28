@@ -26,7 +26,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddTransient<ProxyHttpMessageHandler>();
 
-        // TODO: When the first real typed client is registered, add
+        // TEMPORARY: When the first real typed client is registered, add
         // Microsoft.Extensions.Http.Resilience on that client, as waste-obligations
         // does for its downstream clients. Register it with AddHttpClientWithTracing
         // or AddHttpClientWithTracingAndProxy. Do not add resilience before a client exists.

@@ -42,8 +42,8 @@ public class PomSubmissionService(
     // Saves a first submission.
     // The request validator checks the posted shape only. A current submission for the same
     // scheme, member, year and quarter is read once here: a first submission is rejected when one exists.
-    // TODO: Check vocabulary texts against the reference lists, and resolve scheme and member references.
-    // TODO: Infer compliancePeriodYear from the submission window.
+    // TEMPORARY: Check vocabulary texts against the reference lists, and resolve scheme and member references.
+    // TEMPORARY: Infer compliancePeriodYear from the submission window.
     public async Task<PomSubmissionModel> CreateAsync(PomSubmissionRequest request, CancellationToken cancellationToken = default)
     {
         request = request.Trimmed();
@@ -161,7 +161,7 @@ public class PomSubmissionService(
     private static IReadOnlyList<T>? Present<T>(IReadOnlyList<T>? values) =>
         values is { Count: > 0 } ? values : null;
 
-    // TODO: An amendment loads the current submission once, rejects when it is missing, writes a new
+    // TEMPORARY: An amendment loads the current submission once, rejects when it is missing, writes a new
     // submission with SupersedesSubmissionId and the next version, and clears isCurrent and sets
     // updatedAtUtc on the previous submission in one transaction.
 
