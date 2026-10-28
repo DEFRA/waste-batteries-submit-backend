@@ -11,13 +11,16 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.OpenApi;
 public class BearerSecuritySchemeTransformerTests
 {
     [Fact]
-    public async Task Document_transformer_adds_bearer_scheme_when_components_are_missing()
+    public async Task TransformAsync_WhenDocumentComponentsAreMissing_AddsBearerScheme()
     {
+        // Arrange
         var document = new OpenApiDocument();
         var transformer = new BearerSecuritySchemeTransformer();
 
+        // Act
         await transformer.TransformAsync(document, CreateDocumentContext(), CancellationToken.None);
 
+        // Assert
         Assert.Equal(BearerSecuritySchemeTransformer.DocumentTitle, document.Info.Title);
         Assert.Equal("v1", document.Info.Version);
         Assert.NotNull(document.Components);
@@ -28,8 +31,9 @@ public class BearerSecuritySchemeTransformerTests
     }
 
     [Fact]
-    public async Task Document_transformer_keeps_existing_components_and_security()
+    public async Task TransformAsync_WhenDocumentAlreadyHasComponents_KeepsExistingSecurity()
     {
+        // Arrange
         var document = new OpenApiDocument
         {
             Components = new OpenApiComponents
@@ -40,8 +44,10 @@ public class BearerSecuritySchemeTransformerTests
         };
         var transformer = new BearerSecuritySchemeTransformer();
 
+        // Act
         await transformer.TransformAsync(document, CreateDocumentContext(), CancellationToken.None);
 
+        // Assert
         Assert.NotNull(document.Components.SecuritySchemes);
         Assert.True(document.Components.SecuritySchemes.ContainsKey(BearerSecuritySchemeTransformer.SchemeId));
         Assert.NotNull(document.Security);
@@ -49,46 +55,55 @@ public class BearerSecuritySchemeTransformerTests
     }
 
     [Fact]
-    public async Task Operation_transformer_clears_security_for_anonymous_operations()
+    public async Task TransformAsync_WhenOperationIsAnonymous_ClearsSecurity()
     {
+        // Arrange
         var operation = new OpenApiOperation
         {
             Security = [new OpenApiSecurityRequirement()]
         };
         var transformer = new BearerSecuritySchemeTransformer();
 
+        // Act
         await transformer.TransformAsync(
             operation,
             CreateOperationContext(new AllowAnonymousAttribute()),
             CancellationToken.None);
 
+        // Assert
         Assert.NotNull(operation.Security);
         Assert.Empty(operation.Security);
     }
 
     [Fact]
-    public async Task Operation_transformer_clears_security_when_the_operation_is_not_authorized()
+    public async Task TransformAsync_WhenOperationIsNotAuthorized_ClearsSecurity()
     {
+        // Arrange
         var operation = new OpenApiOperation();
         var transformer = new BearerSecuritySchemeTransformer();
 
+        // Act
         await transformer.TransformAsync(operation, CreateOperationContext(), CancellationToken.None);
 
+        // Assert
         Assert.NotNull(operation.Security);
         Assert.Empty(operation.Security);
     }
 
     [Fact]
-    public async Task Operation_transformer_leaves_security_when_the_operation_requires_authorization()
+    public async Task TransformAsync_WhenOperationRequiresAuthorization_LeavesSecurityUnset()
     {
+        // Arrange
         var operation = new OpenApiOperation();
         var transformer = new BearerSecuritySchemeTransformer();
 
+        // Act
         await transformer.TransformAsync(
             operation,
             CreateOperationContext(new AuthorizeAttribute()),
             CancellationToken.None);
 
+        // Assert
         Assert.Null(operation.Security);
     }
 

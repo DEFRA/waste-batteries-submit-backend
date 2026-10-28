@@ -50,9 +50,6 @@ public class ExampleDataRepository(IMongoDbClientFactory connectionFactory, ILog
             Id = existing?.Id ?? Guid.NewGuid().ToString(),
             ExampleText = exampleText,
             UserId = userId,
-            // TODO: Inject TimeProvider instead of DateTime.UtcNow when this write stores
-            // real data, so tests can control the clock. Both Defra APIs do this.
-            // ExampleModel.Created and ExampleDataModel.CreatedAt also default to UtcNow.
             CreatedAt = existing?.CreatedAt ?? DateTime.UtcNow
         };
 

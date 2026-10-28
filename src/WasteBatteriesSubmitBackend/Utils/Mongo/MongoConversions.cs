@@ -4,20 +4,30 @@ namespace WasteBatteriesSubmitBackend.Utils.Mongo;
 
 public static class MongoConventions
 {
-    private static int s_initialized;
+    private static readonly object Gate = new();
+    private static volatile bool registered;
 
     public static void Register()
     {
-        if (Interlocked.Exchange(ref s_initialized, 1) == 1)
+        if (registered)
         {
             return;
         }
 
-        var conversions = new ConventionPack
+        lock (Gate)
         {
-            new CamelCaseElementNameConvention()
-        };
+            if (registered)
+            {
+                return;
+            }
 
-        ConventionRegistry.Register("CamelCase", conversions, _ => true);
+            var conversions = new ConventionPack
+            {
+                new CamelCaseElementNameConvention()
+            };
+
+            ConventionRegistry.Register("CamelCase", conversions, _ => true);
+            registered = true;
+        }
     }
 }
