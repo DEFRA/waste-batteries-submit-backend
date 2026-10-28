@@ -24,6 +24,7 @@ public partial class PomSubmissionEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
+        var countBefore = await SubmissionCount(cancellationToken);
         using var client = fixture.CreateAnonymousClient();
 
         // Act
@@ -31,7 +32,7 @@ public partial class PomSubmissionEndpointsTests
 
         // Assert
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        await AssertNothingStored(cancellationToken);
+        await AssertNothingStored(countBefore, cancellationToken);
     }
 
     [Fact]
@@ -39,6 +40,7 @@ public partial class PomSubmissionEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
+        var countBefore = await SubmissionCount(cancellationToken);
         using var client = fixture.CreateAnonymousClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "not-the-test-token");
 
@@ -49,7 +51,7 @@ public partial class PomSubmissionEndpointsTests
         // RequireAuthorization only checks that a principal exists. A token this API
         // does not accept is challenged with 401. There is no role policy that returns 403.
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        await AssertNothingStored(cancellationToken);
+        await AssertNothingStored(countBefore, cancellationToken);
     }
 
     [Theory]
@@ -64,6 +66,7 @@ public partial class PomSubmissionEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
+        var countBefore = await SubmissionCount(cancellationToken);
         using var client = fixture.CreateClient();
 
         // Act
@@ -71,7 +74,7 @@ public partial class PomSubmissionEndpointsTests
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        await AssertNothingStored(cancellationToken);
+        await AssertNothingStored(countBefore, cancellationToken);
     }
 
     [Theory]
@@ -82,6 +85,7 @@ public partial class PomSubmissionEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
+        var countBefore = await SubmissionCount(cancellationToken);
         using var client = fixture.CreateClient();
 
         // Act
@@ -89,7 +93,7 @@ public partial class PomSubmissionEndpointsTests
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        await AssertNothingStored(cancellationToken);
+        await AssertNothingStored(countBefore, cancellationToken);
     }
 
     [Theory]
@@ -99,6 +103,7 @@ public partial class PomSubmissionEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
+        var countBefore = await SubmissionCount(cancellationToken);
         using var client = fixture.CreateClient();
         var classification = year == "null"
             ? "null"
@@ -132,7 +137,7 @@ public partial class PomSubmissionEndpointsTests
         Assert.Contains("'Member Name' must not be empty.", problem.Errors["MemberName"]);
         Assert.Contains("compliancePeriodYear must be a calendar year.", problem.Errors["CompliancePeriodYear"]);
         Assert.Contains("'Tonnes' must not be empty.", problem.Errors["TonnageEntries[0].Tonnes"]);
-        await AssertNothingStored(cancellationToken);
+        await AssertNothingStored(countBefore, cancellationToken);
     }
 
     [Fact]
@@ -140,6 +145,7 @@ public partial class PomSubmissionEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
+        var countBefore = await SubmissionCount(cancellationToken);
         using var client = fixture.CreateClient();
         var body = """
             {
@@ -176,7 +182,7 @@ public partial class PomSubmissionEndpointsTests
         Assert.Contains("DataBasis", problem.Errors.Keys);
         Assert.Contains(problem.Errors.Keys, key => key.Contains("Tonnes"));
         Assert.Contains(problem.Errors.Keys, key => key.Contains("Chemistry"));
-        await AssertNothingStored(cancellationToken);
+        await AssertNothingStored(countBefore, cancellationToken);
     }
 
     [Fact]
@@ -211,6 +217,7 @@ public partial class PomSubmissionEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
+        var countBefore = await SubmissionCount(cancellationToken);
         using var client = fixture.CreateClient();
         var body = CreateBody.Replace("\"memberName\": \"Northwind Batteries Ltd\",", string.Empty, StringComparison.Ordinal);
 
@@ -222,7 +229,7 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.NotNull(problem);
         Assert.Contains("MemberName", problem.Errors.Keys);
-        await AssertNothingStored(cancellationToken);
+        await AssertNothingStored(countBefore, cancellationToken);
     }
 
     [Fact]
@@ -230,6 +237,7 @@ public partial class PomSubmissionEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
+        var countBefore = await SubmissionCount(cancellationToken);
         using var client = fixture.CreateClient();
         var body = CreateBody.Replace(
             "\"dataBasis\": \"Actual\",",
@@ -245,7 +253,7 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal("Bad request", problem.RootElement.GetProperty("title").GetString());
         Assert.Contains("JSON", problem.RootElement.GetProperty("detail").GetString());
         Assert.False(problem.RootElement.TryGetProperty("errors", out _));
-        await AssertNothingStored(cancellationToken);
+        await AssertNothingStored(countBefore, cancellationToken);
     }
 
     [Fact]

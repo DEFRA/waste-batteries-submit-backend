@@ -29,5 +29,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\WasteBatteriesSubmitBackend\WasteBatteriesSubmitBackend.csproj" />
+    <ProjectReference Include="..\WasteBatteriesSubmitBackend.Tests.Common\WasteBatteriesSubmitBackend.Tests.Common.csproj" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using WasteBatteriesSubmitBackend.Models;
@@ -10,7 +9,6 @@ using WasteBatteriesSubmitBackend.PomSubmission.Services;
 namespace WasteBatteriesSubmitBackend.PomSubmission.Endpoints;
 
 // POM (placed on market) submissions filed by a battery compliance scheme.
-[ExcludeFromCodeCoverage]
 public static class PomSubmissionEndpoints
 {
     public const string RoutePrefix = "/pom-submissions";

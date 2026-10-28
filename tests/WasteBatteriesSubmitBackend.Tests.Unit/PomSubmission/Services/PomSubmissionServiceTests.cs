@@ -9,8 +9,7 @@ using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
 using WasteBatteriesSubmitBackend.PomSubmission.Validators;
-using WasteBatteriesSubmitBackend.Tests.Unit.Utils.Logging;
-using WasteBatteriesSubmitBackend.Tests.Unit.Utils.Time;
+using WasteBatteriesSubmitBackend.Tests.Common;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Services;
 
@@ -27,25 +26,20 @@ public partial class PomSubmissionServiceTests
             .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>([], 0, 1, 0));
 
+    private static readonly IOptions<PomSubmissionConfig> Config = Options.Create(new PomSubmissionConfig
+    {
+        InitialStatus = "Submitted",
+        InitialVersion = 1,
+        InitialActivity = "Placed",
+        MaxPageSize = MaxPageSize,
+        MaxGzipPageSize = MaxGzipPageSize
+    });
+
     private static PomSubmissionService Service(IPomSubmissionRepository repository, CapturingLogger<PomSubmissionService> logger) =>
         new(
             repository,
-            new PomSubmissionMapper(Options.Create(new PomSubmissionConfig
-            {
-                InitialStatus = "Submitted",
-                InitialVersion = 1,
-                InitialActivity = "Placed",
-                MaxPageSize = MaxPageSize,
-                MaxGzipPageSize = MaxGzipPageSize
-            })),
-            Options.Create(new PomSubmissionConfig
-            {
-                InitialStatus = "Submitted",
-                InitialVersion = 1,
-                InitialActivity = "Placed",
-                MaxPageSize = MaxPageSize,
-                MaxGzipPageSize = MaxGzipPageSize
-            }),
+            new PomSubmissionMapper(Config),
+            Config,
             new PomSubmissionRequestValidator(),
             new PomSubmissionListRequestValidator(),
             new FixedTime(CreatedAt),

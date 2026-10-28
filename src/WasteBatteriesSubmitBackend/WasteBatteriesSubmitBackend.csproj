@@ -14,6 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="WasteBatteriesSubmitBackend.Tests.Common" />
     <InternalsVisibleTo Include="WasteBatteriesSubmitBackend.Tests.Unit" />
     <InternalsVisibleTo Include="WasteBatteriesSubmitBackend.Tests.Integration" />
   </ItemGroup>

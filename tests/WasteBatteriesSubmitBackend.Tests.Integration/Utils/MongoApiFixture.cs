@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Testcontainers.MongoDb;
+using WasteBatteriesSubmitBackend.Tests.Common;
 using WasteBatteriesSubmitBackend.Utils.Mongo;
 using WasteBatteriesSubmitBackend.Utils.Time;
 
@@ -101,10 +102,5 @@ public abstract class MongoApiFixture : IAsyncLifetime
                 configureServices(services);
             });
         }
-    }
-
-    private sealed class FixedTime(DateTime utcNow) : ITimeProvider
-    {
-        public DateTime UtcNow => utcNow;
     }
 }

@@ -1,16 +1,15 @@
-using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using WasteBatteriesSubmitBackend.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
+using WasteBatteriesSubmitBackend.Tests.Common;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Models;
 
 // MaxPageSize is 750, rounded down from 772 uncompressed submissions.
-// The in-memory gzip ceiling is 17696. The list endpoint fits fewer: see the README.
-// MaxGzipPageSize is 17000, rounded down from that endpoint measurement.
+// MaxGzipPageSize is 17000, rounded down from the endpoint measurement in the README.
 // Recalculate both when PomSubmissionModel changes.
 public class PomSubmissionPageBudgetTests
 {
@@ -19,8 +18,6 @@ public class PomSubmissionPageBudgetTests
     private const int LargestFittingPage = 772;
 
     private const int RoundedPageSize = 750;
-
-    private const int LargestGzipPage = 17696;
 
     private const int RoundedGzipPageSize = 17000;
 
@@ -54,17 +51,22 @@ public class PomSubmissionPageBudgetTests
     {
         // Arrange
         var configured = ConfiguredMaxGzipPageSize();
+        var items = MeasuredPomSubmission.Page(
+            MeasuredPomSubmission.SchemeOrgId,
+            configured,
+            ConfiguredPomSubmissionText("InitialActivity"),
+            ConfiguredPomSubmissionText("InitialStatus"),
+            ConfiguredPomSubmissionSetting("InitialVersion"),
+            distinct: true);
 
         // Act
-        var atConfigured = GzipBytes(configured);
-        var atLargest = GzipBytes(LargestGzipPage);
-        var atOneMore = GzipBytes(LargestGzipPage + 1);
+        var gzipBytes = MeasuredPomSubmission.GzipPage(items, configured, pageNumber: 1, pageSize: configured);
 
         // Assert
         Assert.Equal(RoundedGzipPageSize, configured);
-        Assert.True(atConfigured < CdpPayloadLimitBytes, $"Gzip of {configured} is {atConfigured} bytes.");
-        Assert.True(atLargest < CdpPayloadLimitBytes, $"Gzip of {LargestGzipPage} is {atLargest} bytes.");
-        Assert.True(atOneMore >= CdpPayloadLimitBytes, $"Gzip of {LargestGzipPage + 1} is {atOneMore} bytes.");
+        Assert.True(
+            gzipBytes < CdpPayloadLimitBytes,
+            $"Gzip of {configured} submissions is {gzipBytes} bytes, which is over the {CdpPayloadLimitBytes} byte limit.");
     }
 
     private static int LargestPageUnderLimit(PomSubmissionModel submission)
@@ -87,7 +89,24 @@ public class PomSubmissionPageBudgetTests
         return Encoding.UTF8.GetByteCount(json);
     }
 
-    private static int ConfiguredMaxPageSize([CallerFilePath] string sourceFile = "")
+    private static int ConfiguredMaxPageSize() => ConfiguredPomSubmissionSetting("MaxPageSize");
+
+    private static int ConfiguredMaxGzipPageSize() => ConfiguredPomSubmissionSetting("MaxGzipPageSize");
+
+    private static int ConfiguredPomSubmissionSetting(string name)
+    {
+        using var document = OpenAppSettings();
+        return document.RootElement.GetProperty("PomSubmission").GetProperty(name).GetInt32();
+    }
+
+    private static string ConfiguredPomSubmissionText(string name)
+    {
+        using var document = OpenAppSettings();
+        return document.RootElement.GetProperty("PomSubmission").GetProperty(name).GetString()
+            ?? throw new InvalidOperationException($"PomSubmission:{name} is missing from appsettings.json.");
+    }
+
+    private static JsonDocument OpenAppSettings([CallerFilePath] string sourceFile = "")
     {
         var appSettings = Path.GetFullPath(Path.Combine(
             Path.GetDirectoryName(sourceFile)!,
@@ -98,76 +117,9 @@ public class PomSubmissionPageBudgetTests
             "src",
             "WasteBatteriesSubmitBackend",
             "appsettings.json"));
-        using var document = JsonDocument.Parse(
+        return JsonDocument.Parse(
             File.ReadAllText(appSettings),
             new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
-        return document.RootElement.GetProperty("PomSubmission").GetProperty("MaxPageSize").GetInt32();
-    }
-
-    private static int ConfiguredMaxGzipPageSize([CallerFilePath] string sourceFile = "")
-    {
-        var appSettings = Path.GetFullPath(Path.Combine(
-            Path.GetDirectoryName(sourceFile)!,
-            "..",
-            "..",
-            "..",
-            "..",
-            "src",
-            "WasteBatteriesSubmitBackend",
-            "appsettings.json"));
-        using var document = JsonDocument.Parse(
-            File.ReadAllText(appSettings),
-            new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
-        return document.RootElement.GetProperty("PomSubmission").GetProperty("MaxGzipPageSize").GetInt32();
-    }
-
-    private static int GzipBytes(int count)
-    {
-        var items = Enumerable.Range(0, count).Select(DistinctSubmission).ToArray();
-        var json = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(
-            new PaginatedList<PomSubmissionModel>(items, count, 1, count),
-            Options));
-        using var output = new MemoryStream();
-        using (var gzip = new GZipStream(output, CompressionLevel.Optimal, leaveOpen: true))
-        {
-            gzip.Write(json);
-        }
-
-        return (int)output.Length;
-    }
-
-    // Each submission differs. Identical copies compress far more than a real list.
-    private static PomSubmissionModel DistinctSubmission(int index)
-    {
-        const string chemistry = "Nickel-metal hydride";
-        var header = new PomSubmissionRequest
-        {
-            SchemeOrgId = "674a1b2c3d4e5f6789012345",
-            MemberOrgId = $"674a1b2c3d4e5f67{index:x8}",
-            MemberName = $"{index:D6} " + new string((char)('A' + (index % 26)), 153),
-            MemberBprn = $"BPRN-NIEA-2026-{(index % 1000000):D6}",
-            SchemeMembershipRef = $"SCH-{index:D36}",
-            CompliancePeriodYear = 2020 + (index % 7),
-            CompliancePeriodQuarter = $"Quarter {(index % 4) + 1}",
-            DataBasis = index % 2 == 0 ? "Estimated" : "Actual",
-            TonnageEntries = Enumerable.Range(1, TonnageEntries).Select(entry => new TonnageEntryBase
-            {
-                Classification = new BatteryClassification
-                {
-                    Chemistry = $"{chemistry} {entry:00}"
-                },
-                Tonnes = $"{(index * 17 + entry) % 100000:D5}.{(entry * 13) % 1000:D3}"
-            }).ToList()
-        };
-
-        return new PomSubmissionModel(
-            header,
-            $"674a1b2c3d4e5f66{index:x8}",
-            CreatedAt.AddMinutes(index),
-            header.TonnageEntries.Select((entry, entryIndex) =>
-                entry.ToStoredEntry($"{index:x8}{entryIndex:x8}674a1b2c", "Placed")).ToList(),
-            "Submitted",
-            1 + (index % 5));
     }
 
     // Long header text and a long chemistry on every entry. The example response is smaller than this.

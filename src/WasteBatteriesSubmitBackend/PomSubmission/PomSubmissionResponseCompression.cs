@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
 using Microsoft.AspNetCore.ResponseCompression;
 using WasteBatteriesSubmitBackend.PomSubmission.Endpoints;
@@ -6,7 +5,6 @@ using WasteBatteriesSubmitBackend.PomSubmission.Endpoints;
 namespace WasteBatteriesSubmitBackend.PomSubmission;
 
 // Gzip for the POM submission list. A single submission is plain JSON. The list is the response that can reach the CDP payload limit.
-[ExcludeFromCodeCoverage]
 public static class PomSubmissionResponseCompression
 {
     public static IServiceCollection AddPomSubmissionResponseCompression(this IServiceCollection services)
@@ -33,9 +31,11 @@ public static class PomSubmissionResponseCompression
     }
 
     // The document route is /pom-submissions/{id}. Only the collection path is compressed.
+    // Routing also sends /pom-submissions/ to the list, which takes the gzip page size, so it must be compressed too.
     private static bool IsPomSubmissionList(HttpContext context) =>
         HttpMethods.IsGet(context.Request.Method)
-        && context.Request.Path == PomSubmissionEndpoints.RoutePrefix;
+        && context.Request.Path.StartsWithSegments(PomSubmissionEndpoints.RoutePrefix, out var remaining)
+        && (!remaining.HasValue || remaining == "/");
 
     // The list page limit uses this same decision. gzip;q=0 refuses gzip. * accepts it.
     internal static bool ClientAcceptsGzip(HttpRequest request)

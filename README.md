@@ -22,11 +22,11 @@ The target data model is the Compliance Scheme POM Submission page in the [waste
 
 `PomSubmission:MaxPageSize` is 750. That is the page size when the caller does not accept gzip. `PomSubmission:MaxGzipPageSize` is 17000. That is the page size when `Accept-Encoding` includes `gzip` or `*` with a quality above 0. `gzip;q=0` does not accept gzip, so the smaller limit applies and the body is plain JSON. A caller that does not accept gzip still receives `200` and uncompressed JSON. The response does not fail.
 
-Both numbers were calculated for the current `PomSubmissionModel` shape, including its 80 tonnage entries. If that class changes, measure the plain JSON and the gzip response again and update both settings. Until that is done, the limits are for the old shape and a page can pass the 10 MiB CDP payload limit (10,485,760 bytes). The list integration tests fail in that case: they store a full page of the measured shape and reject a body that is not under 10 MiB.
+Both numbers were calculated for the current `PomSubmissionModel` shape, including its 80 tonnage entries. If that class changes, measure the plain JSON and the gzip response again and update both settings. Until that is done, the limits are for the old shape and a page can pass the 10 MiB CDP payload limit (10,485,760 bytes). The plain-JSON integration test fails when a full plain page is not under 10 MiB. The gzip unit test fails when a full gzip page is not under 10 MiB.
 
 The measured submission has a 160-character member name, a 40-character scheme membership reference, BPRN `BPRN-NIEA-2026-000123`, data basis `Estimated`, tonnes `99999.999`, and chemistry `Nickel-metal hydride` with a two-digit suffix on every entry. One of those objects is 13,578 bytes. As uncompressed JSON, 772 of them stay under 10 MiB and 773 do not. 750 is 772 rounded down. The shorter example fields are about 12,207 bytes each and would fit 858 submissions. That larger count is not the plain-JSON limit, because long member names and long chemistry text would then pass 10 MiB. The plain-JSON integration test stores 750 of these long submissions and reads `GET /pom-submissions` with no `Accept-Encoding`. That response body is under 10 MiB.
 
-The gzip limit uses that same long submission, with each submission different (member, tonnes, and ids). Identical copies compress far more than a real list, so they are not the measure. Gzip is `Optimal`, which is what the API uses. Serialising the model in memory, 17,696 of those submissions gzip to 10,485,286 bytes and 17,697 goes over 10 MiB. The list endpoint is a little larger than that. Tonnes are stored as `Decimal128` and written back as a string, and the response is the stored page rather than the in-memory object. Measured on `GET /pom-submissions` with `Accept-Encoding: gzip`, 17,364 distinct submissions gzip to 10,485,744 bytes, which is 16 bytes under 10 MiB. 17,365 is 10,486,326 bytes and does not fit. 17,500 was over the limit on that endpoint (10,567,695 bytes). 17000 is 17,364 rounded down, so the configured page is not sitting on the limit. The gzip integration test stores 17000 distinct submissions and checks that gzip body.
+The gzip limit uses that same long submission, with each submission different (member, tonnes, and ids). Identical copies compress far more than a real list, so they are not the measure. Gzip is `Optimal`, which is what the API uses. Tonnes are stored as `Decimal128` and written back as a string. Measured on `GET /pom-submissions` with `Accept-Encoding: gzip`, 17,364 distinct submissions gzip to 10,485,744 bytes, which is 16 bytes under 10 MiB. 17,365 is 10,486,326 bytes and does not fit. 17,500 was over the limit on that endpoint (10,567,695 bytes). 17000 is 17,364 rounded down, so the configured page is not sitting on the limit. The unit test gzips a page of `MaxGzipPageSize` of these submissions, using the tonnes text the store writes back, and fails when that gzip is not under 10 MiB. It does not insert them. An integration test stores two of them, reads the gzip list, and requires that JSON to match the JSON the unit test gzips. A change to the response breaks that match, which is the signal to measure the page again.
 
 The caller posts `schemeOrgId`, `memberOrgId`, `memberName`, `memberBprn`, `schemeMembershipRef`, `compliancePeriodYear`, `compliancePeriodQuarter`, `dataBasis` and at least one `tonnageEntries` item. `schemeOrgId` and `memberOrgId` are ObjectIds. `memberBprn` matches `BPRN-{EA|NRW|SEPA|NIEA}-{year}-{6 digits}`, and that year equals `compliancePeriodYear`. `compliancePeriodYear` is a four-digit year on the request. Each entry posts `chemistry` and `tonnes`. `tonnes` is a string with exactly three digits after the decimal point, stored as `Decimal128` and returned as that string. `batteryCategory` is required on the stored classification. The request must not include it, and posting it is a bad request. The service sets it to `Portable` for every submission. `subCategory`, `cellType` and `equipmentState` are not on the classification. Posting one of them, or any other property the request model does not declare, is a bad request and is logged as an error.
 
@@ -51,7 +51,7 @@ The caller posts `schemeOrgId`, `memberOrgId`, `memberName`, `memberBprn`, `sche
 }
 ```
 
-The service sets `id`, `schemaVersion`, `version`, `status`, `isCurrent`, `submittedOnUtc`, `createdAtUtc`, `updatedAtUtc`, `supersedesSubmissionId`, each entry's `id` and `activity`, and `batteryCategory` (`Portable`). A first submission returns `schemaVersion` `2` and `version` `1`. `schemaVersion` is a constant. `2` is the classification that stores `batteryCategory` and `chemistry` only. `version`, `status` and `activity` come from the `PomSubmission` configuration, and the defaults are `1`, `Submitted` and `Placed`. `submittedOnUtc` equals `createdAtUtc` when the status is `Submitted`. `supersedesSubmissionId` and `updatedAtUtc` are null. Both `schemaVersion` and `version` are on the response. `schemaVersion` says which vocabulary the stored texts use. `version` is the concurrency token a later write sends back. Create does not check it. The declaration is omitted.
+The service sets `id`, `schemaVersion`, `version`, `status`, `isCurrent`, `submittedOnUtc`, `createdAtUtc`, `updatedAtUtc`, `supersedesSubmissionId`, each entry's `id` and `activity`, and `batteryCategory` (`Portable`). A first submission returns `schemaVersion` `1` and `version` `1`. `schemaVersion` is a constant. `1` is the classification that stores `batteryCategory` and `chemistry` only. `version`, `status` and `activity` come from the `PomSubmission` configuration, and the defaults are `1`, `Submitted` and `Placed`. `submittedOnUtc` equals `createdAtUtc` when the status is `Submitted`. `supersedesSubmissionId` and `updatedAtUtc` are null. Both `schemaVersion` and `version` are on the response. `schemaVersion` says which vocabulary the stored texts use. `version` is the concurrency token a later write sends back. Create does not check it. The declaration is omitted.
 
 A repeated classification is rejected. The comparison is `batteryCategory` and `chemistry`. Activity is not part of that key. A second submission is rejected while a current submission already exists for the same scheme, member, year and quarter. That lookup runs when those key fields are well formed, and it reads the collection once. Field failures, including that duplicate, are `400` validation problems and are logged at information.
 
@@ -115,19 +115,11 @@ You can use the CDP Terminal to access the environments' MongoDB.
 
 ### Testing
 
-Build the Debug assemblies, then run them directly:
-
 ```bash
-dotnet build --configuration Debug
-bash scripts/run-tests.sh
+dotnet test
 ```
 
-`dotnet test` uses the testing-platform server and currently reports that zero tests ran. The pull request workflow builds Debug and runs `scripts/run-tests.sh`. On PowerShell, run the two assemblies the script launches:
-
-```powershell
-dotnet tests/WasteBatteriesSubmitBackend.Tests.Unit/bin/Debug/net10.0/WasteBatteriesSubmitBackend.Tests.Unit.dll
-dotnet tests/WasteBatteriesSubmitBackend.Tests.Integration/bin/Debug/net10.0/WasteBatteriesSubmitBackend.Tests.Integration.dll
-```
+`dotnet test` runs both suites. The pull request check and the SonarCloud check both use it. The pull request check fails when line coverage of `WasteBatteriesSubmitBackend` is below 90%.
 
 `WasteBatteriesSubmitBackend.Tests.Unit` covers validators, mapping, the submission service and handlers without hosting the API.
 

@@ -68,6 +68,23 @@ public partial class PomSubmissionEndpointsTests
     }
 
     [Fact]
+    public async Task List_WhenThePathHasATrailingSlash_StillCompressesTheGzipPage()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = GzipClient();
+
+        // Act
+        var response = await client.GetAsync("/pom-submissions/?schemeOrgId=674a1b2c3d4e5f6789012941", cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("gzip", Assert.Single(response.Content.Headers.ContentEncoding));
+        using var page = JsonDocument.Parse(await Gunzip(response, cancellationToken));
+        Assert.Equal(fixture.Defaults.MaxGzipPageSize, page.RootElement.GetProperty("pageSize").GetInt32());
+    }
+
+    [Fact]
     public async Task Create_WhenTheClientAcceptsGzip_ReturnsPlainJson()
     {
         // Arrange

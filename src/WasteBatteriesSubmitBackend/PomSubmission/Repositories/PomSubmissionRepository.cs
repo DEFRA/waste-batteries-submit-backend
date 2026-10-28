@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using MongoDB.Driver;
 using WasteBatteriesSubmitBackend.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
@@ -19,7 +18,6 @@ public interface IPomSubmissionRepository
         CancellationToken cancellationToken = default);
 }
 
-[ExcludeFromCodeCoverage]
 public class PomSubmissionRepository(IMongoDbClientFactory connectionFactory, ILoggerFactory loggerFactory)
     : MongoService<PomSubmissionModel>(connectionFactory, CollectionName, loggerFactory), IPomSubmissionRepository
 {

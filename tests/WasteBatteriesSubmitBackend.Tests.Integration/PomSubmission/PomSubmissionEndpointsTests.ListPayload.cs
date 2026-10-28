@@ -1,19 +1,21 @@
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
-using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
+using WasteBatteriesSubmitBackend.Tests.Common;
 using WasteBatteriesSubmitBackend.Utils.Mongo;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
 
-// A full page of the long submission from the README, read back through GET /pom-submissions.
-// The plain body uses MaxPageSize. The gzip body uses MaxGzipPageSize. Both must stay under 10 MiB.
-// Recalculate both settings when PomSubmissionModel changes. These tests fail until that is done.
+// The plain list stores a full page and fails when that response is not under 10 MiB.
+// The gzip list stores two of the distinct submissions the unit test gzips, and fails when the
+// endpoint JSON is not that JSON. The unit test then fails when a full gzip page is not under 10 MiB.
+// Recalculate both settings when PomSubmissionModel changes.
 public partial class PomSubmissionEndpointsTests
 {
     private const int PayloadTonnageEntries = 80;
@@ -28,7 +30,7 @@ public partial class PomSubmissionEndpointsTests
 
     private const string PlainSchemeOrgId = "674a1b2c3d4e5f6789012c11";
 
-    private const string GzipSchemeOrgId = "674a1b2c3d4e5f6789012c12";
+    private const string GzipSchemeOrgId = MeasuredPomSubmission.SchemeOrgId;
 
     [Fact(Timeout = 180_000)]
     public async Task List_WhenGzipIsNotAccepted_ReturnsTheFullPageUnderThePayloadLimit()
@@ -57,14 +59,21 @@ public partial class PomSubmissionEndpointsTests
         }
     }
 
-    [Fact(Timeout = 600_000)]
-    public async Task List_WhenGzipIsAccepted_ReturnsTheFullPageUnderThePayloadLimit()
+    [Fact]
+    public async Task List_WhenGzipIsAccepted_ReturnsTheMeasuredSubmissionJson()
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
-        var count = fixture.Defaults.MaxGzipPageSize;
+        const int count = 2;
         await InsertMeasuredPage(GzipSchemeOrgId, count, distinct: true, cancellationToken);
         using var client = PayloadClient(acceptsGzip: true);
+        var items = MeasuredPomSubmission.Page(
+            GzipSchemeOrgId,
+            count,
+            fixture.Defaults.InitialActivity,
+            fixture.Defaults.InitialStatus,
+            fixture.Defaults.InitialVersion,
+            distinct: true);
 
         try
         {
@@ -75,8 +84,9 @@ public partial class PomSubmissionEndpointsTests
             // Assert
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             Assert.Equal("gzip", Assert.Single(response.Content.Headers.ContentEncoding));
-            AssertUnderPayloadLimit(compressed.Length, count, "gzip");
-            AssertFullPage(Gunzip(compressed), count);
+            Assert.Equal(
+                MeasuredPomSubmission.PageJson(items, count, pageNumber: 1, fixture.Defaults.MaxGzipPageSize),
+                Encoding.UTF8.GetString(Gunzip(compressed)));
         }
         finally
         {
@@ -113,8 +123,18 @@ public partial class PomSubmissionEndpointsTests
             {
                 var index = start + offset;
                 batch[offset] = distinct
-                    ? DistinctMeasuredSubmission(schemeOrgId, index)
-                    : FullMeasuredSubmission(schemeOrgId, index);
+                    ? MeasuredPomSubmission.Distinct(
+                        schemeOrgId,
+                        index,
+                        fixture.Defaults.InitialActivity,
+                        fixture.Defaults.InitialStatus,
+                        fixture.Defaults.InitialVersion)
+                    : MeasuredPomSubmission.Full(
+                        schemeOrgId,
+                        index,
+                        fixture.Defaults.InitialActivity,
+                        fixture.Defaults.InitialStatus,
+                        fixture.Defaults.InitialVersion);
             }
 
             await collection.InsertManyAsync(batch, cancellationToken: cancellationToken);
@@ -155,70 +175,6 @@ public partial class PomSubmissionEndpointsTests
         gzip.CopyTo(output);
         return output.ToArray();
     }
-
-    // Long header text and a long chemistry on every entry. Ids differ so the current-submission index allows the page.
-    private PomSubmissionModel FullMeasuredSubmission(string schemeOrgId, int index)
-    {
-        const string chemistry = "Nickel-metal hydride";
-        var header = new PomSubmissionRequest
-        {
-            SchemeOrgId = schemeOrgId,
-            MemberOrgId = $"674a1b2c3d4e5f68{index:x8}",
-            MemberName = new string('N', PayloadMemberNameLength),
-            MemberBprn = "BPRN-NIEA-2026-000123",
-            SchemeMembershipRef = new string('S', 40),
-            CompliancePeriodYear = 2026,
-            CompliancePeriodQuarter = "Quarter 2",
-            DataBasis = "Estimated",
-            TonnageEntries = Enumerable.Range(1, PayloadTonnageEntries).Select(entry => new TonnageEntryBase
-            {
-                Classification = new BatteryClassification
-                {
-                    Chemistry = $"{chemistry} {entry:00}"
-                },
-                Tonnes = "99999.999"
-            }).ToList()
-        };
-
-        return StoredSubmission(header, index, PomSubmissionApiFixture.CreatedAt);
-    }
-
-    // Each submission differs. Identical copies compress far more than a real list.
-    private PomSubmissionModel DistinctMeasuredSubmission(string schemeOrgId, int index)
-    {
-        const string chemistry = "Nickel-metal hydride";
-        var header = new PomSubmissionRequest
-        {
-            SchemeOrgId = schemeOrgId,
-            MemberOrgId = $"674a1b2c3d4e5f68{index:x8}",
-            MemberName = $"{index:D6} " + new string((char)('A' + (index % 26)), 153),
-            MemberBprn = $"BPRN-NIEA-2026-{(index % 1000000):D6}",
-            SchemeMembershipRef = $"SCH-{index:D36}",
-            CompliancePeriodYear = 2020 + (index % 7),
-            CompliancePeriodQuarter = $"Quarter {(index % 4) + 1}",
-            DataBasis = index % 2 == 0 ? "Estimated" : "Actual",
-            TonnageEntries = Enumerable.Range(1, PayloadTonnageEntries).Select(entry => new TonnageEntryBase
-            {
-                Classification = new BatteryClassification
-                {
-                    Chemistry = $"{chemistry} {entry:00}"
-                },
-                Tonnes = $"{10000 + ((index * 17 + entry) % 90000):D5}.{(entry * 13) % 1000:D3}"
-            }).ToList()
-        };
-
-        return StoredSubmission(header, index, PomSubmissionApiFixture.CreatedAt.AddMinutes(index));
-    }
-
-    private PomSubmissionModel StoredSubmission(PomSubmissionRequest header, int index, DateTime createdAt) =>
-        new(
-            header,
-            $"674a1b2c3d4e5f69{index:x8}",
-            createdAt,
-            header.TonnageEntries.Select((entry, entryIndex) =>
-                entry.ToStoredEntry($"{index:x8}{entryIndex:x8}674a1b2c", fixture.Defaults.InitialActivity)).ToList(),
-            fixture.Defaults.InitialStatus,
-            fixture.Defaults.InitialVersion);
 
     private static ListPayload ReadListPayload(ReadOnlySpan<byte> json)
     {

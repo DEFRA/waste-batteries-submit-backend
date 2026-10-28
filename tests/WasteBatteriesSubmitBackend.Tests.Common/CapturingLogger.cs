@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace WasteBatteriesSubmitBackend.Tests.Unit.Utils.Logging;
+namespace WasteBatteriesSubmitBackend.Tests.Common;
 
 public sealed class CapturingLogger<T> : ILogger<T>
 {
