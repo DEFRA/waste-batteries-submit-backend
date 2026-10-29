@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using WasteBatteriesSubmitBackend.Config;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 

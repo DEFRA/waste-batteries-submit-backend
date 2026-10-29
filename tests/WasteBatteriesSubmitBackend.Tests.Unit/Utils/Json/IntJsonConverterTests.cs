@@ -1,5 +1,5 @@
 using System.Text.Json;
-using WasteBatteriesSubmitBackend.PomSubmission.Models;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.Utils.Json;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.Utils.Json;

@@ -7,7 +7,7 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddApiOpenApi(this IServiceCollection services)
     {
-        // TODO: Generate the OpenAPI document at build time, as waste-obligations does
+        // TEMPORARY: Generate the OpenAPI document at build time, as waste-obligations does
         // with OpenApiGenerateDocuments. Generation starts the app, and startup currently
         // requires JWT and Mongo. Skip that infrastructure when the entry assembly is
         // GetDocument.Insider, the same guard as IsProjectBuildGeneratingOpenApi.

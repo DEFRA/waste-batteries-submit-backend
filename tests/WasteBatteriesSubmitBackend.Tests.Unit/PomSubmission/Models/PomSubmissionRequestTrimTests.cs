@@ -1,4 +1,5 @@
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Models;
 

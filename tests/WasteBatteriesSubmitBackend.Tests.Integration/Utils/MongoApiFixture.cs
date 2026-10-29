@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Testcontainers.MongoDb;
+using WasteBatteriesSubmitBackend.Tests.Common;
 using WasteBatteriesSubmitBackend.Utils.Mongo;
 using WasteBatteriesSubmitBackend.Utils.Time;
 
@@ -17,8 +18,8 @@ namespace WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 //Testcontainers.MongoDb - see https://devblogs.microsoft.com/ise/testing-with-testcontainers/ and https://dotnet.testcontainers.org/modules/mongodb/
 public abstract class MongoApiFixture : IAsyncLifetime
 {
-    private readonly MongoDbContainer container = new MongoDbBuilder("mongo:7").Build();
-    private WebApplicationFactory<Program>? factory;
+    private readonly MongoDbContainer _container = new MongoDbBuilder("mongo:7").Build();
+    private WebApplicationFactory<Program>? _factory;
 
     protected MongoApiFixture(string databasePrefix)
     {
@@ -46,13 +47,13 @@ public abstract class MongoApiFixture : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        await container.StartAsync();
-        factory = new ApplicationFactory(
-            container.GetConnectionString(),
+        await _container.StartAsync();
+        _factory = new ApplicationFactory(
+            _container.GetConnectionString(),
             DatabaseName,
             FixedUtcNow,
             ConfigureTestServices);
-        Factory = factory;
+        Factory = _factory;
         OnStarted();
     }
 
@@ -60,12 +61,12 @@ public abstract class MongoApiFixture : IAsyncLifetime
     {
         try
         {
-            if (factory is not null)
+            if (_factory is not null)
             {
-                await factory.DisposeAsync();
+                await _factory.DisposeAsync();
             }
 
-            await container.DisposeAsync();
+            await _container.DisposeAsync();
         }
         finally
         {
@@ -101,10 +102,5 @@ public abstract class MongoApiFixture : IAsyncLifetime
                 configureServices(services);
             });
         }
-    }
-
-    private sealed class FixedTime(DateTime utcNow) : ITimeProvider
-    {
-        public DateTime UtcNow => utcNow;
     }
 }

@@ -1,4 +1,4 @@
-namespace WasteBatteriesSubmitBackend.PomSubmission.Models;
+namespace WasteBatteriesSubmitBackend.PomSubmission.Validators;
 
 // A posted compliance period year is a four-digit calendar year.
 public static class CalendarYear

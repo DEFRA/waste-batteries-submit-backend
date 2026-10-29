@@ -1,5 +1,6 @@
 using System.Text.Json;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.PomSubmission.Validators;
 using WasteBatteriesSubmitBackend.Tests.Unit.Utils.Validation;
 

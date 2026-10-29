@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using WasteBatteriesSubmitBackend.Tests.Common;
 using WasteBatteriesSubmitBackend.Utils.Logging;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.Utils.Logging;
