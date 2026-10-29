@@ -14,9 +14,9 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Services;
 
 public partial class PomSubmissionServiceTests
 {
-    private static readonly int[] TrimmedCompliancePeriodYear = [2026];
+    private static readonly int[] s_trimmedCompliancePeriodYear = [2026];
 
-    private static readonly string[] TrimmedCompliancePeriodQuarter = ["Quarter 2"];
+    private static readonly string[] s_trimmedCompliancePeriodQuarter = ["Quarter 2"];
 
     [Fact]
     public async Task CreateAsync_WhenRequestIsValid_SavesSubmissionAndLogsIt()
@@ -48,12 +48,12 @@ public partial class PomSubmissionServiceTests
                 saved.Id == submission.Id
                 && saved.Status == "Submitted"
                 && saved.Version == 1
-                && saved.SubmittedOnUtc == CreatedAt
+                && saved.SubmittedOnUtc == s_createdAt
                 && saved.SubmittedOnUtc == saved.CreatedAtUtc
                 && saved.MemberName == "Northwind Batteries Ltd"
                 && saved.TonnageEntries[0].Activity == "Placed"
                 && saved.IsCurrent
-                && saved.CreatedAtUtc == CreatedAt),
+                && saved.CreatedAtUtc == s_createdAt),
             Arg.Any<CancellationToken>());
         var entry = Assert.Single(logger.Entries);
         Assert.Equal(LogLevel.Information, entry.Level);
@@ -145,9 +145,9 @@ public partial class PomSubmissionServiceTests
                 query.SchemeOrgId == "674a1b2c3d4e5f6789012345"
                 && query.MemberOrgId == "674a1b2c3d4e5f6789012346"
                 && query.CompliancePeriodYears != null
-                && query.CompliancePeriodYears.SequenceEqual(TrimmedCompliancePeriodYear)
+                && query.CompliancePeriodYears.SequenceEqual(s_trimmedCompliancePeriodYear)
                 && query.CompliancePeriodQuarters != null
-                && query.CompliancePeriodQuarters.SequenceEqual(TrimmedCompliancePeriodQuarter)
+                && query.CompliancePeriodQuarters.SequenceEqual(s_trimmedCompliancePeriodQuarter)
                 && query.IsCurrent == true),
             new PageRequest { PageSize = MaxPageSize },
             Arg.Any<CancellationToken>());
@@ -276,7 +276,7 @@ public partial class PomSubmissionServiceTests
         repository
             .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>(
-                [new PomSubmissionModel { Id = "674a1b2c3d4e5f6789012345", CreatedAtUtc = CreatedAt }],
+                [new PomSubmissionModel { Id = "674a1b2c3d4e5f6789012345", CreatedAtUtc = s_createdAt }],
                 1,
                 1,
                 1));
@@ -306,7 +306,7 @@ public partial class PomSubmissionServiceTests
         repository
             .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>(
-                [new PomSubmissionModel { Id = "674a1b2c3d4e5f6789012345", CreatedAtUtc = CreatedAt }],
+                [new PomSubmissionModel { Id = "674a1b2c3d4e5f6789012345", CreatedAtUtc = s_createdAt }],
                 1,
                 1,
                 1));

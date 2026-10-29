@@ -4,19 +4,19 @@ namespace WasteBatteriesSubmitBackend.Utils.Mongo;
 
 public static class MongoConventions
 {
-    private static readonly object Gate = new();
-    private static volatile bool registered;
+    private static readonly object s_gate = new();
+    private static volatile bool s_registered;
 
     public static void Register()
     {
-        if (registered)
+        if (s_registered)
         {
             return;
         }
 
-        lock (Gate)
+        lock (s_gate)
         {
-            if (registered)
+            if (s_registered)
             {
                 return;
             }
@@ -27,7 +27,7 @@ public static class MongoConventions
             };
 
             ConventionRegistry.Register("CamelCase", conversions, _ => true);
-            registered = true;
+            s_registered = true;
         }
     }
 }

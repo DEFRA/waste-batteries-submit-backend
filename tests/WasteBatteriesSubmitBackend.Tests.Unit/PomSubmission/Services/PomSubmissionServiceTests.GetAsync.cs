@@ -21,7 +21,7 @@ public partial class PomSubmissionServiceTests
         var stored = new PomSubmissionModel
         {
             Id = "674a1b2c3d4e5f6789012345",
-            CreatedAtUtc = CreatedAt
+            CreatedAtUtc = s_createdAt
         };
         repository
             .FindAsync(

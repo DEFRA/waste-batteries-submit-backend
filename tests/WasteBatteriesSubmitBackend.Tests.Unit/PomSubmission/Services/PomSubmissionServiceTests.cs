@@ -19,14 +19,14 @@ public partial class PomSubmissionServiceTests
 
     private const int MaxGzipPageSize = 40;
 
-    private static readonly DateTime CreatedAt = new(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime s_createdAt = new(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc);
 
     private static void ReturnNoSubmissions(IPomSubmissionRepository repository) =>
         repository
             .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>([], 0, 1, 0));
 
-    private static readonly IOptions<PomSubmissionConfig> Config = Options.Create(new PomSubmissionConfig
+    private static readonly IOptions<PomSubmissionConfig> s_config = Options.Create(new PomSubmissionConfig
     {
         InitialStatus = "Submitted",
         InitialVersion = 1,
@@ -38,11 +38,11 @@ public partial class PomSubmissionServiceTests
     private static PomSubmissionService Service(IPomSubmissionRepository repository, CapturingLogger<PomSubmissionService> logger) =>
         new(
             repository,
-            new PomSubmissionMapper(Config),
-            Config,
+            new PomSubmissionMapper(s_config),
+            s_config,
             new PomSubmissionRequestValidator(),
             new PomSubmissionListRequestValidator(),
-            new FixedTime(CreatedAt),
+            new FixedTime(s_createdAt),
             logger);
 
     private static PomSubmissionRequest ValidRequest() => new()

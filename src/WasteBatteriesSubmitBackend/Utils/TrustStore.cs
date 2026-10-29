@@ -15,10 +15,10 @@ public static class TrustStore
 
     private static List<byte[]> GetCertificates()
     {
-        return Environment.GetEnvironmentVariables().Cast<DictionaryEntry>()
+        return [.. Environment.GetEnvironmentVariables().Cast<DictionaryEntry>()
             .Where(entry =>
                 entry.Key.ToString()!.StartsWith("TRUSTSTORE_", StringComparison.Ordinal) && IsBase64String(entry.Value?.ToString() ?? ""))
-            .Select(entry => Convert.FromBase64String(entry.Value?.ToString() ?? "")).ToList();
+            .Select(entry => Convert.FromBase64String(entry.Value?.ToString() ?? ""))];
     }
 
     private static void AddCertificates(List<byte[]> certificates)

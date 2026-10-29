@@ -12,7 +12,7 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Mapping;
 
 public class PomSubmissionMapperTests
 {
-    private static readonly DateTime CreatedAt = new(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime s_createdAt = new(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc);
 
     [Fact]
     public void ToNewSubmission_WhenRequestIsComplete_MapsSubmittedSubmission()
@@ -42,7 +42,7 @@ public class PomSubmissionMapperTests
             JsonSerializerOptions.Web);
 
         // Act
-        var submission = Mapper().ToNewSubmission(request!, CreatedAt);
+        var submission = Mapper().ToNewSubmission(request!, s_createdAt);
 
         // Assert
         Assert.Equal("674a1b2c3d4e5f6789012345", submission.SchemeOrgId);
@@ -54,12 +54,12 @@ public class PomSubmissionMapperTests
         Assert.Equal("Quarter 2", submission.CompliancePeriodQuarter);
         Assert.Equal("Actual", submission.DataBasis);
         Assert.Equal("Submitted", submission.Status);
-        Assert.Equal(CreatedAt, submission.SubmittedOnUtc);
+        Assert.Equal(s_createdAt, submission.SubmittedOnUtc);
         Assert.Equal(submission.CreatedAtUtc, submission.SubmittedOnUtc);
         Assert.True(submission.IsCurrent);
         Assert.Null(submission.SupersedesSubmissionId);
         Assert.Null(submission.UpdatedAtUtc);
-        Assert.Equal(CreatedAt, submission.CreatedAtUtc);
+        Assert.Equal(s_createdAt, submission.CreatedAtUtc);
         Assert.Equal(PomSubmissionModel.CurrentSchemaVersion, submission.SchemaVersion);
         Assert.Equal(1, submission.Version);
         Assert.True(ObjectId.TryParse(submission.Id, out _));
@@ -86,7 +86,7 @@ public class PomSubmissionMapperTests
         };
 
         // Act
-        var act = () => Mapper().ToNewSubmission(request, CreatedAt);
+        var act = () => Mapper().ToNewSubmission(request, s_createdAt);
 
         // Assert
         var exception = Assert.Throws<ArgumentException>(act);
@@ -111,7 +111,7 @@ public class PomSubmissionMapperTests
                     Tonnes = "12.500"
                 }
             ]
-        }, CreatedAt);
+        }, s_createdAt);
 
         // Act
         var document = submission.ToBsonDocument();
@@ -120,7 +120,7 @@ public class PomSubmissionMapperTests
         // Assert
         Assert.Equal("Submitted", document["status"].AsString);
         Assert.Equal(1, document["version"].AsInt32);
-        Assert.Equal(CreatedAt, document["submittedOnUtc"].ToUniversalTime());
+        Assert.Equal(s_createdAt, document["submittedOnUtc"].ToUniversalTime());
         Assert.Equal(document["createdAtUtc"].ToUniversalTime(), document["submittedOnUtc"].ToUniversalTime());
         Assert.Equal("Northwind Batteries Ltd", document["memberName"].AsString);
         Assert.Equal("Placed", document["tonnageEntries"][0]["activity"].AsString);
@@ -129,7 +129,7 @@ public class PomSubmissionMapperTests
         Assert.False(document.Contains("declaration"));
         Assert.Equal(submission.Id, stored.Id);
         Assert.Equal("Submitted", stored.Status);
-        Assert.Equal(CreatedAt, stored.SubmittedOnUtc);
+        Assert.Equal(s_createdAt, stored.SubmittedOnUtc);
         Assert.Equal(stored.CreatedAtUtc, stored.SubmittedOnUtc);
         Assert.Equal("12.500", stored.TonnageEntries[0].Tonnes);
     }
@@ -150,14 +150,14 @@ public class PomSubmissionMapperTests
         };
 
         // Act
-        var submission = mapper.ToNewSubmission(request, CreatedAt);
+        var submission = mapper.ToNewSubmission(request, s_createdAt);
 
         // Assert
         Assert.Equal("Filed", submission.Status);
         Assert.Equal(4, submission.Version);
         Assert.Equal(PomSubmissionModel.CurrentSchemaVersion, submission.SchemaVersion);
         Assert.Equal("Held", submission.TonnageEntries[0].Activity);
-        Assert.Equal(CreatedAt, submission.CreatedAtUtc);
+        Assert.Equal(s_createdAt, submission.CreatedAtUtc);
         Assert.Null(submission.SubmittedOnUtc);
     }
 
@@ -177,11 +177,11 @@ public class PomSubmissionMapperTests
         };
 
         // Act
-        var submission = mapper.ToNewSubmission(request, CreatedAt);
+        var submission = mapper.ToNewSubmission(request, s_createdAt);
 
         // Assert
         Assert.Equal("sUbMiTtEd", submission.Status);
-        Assert.Equal(CreatedAt, submission.SubmittedOnUtc);
+        Assert.Equal(s_createdAt, submission.SubmittedOnUtc);
         Assert.Equal(submission.CreatedAtUtc, submission.SubmittedOnUtc);
     }
 
@@ -195,12 +195,12 @@ public class PomSubmissionMapperTests
         };
 
         // Act
-        var submission = Mapper().ToNewSubmission(request, CreatedAt, version: 3);
+        var submission = Mapper().ToNewSubmission(request, s_createdAt, version: 3);
 
         // Assert
         Assert.Equal(3, submission.Version);
         Assert.Null(submission.SupersedesSubmissionId);
-        Assert.Equal(CreatedAt, submission.CreatedAtUtc);
+        Assert.Equal(s_createdAt, submission.CreatedAtUtc);
     }
 
     [Fact]
@@ -216,7 +216,7 @@ public class PomSubmissionMapperTests
         // Act
         var submission = Mapper().ToNewSubmission(
             request,
-            CreatedAt,
+            s_createdAt,
             version: 2,
             supersedesSubmissionId: previousId);
 

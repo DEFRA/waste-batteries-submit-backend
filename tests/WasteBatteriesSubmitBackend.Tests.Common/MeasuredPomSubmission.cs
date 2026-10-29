@@ -19,22 +19,19 @@ public static class MeasuredPomSubmission
 
     public static readonly DateTime CreatedAt = new(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc);
 
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions s_jsonOptions = new(JsonSerializerDefaults.Web);
 
     public static PomSubmissionModel[] Page(
         string schemeOrgId,
         int count,
         string activity,
         string status,
-        int version,
-        bool distinct)
+        int version)
     {
         var items = new PomSubmissionModel[count];
         for (var index = 0; index < count; index++)
         {
-            items[index] = distinct
-                ? Distinct(schemeOrgId, index, activity, status, version)
-                : Full(schemeOrgId, index, activity, status, version);
+            items[index] = Distinct(schemeOrgId, index, activity, status, version);
         }
 
         Array.Sort(items, CompareNewestFirst);
@@ -59,32 +56,6 @@ public static class MeasuredPomSubmission
         return (int)output.Length;
     }
 
-    public static PomSubmissionModel Full(string schemeOrgId, int index, string activity, string status, int version)
-    {
-        const string chemistry = "Nickel-metal hydride";
-        var header = new PomSubmissionRequest
-        {
-            SchemeOrgId = schemeOrgId,
-            MemberOrgId = $"674a1b2c3d4e5f68{index:x8}",
-            MemberName = new string('N', 160),
-            MemberBprn = "BPRN-NIEA-2026-000123",
-            SchemeMembershipRef = new string('S', 40),
-            CompliancePeriodYear = 2026,
-            CompliancePeriodQuarter = "Quarter 2",
-            DataBasis = "Estimated",
-            TonnageEntries = Enumerable.Range(1, TonnageEntryCount).Select(entry => new TonnageEntryBase
-            {
-                Classification = new BatteryClassification
-                {
-                    Chemistry = $"{chemistry} {entry:00}"
-                },
-                Tonnes = StoredTonnes("99999.999")
-            }).ToList()
-        };
-
-        return Stored(header, index, CreatedAt, activity, status, version);
-    }
-
     // Each submission differs. Identical copies compress far more than a real list.
     public static PomSubmissionModel Distinct(string schemeOrgId, int index, string activity, string status, int version)
     {
@@ -99,14 +70,14 @@ public static class MeasuredPomSubmission
             CompliancePeriodYear = 2020 + (index % 7),
             CompliancePeriodQuarter = $"Quarter {(index % 4) + 1}",
             DataBasis = index % 2 == 0 ? "Estimated" : "Actual",
-            TonnageEntries = Enumerable.Range(1, TonnageEntryCount).Select(entry => new TonnageEntryBase
+            TonnageEntries = [.. Enumerable.Range(1, TonnageEntryCount).Select(entry => new TonnageEntryBase
             {
                 Classification = new BatteryClassification
                 {
                     Chemistry = $"{chemistry} {entry:00}"
                 },
                 Tonnes = StoredTonnes($"{10000 + ((index * 17 + entry) % 90000):D5}.{(entry * 13) % 1000:D3}")
-            }).ToList()
+            })]
         };
 
         return Stored(header, index, CreatedAt.AddMinutes(index), activity, status, version);
@@ -121,7 +92,7 @@ public static class MeasuredPomSubmission
         JsonSerializer.Serialize(
             stream,
             new PaginatedList<PomSubmissionModel>(items, totalCount, pageNumber, pageSize),
-            JsonOptions);
+            s_jsonOptions);
 
     private static int CompareNewestFirst(PomSubmissionModel left, PomSubmissionModel right)
     {
@@ -143,8 +114,8 @@ public static class MeasuredPomSubmission
             header,
             $"674a1b2c3d4e5f69{index:x8}",
             createdAt,
-            header.TonnageEntries.Select((entry, entryIndex) =>
-                entry.ToStoredEntry($"{index:x8}{entryIndex:x8}674a1b2c", activity)).ToList(),
+            [.. header.TonnageEntries.Select((entry, entryIndex) =>
+                entry.ToStoredEntry($"{index:x8}{entryIndex:x8}674a1b2c", activity))],
             status,
             version);
 }

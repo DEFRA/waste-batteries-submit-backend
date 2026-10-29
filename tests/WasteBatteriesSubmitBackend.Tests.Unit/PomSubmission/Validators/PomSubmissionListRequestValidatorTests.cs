@@ -6,13 +6,13 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Validators;
 
 public class PomSubmissionListRequestValidatorTests
 {
-    private readonly PomSubmissionListRequestValidator validator = new();
+    private readonly PomSubmissionListRequestValidator _validator = new();
 
     [Fact]
     public async Task ValidateAsync_WhenNoBusinessFilterIsSet_ReturnsThatError()
     {
         await ValidationAssert.AssertOnly(
-            validator,
+            _validator,
             new PomSubmissionListRequest
             {
                 IsCurrent = true,
@@ -39,7 +39,7 @@ public class PomSubmissionListRequestValidatorTests
             _ => throw new ArgumentOutOfRangeException(nameof(filter))
         };
 
-        var result = await validator.ValidateAsync(request, TestContext.Current.CancellationToken);
+        var result = await _validator.ValidateAsync(request, TestContext.Current.CancellationToken);
 
         Assert.True(result.IsValid);
     }
@@ -47,7 +47,7 @@ public class PomSubmissionListRequestValidatorTests
     [Fact]
     public async Task ValidateAsync_WhenEveryFilterIsWellFormed_IsValid()
     {
-        var result = await validator.ValidateAsync(
+        var result = await _validator.ValidateAsync(
             new PomSubmissionListRequest
             {
                 SchemeOrgId = "674a1b2c3d4e5f6789012346",
@@ -66,7 +66,7 @@ public class PomSubmissionListRequestValidatorTests
     [Fact]
     public async Task ValidateAsync_WhenTheSuppliedValuesAreInvalid_ReturnsEveryError()
     {
-        var result = await validator.ValidateAsync(
+        var result = await _validator.ValidateAsync(
             new PomSubmissionListRequest
             {
                 SchemeOrgId = "not-an-id",
@@ -90,7 +90,7 @@ public class PomSubmissionListRequestValidatorTests
     [Fact]
     public async Task ValidateAsync_WhenPageNumberIsSetWithoutPageSize_IsValid()
     {
-        var result = await validator.ValidateAsync(
+        var result = await _validator.ValidateAsync(
             new PomSubmissionListRequest
             {
                 SchemeOrgId = "674a1b2c3d4e5f6789012346",
