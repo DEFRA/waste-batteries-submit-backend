@@ -49,7 +49,7 @@ public class PomSubmissionRepository(IMongoDbClientFactory connectionFactory, IL
             .SortByDescending(submission => submission.CreatedAtUtc)
             .ThenByDescending(submission => submission.Id);
 
-        if (!window.IncludesAll)
+        if (window.IsPaged)
         {
             find = find.Skip(window.Skip).Limit(window.PageSize);
         }

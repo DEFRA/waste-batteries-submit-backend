@@ -7,13 +7,13 @@ internal static class PageWindow
     {
         if (pageSize is null)
         {
-            return new ResolvedPage(PageNumber: 1, PageSize: totalCount, Skip: 0, IncludesAll: true);
+            return new ResolvedPage(PageNumber: 1, PageSize: totalCount, Skip: 0, IsPaged: false);
         }
 
         var size = pageSize.Value;
         if (totalCount == 0)
         {
-            return new ResolvedPage(PageNumber: 1, PageSize: size, Skip: 0, IncludesAll: false);
+            return new ResolvedPage(PageNumber: 1, PageSize: size, Skip: 0, IsPaged: false);
         }
 
         var number = pageNumber ?? 1;
@@ -23,8 +23,8 @@ internal static class PageWindow
             number = totalPages;
         }
 
-        return new ResolvedPage(number, size, (number - 1) * size, IncludesAll: false);
+        return new ResolvedPage(number, size, (number - 1) * size, IsPaged: true);
     }
 }
 
-internal readonly record struct ResolvedPage(int PageNumber, int PageSize, int Skip, bool IncludesAll);
+internal readonly record struct ResolvedPage(int PageNumber, int PageSize, int Skip, bool IsPaged);

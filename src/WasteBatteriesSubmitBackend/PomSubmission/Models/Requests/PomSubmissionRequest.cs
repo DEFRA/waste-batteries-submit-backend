@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.Utils.Text;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
