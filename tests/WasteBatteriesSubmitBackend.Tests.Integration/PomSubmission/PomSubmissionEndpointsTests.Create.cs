@@ -10,8 +10,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
-using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
+using WasteBatteriesSubmitBackend.Tests.Common;
 using WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 using WasteBatteriesSubmitBackend.Utils.Mongo;
 
@@ -219,7 +219,10 @@ public partial class PomSubmissionEndpointsTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var countBefore = await SubmissionCount(cancellationToken);
         using var client = fixture.CreateClient();
-        var body = CreateBody.Replace("\"memberName\": \"Northwind Batteries Ltd\",", string.Empty, StringComparison.Ordinal);
+        var body = CreateBody.Replace(
+            $"\"memberName\": \"{SamplePomSubmission.MemberName}\",",
+            string.Empty,
+            StringComparison.Ordinal);
 
         // Act
         var response = await client.PostAsync("/pom-submissions", Json(body), cancellationToken);
@@ -240,8 +243,8 @@ public partial class PomSubmissionEndpointsTests
         var countBefore = await SubmissionCount(cancellationToken);
         using var client = fixture.CreateClient();
         var body = CreateBody.Replace(
-            "\"dataBasis\": \"Actual\",",
-            "\"dataBasis\": \"Actual\", \"regulatorNote\": \"ignore me\",",
+            $"\"dataBasis\": \"{SamplePomSubmission.DataBasis}\",",
+            $"\"dataBasis\": \"{SamplePomSubmission.DataBasis}\", \"regulatorNote\": \"ignore me\",",
             StringComparison.Ordinal);
 
         // Act
@@ -277,7 +280,7 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.Equal($"/pom-submissions/{id}", response.Headers.Location?.OriginalString);
         Assert.Equal(fixture.Defaults.InitialStatus, created.GetProperty("status").GetString());
-        Assert.Equal("Northwind Batteries Ltd", created.GetProperty("memberName").GetString());
+        Assert.Equal(SamplePomSubmission.MemberName, created.GetProperty("memberName").GetString());
         Assert.Equal(PomSubmissionApiFixture.CreatedAt, created.GetProperty("submittedOnUtc").GetDateTime().ToUniversalTime());
         Assert.Equal(
             created.GetProperty("createdAtUtc").GetDateTime().ToUniversalTime(),
@@ -288,10 +291,10 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal(JsonValueKind.Null, created.GetProperty("updatedAtUtc").ValueKind);
         Assert.Equal(PomSubmissionModel.CurrentSchemaVersion, created.GetProperty("schemaVersion").GetInt32());
         Assert.Equal(fixture.Defaults.InitialVersion, created.GetProperty("version").GetInt32());
-        Assert.Equal("12.500", created.GetProperty("tonnageEntries")[0].GetProperty("tonnes").GetString());
+        Assert.Equal(SamplePomSubmission.Tonnes, created.GetProperty("tonnageEntries")[0].GetProperty("tonnes").GetString());
         var classification = created.GetProperty("tonnageEntries")[0].GetProperty("classification");
-        Assert.Equal("Portable", classification.GetProperty("batteryCategory").GetString());
-        Assert.Equal("Alkaline", classification.GetProperty("chemistry").GetString());
+        Assert.Equal(BatteryClassification.Portable, classification.GetProperty("batteryCategory").GetString());
+        Assert.Equal(SamplePomSubmission.Chemistry, classification.GetProperty("chemistry").GetString());
         Assert.False(classification.TryGetProperty("subCategory", out _));
         Assert.False(classification.TryGetProperty("cellType", out _));
         Assert.False(classification.TryGetProperty("equipmentState", out _));
@@ -330,29 +333,7 @@ public partial class PomSubmissionEndpointsTests
         const string memberOrgId = "674a1b2c3d4e5f67890124ff";
         var repository = fixture.Services.GetRequiredService<IPomSubmissionRepository>();
         var mapper = fixture.Services.GetRequiredService<IPomSubmissionMapper>();
-        var request = new PomSubmissionRequest
-        {
-            SchemeOrgId = PomSubmissionApiFixture.SchemeOrgId,
-            MemberOrgId = memberOrgId,
-            MemberName = "Northwind Batteries Ltd",
-            MemberBprn = "BPRN-EA-2026-000123",
-            SchemeMembershipRef = "SCH-00417",
-            CompliancePeriodYear = 2026,
-            CompliancePeriodQuarter = "Quarter 2",
-            DataBasis = "Actual",
-            TonnageEntries =
-            [
-                new TonnageEntryBase
-                {
-                    Classification = new BatteryClassification
-                    {
-                        BatteryCategory = "Portable",
-                        Chemistry = "Alkaline"
-                    },
-                    Tonnes = "1.000"
-                }
-            ]
-        };
+        var request = SamplePomSubmission.Request() with { MemberOrgId = memberOrgId };
         var first = mapper.ToNewSubmission(request, PomSubmissionApiFixture.CreatedAt);
         var second = mapper.ToNewSubmission(request, PomSubmissionApiFixture.CreatedAt);
 

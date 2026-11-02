@@ -1,6 +1,3 @@
-using System.Net;
-using System.Text;
-using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -10,6 +7,9 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
+using System.Net;
+using System.Text;
+using System.Text.Json;
 using WasteBatteriesSubmitBackend.Example.Repositories;
 using WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 

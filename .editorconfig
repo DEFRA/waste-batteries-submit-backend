@@ -55,6 +55,10 @@ resharper_web_config_type_not_resolved_highlighting = warning
 resharper_web_config_wrong_module_highlighting = warning
 
 [*.cs]
+# One alphabetical list. Visual Studio Remove and Sort Usings follows this.
+dotnet_sort_system_directives_first = false
+dotnet_separate_import_directive_groups = false
+
 # Newline settings
 csharp_new_line_before_open_brace = all
 csharp_new_line_before_else = true

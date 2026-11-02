@@ -1,15 +1,16 @@
+using MongoDB.Bson;
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
-using MongoDB.Bson;
 using WasteBatteriesSubmitBackend.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 
 namespace WasteBatteriesSubmitBackend.Tests.Common;
 
-// The long submission the page-size limits were measured against. Distinct submissions differ, because identical
-// copies compress far more than a real list. The list endpoint returns this JSON, newest first.
+// The long submission the page-size limits were measured against. Distinct rows differ, because identical
+// copies compress far more than a real list. Full is the index-0 row and is repeated for the uncompressed limit.
+// The list endpoint returns this JSON, newest first.
 public static class MeasuredPomSubmission
 {
     public const int TonnageEntryCount = 80;
@@ -17,7 +18,7 @@ public static class MeasuredPomSubmission
     // The scheme id the gzip page measurement and the endpoint comparison both use.
     public const string SchemeOrgId = "674a1b2c3d4e5f6789012c12";
 
-    public static readonly DateTime CreatedAt = new(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc);
+    public static readonly DateTime CreatedAt = SamplePomSubmission.CreatedAt;
 
     private static readonly JsonSerializerOptions s_jsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -45,6 +46,13 @@ public static class MeasuredPomSubmission
         return Encoding.UTF8.GetString(stream.GetBuffer(), 0, (int)stream.Length);
     }
 
+    public static int PageBytes(IReadOnlyList<PomSubmissionModel> items, int totalCount, int pageNumber, int pageSize)
+    {
+        using var stream = new MemoryStream();
+        WritePage(stream, items, totalCount, pageNumber, pageSize);
+        return (int)stream.Length;
+    }
+
     public static int GzipPage(IReadOnlyList<PomSubmissionModel> items, int totalCount, int pageNumber, int pageSize)
     {
         using var output = new MemoryStream();
@@ -55,6 +63,10 @@ public static class MeasuredPomSubmission
 
         return (int)output.Length;
     }
+
+    // Distinct at index 0. Repeating it measures the uncompressed page; the row is the same length as the gzip rows.
+    public static PomSubmissionModel Full(string activity, string status, int version) =>
+        Distinct(SchemeOrgId, 0, activity, status, version);
 
     // Each submission differs. Identical copies compress far more than a real list.
     public static PomSubmissionModel Distinct(string schemeOrgId, int index, string activity, string status, int version)

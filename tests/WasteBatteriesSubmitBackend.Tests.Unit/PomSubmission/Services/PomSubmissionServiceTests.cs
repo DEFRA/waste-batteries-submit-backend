@@ -19,7 +19,7 @@ public partial class PomSubmissionServiceTests
 
     private const int MaxGzipPageSize = 40;
 
-    private static readonly DateTime s_createdAt = new(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime s_createdAt = SamplePomSubmission.CreatedAt;
 
     private static void ReturnNoSubmissions(IPomSubmissionRepository repository) =>
         repository
@@ -45,27 +45,5 @@ public partial class PomSubmissionServiceTests
             new FixedTime(s_createdAt),
             logger);
 
-    private static PomSubmissionRequest ValidRequest() => new()
-    {
-        SchemeOrgId = "674a1b2c3d4e5f6789012345",
-        MemberOrgId = "674a1b2c3d4e5f6789012346",
-        MemberName = "Northwind Batteries Ltd",
-        MemberBprn = "BPRN-EA-2026-000123",
-        SchemeMembershipRef = "SCH-00417",
-        CompliancePeriodYear = 2026,
-        CompliancePeriodQuarter = "Quarter 2",
-        DataBasis = "Actual",
-        TonnageEntries =
-        [
-            new TonnageEntryBase
-            {
-                Classification = new BatteryClassification
-                {
-                    BatteryCategory = "Portable",
-                    Chemistry = "Alkaline"
-                },
-                Tonnes = "12.500"
-            }
-        ]
-    };
+    private static PomSubmissionRequest ValidRequest() => SamplePomSubmission.Request();
 }

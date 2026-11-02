@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using WasteBatteriesSubmitBackend.Tests.Common;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
 
@@ -124,6 +125,6 @@ public partial class PomSubmissionEndpointsTests
         Assert.False(fetched.RootElement.GetProperty("isCurrent").GetBoolean());
         Assert.Equal(id, fetched.RootElement.GetProperty("id").GetString());
         Assert.Equal(memberOrgId, fetched.RootElement.GetProperty("memberOrgId").GetString());
-        Assert.Equal("Northwind Batteries Ltd", fetched.RootElement.GetProperty("memberName").GetString());
+        Assert.Equal(SamplePomSubmission.MemberName, fetched.RootElement.GetProperty("memberName").GetString());
     }
 }

@@ -1,7 +1,7 @@
-using System.Net;
-using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using System.Net;
+using System.Text.Json;
 using WasteBatteriesSubmitBackend.OpenApi;
 using WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 

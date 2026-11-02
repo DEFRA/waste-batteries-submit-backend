@@ -1,7 +1,7 @@
-using System.Diagnostics.CodeAnalysis;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics.CodeAnalysis;
+using System.Security.Claims;
 using WasteBatteriesSubmitBackend.ExampleData.Models;
 using WasteBatteriesSubmitBackend.ExampleData.Services;
 

@@ -1,5 +1,6 @@
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
+using WasteBatteriesSubmitBackend.Tests.Common;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Models;
 
@@ -11,14 +12,14 @@ public class PomSubmissionRequestTrimTests
         // Arrange
         var request = new PomSubmissionRequest
         {
-            SchemeOrgId = "  674a1b2c3d4e5f6789012345  ",
-            MemberOrgId = "\t674a1b2c3d4e5f6789012346\t",
-            MemberName = "  Northwind Batteries Ltd  ",
-            MemberBprn = "  BPRN-EA-2026-000123  ",
-            SchemeMembershipRef = "  SCH-00417  ",
-            CompliancePeriodYear = 2026,
-            CompliancePeriodQuarter = "  Quarter 2  ",
-            DataBasis = "  Actual  ",
+            SchemeOrgId = $"  {SamplePomSubmission.SchemeOrgId}  ",
+            MemberOrgId = $"\t{SamplePomSubmission.MemberOrgId}\t",
+            MemberName = $"  {SamplePomSubmission.MemberName}  ",
+            MemberBprn = $"  {SamplePomSubmission.MemberBprn}  ",
+            SchemeMembershipRef = $"  {SamplePomSubmission.SchemeMembershipRef}  ",
+            CompliancePeriodYear = SamplePomSubmission.CompliancePeriodYear,
+            CompliancePeriodQuarter = $"  {SamplePomSubmission.CompliancePeriodQuarter}  ",
+            DataBasis = $"  {SamplePomSubmission.DataBasis}  ",
             TonnageEntries =
             [
                 new TonnageEntryBase
@@ -26,9 +27,9 @@ public class PomSubmissionRequestTrimTests
                     Classification = new BatteryClassification
                     {
                         BatteryCategory = "Industrial",
-                        Chemistry = "  Alkaline  "
+                        Chemistry = $"  {SamplePomSubmission.Chemistry}  "
                     },
-                    Tonnes = "  12.500  "
+                    Tonnes = $"  {SamplePomSubmission.Tonnes}  "
                 }
             ]
         };
@@ -37,18 +38,18 @@ public class PomSubmissionRequestTrimTests
         var trimmed = request.Trimmed();
 
         // Assert
-        Assert.Equal("674a1b2c3d4e5f6789012345", trimmed.SchemeOrgId);
-        Assert.Equal("674a1b2c3d4e5f6789012346", trimmed.MemberOrgId);
-        Assert.Equal("Northwind Batteries Ltd", trimmed.MemberName);
-        Assert.Equal("BPRN-EA-2026-000123", trimmed.MemberBprn);
-        Assert.Equal("SCH-00417", trimmed.SchemeMembershipRef);
-        Assert.Equal(2026, trimmed.CompliancePeriodYear);
-        Assert.Equal("Quarter 2", trimmed.CompliancePeriodQuarter);
-        Assert.Equal("Actual", trimmed.DataBasis);
+        Assert.Equal(SamplePomSubmission.SchemeOrgId, trimmed.SchemeOrgId);
+        Assert.Equal(SamplePomSubmission.MemberOrgId, trimmed.MemberOrgId);
+        Assert.Equal(SamplePomSubmission.MemberName, trimmed.MemberName);
+        Assert.Equal(SamplePomSubmission.MemberBprn, trimmed.MemberBprn);
+        Assert.Equal(SamplePomSubmission.SchemeMembershipRef, trimmed.SchemeMembershipRef);
+        Assert.Equal(SamplePomSubmission.CompliancePeriodYear, trimmed.CompliancePeriodYear);
+        Assert.Equal(SamplePomSubmission.CompliancePeriodQuarter, trimmed.CompliancePeriodQuarter);
+        Assert.Equal(SamplePomSubmission.DataBasis, trimmed.DataBasis);
         var entry = Assert.Single(trimmed.TonnageEntries);
-        Assert.Equal("12.500", entry.Tonnes);
-        Assert.Equal("Portable", entry.Classification.BatteryCategory);
-        Assert.Equal("Alkaline", entry.Classification.Chemistry);
+        Assert.Equal(SamplePomSubmission.Tonnes, entry.Tonnes);
+        Assert.Equal(BatteryClassification.Portable, entry.Classification.BatteryCategory);
+        Assert.Equal(SamplePomSubmission.Chemistry, entry.Classification.Chemistry);
     }
 
     [Fact]

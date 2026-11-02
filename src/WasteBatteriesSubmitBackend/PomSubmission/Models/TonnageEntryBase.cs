@@ -1,5 +1,5 @@
-using System.Text.Json.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
+using System.Text.Json.Serialization;
 using WasteBatteriesSubmitBackend.Utils.Mongo;
 using WasteBatteriesSubmitBackend.Utils.Text;
 

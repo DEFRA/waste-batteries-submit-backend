@@ -50,7 +50,7 @@ public partial class PomSubmissionServiceTests
                 && saved.Version == 1
                 && saved.SubmittedOnUtc == s_createdAt
                 && saved.SubmittedOnUtc == saved.CreatedAtUtc
-                && saved.MemberName == "Northwind Batteries Ltd"
+                && saved.MemberName == SamplePomSubmission.MemberName
                 && saved.TonnageEntries[0].Activity == "Placed"
                 && saved.IsCurrent
                 && saved.CreatedAtUtc == s_createdAt),
@@ -115,13 +115,13 @@ public partial class PomSubmissionServiceTests
         var service = Service(repository, logger);
         var request = ValidRequest() with
         {
-            SchemeOrgId = "  674a1b2c3d4e5f6789012345  ",
-            MemberOrgId = "  674a1b2c3d4e5f6789012346  ",
-            MemberName = "  Northwind Batteries Ltd  ",
-            MemberBprn = "  BPRN-EA-2026-000123  ",
-            SchemeMembershipRef = "  SCH-00417  ",
-            CompliancePeriodQuarter = "  Quarter 2  ",
-            DataBasis = "  Actual  ",
+            SchemeOrgId = $"  {SamplePomSubmission.SchemeOrgId}  ",
+            MemberOrgId = $"  {SamplePomSubmission.MemberOrgId}  ",
+            MemberName = $"  {SamplePomSubmission.MemberName}  ",
+            MemberBprn = $"  {SamplePomSubmission.MemberBprn}  ",
+            SchemeMembershipRef = $"  {SamplePomSubmission.SchemeMembershipRef}  ",
+            CompliancePeriodQuarter = $"  {SamplePomSubmission.CompliancePeriodQuarter}  ",
+            DataBasis = $"  {SamplePomSubmission.DataBasis}  ",
             TonnageEntries =
             [
                 new TonnageEntryBase
@@ -129,9 +129,9 @@ public partial class PomSubmissionServiceTests
                     Classification = new BatteryClassification
                     {
                         BatteryCategory = "Industrial",
-                        Chemistry = "  Alkaline  "
+                        Chemistry = $"  {SamplePomSubmission.Chemistry}  "
                     },
-                    Tonnes = "  12.500  "
+                    Tonnes = $"  {SamplePomSubmission.Tonnes}  "
                 }
             ]
         };
@@ -142,8 +142,8 @@ public partial class PomSubmissionServiceTests
         // Assert
         await repository.Received(1).FindAsync(
             Arg.Is<PomSubmissionQuery>(query =>
-                query.SchemeOrgId == "674a1b2c3d4e5f6789012345"
-                && query.MemberOrgId == "674a1b2c3d4e5f6789012346"
+                query.SchemeOrgId == SamplePomSubmission.SchemeOrgId
+                && query.MemberOrgId == SamplePomSubmission.MemberOrgId
                 && query.CompliancePeriodYears != null
                 && query.CompliancePeriodYears.SequenceEqual(s_trimmedCompliancePeriodYear)
                 && query.CompliancePeriodQuarters != null
@@ -153,13 +153,13 @@ public partial class PomSubmissionServiceTests
             Arg.Any<CancellationToken>());
         await repository.Received(1).CreateAsync(
             Arg.Is<PomSubmissionModel>(saved =>
-                saved.MemberName == "Northwind Batteries Ltd"
-                && saved.MemberBprn == "BPRN-EA-2026-000123"
-                && saved.SchemeMembershipRef == "SCH-00417"
-                && saved.DataBasis == "Actual"
-                && saved.TonnageEntries[0].Tonnes == "12.500"
-                && saved.TonnageEntries[0].Classification.BatteryCategory == "Portable"
-                && saved.TonnageEntries[0].Classification.Chemistry == "Alkaline"),
+                saved.MemberName == SamplePomSubmission.MemberName
+                && saved.MemberBprn == SamplePomSubmission.MemberBprn
+                && saved.SchemeMembershipRef == SamplePomSubmission.SchemeMembershipRef
+                && saved.DataBasis == SamplePomSubmission.DataBasis
+                && saved.TonnageEntries[0].Tonnes == SamplePomSubmission.Tonnes
+                && saved.TonnageEntries[0].Classification.BatteryCategory == BatteryClassification.Portable
+                && saved.TonnageEntries[0].Classification.Chemistry == SamplePomSubmission.Chemistry),
             Arg.Any<CancellationToken>());
     }
 
@@ -215,7 +215,7 @@ public partial class PomSubmissionServiceTests
                 {
                     Classification = new BatteryClassification
                     {
-                        Chemistry = "  Alkaline  "
+                        Chemistry = $"  {SamplePomSubmission.Chemistry}  "
                     },
                     Tonnes = "1.000"
                 },
@@ -223,7 +223,7 @@ public partial class PomSubmissionServiceTests
                 {
                     Classification = new BatteryClassification
                     {
-                        Chemistry = "Alkaline"
+                        Chemistry = SamplePomSubmission.Chemistry
                     },
                     Tonnes = "2.000"
                 }

@@ -1,5 +1,5 @@
-using System.IO.Compression;
 using Microsoft.AspNetCore.ResponseCompression;
+using System.IO.Compression;
 using WasteBatteriesSubmitBackend.PomSubmission.Endpoints;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission;

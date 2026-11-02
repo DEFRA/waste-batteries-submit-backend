@@ -1,5 +1,5 @@
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using System.Diagnostics.CodeAnalysis;
 
 namespace WasteBatteriesSubmitBackend.Utils.Health;
 

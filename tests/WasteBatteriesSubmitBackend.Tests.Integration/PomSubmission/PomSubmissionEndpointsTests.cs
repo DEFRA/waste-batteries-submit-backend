@@ -4,31 +4,13 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
+using WasteBatteriesSubmitBackend.Tests.Common;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
 
 public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture) : IClassFixture<PomSubmissionApiFixture>
 {
-    private const string CreateBody = """
-        {
-          "schemeOrgId": "674a1b2c3d4e5f6789012345",
-          "memberOrgId": "674a1b2c3d4e5f6789012346",
-          "memberName": "Northwind Batteries Ltd",
-          "memberBprn": "BPRN-EA-2026-000123",
-          "schemeMembershipRef": "SCH-00417",
-          "compliancePeriodYear": 2026,
-          "compliancePeriodQuarter": "Quarter 2",
-          "dataBasis": "Actual",
-          "tonnageEntries": [
-            {
-              "classification": {
-                "chemistry": "Alkaline"
-              },
-              "tonnes": "12.500"
-            }
-          ]
-        }
-        """;
+    private static string CreateBody => SamplePomSubmission.Json;
 
     private void AssertStoredShape(BsonDocument stored, string id)
     {
@@ -38,12 +20,12 @@ public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture
         Assert.Equal(PomSubmissionApiFixture.SchemeOrgId, stored["schemeOrgId"].AsObjectId.ToString());
         Assert.Equal(BsonType.ObjectId, stored["memberOrgId"].BsonType);
         Assert.Equal(PomSubmissionApiFixture.MemberOrgId, stored["memberOrgId"].AsObjectId.ToString());
-        Assert.Equal("Northwind Batteries Ltd", stored["memberName"].AsString);
-        Assert.Equal("BPRN-EA-2026-000123", stored["memberBprn"].AsString);
-        Assert.Equal("SCH-00417", stored["schemeMembershipRef"].AsString);
-        Assert.Equal(2026, stored["compliancePeriodYear"].AsInt32);
-        Assert.Equal("Quarter 2", stored["compliancePeriodQuarter"].AsString);
-        Assert.Equal("Actual", stored["dataBasis"].AsString);
+        Assert.Equal(SamplePomSubmission.MemberName, stored["memberName"].AsString);
+        Assert.Equal(SamplePomSubmission.MemberBprn, stored["memberBprn"].AsString);
+        Assert.Equal(SamplePomSubmission.SchemeMembershipRef, stored["schemeMembershipRef"].AsString);
+        Assert.Equal(SamplePomSubmission.CompliancePeriodYear, stored["compliancePeriodYear"].AsInt32);
+        Assert.Equal(SamplePomSubmission.CompliancePeriodQuarter, stored["compliancePeriodQuarter"].AsString);
+        Assert.Equal(SamplePomSubmission.DataBasis, stored["dataBasis"].AsString);
         Assert.Equal(fixture.Defaults.InitialStatus, stored["status"].AsString);
         Assert.Equal(PomSubmissionApiFixture.CreatedAt, stored["submittedOnUtc"].ToUniversalTime());
         Assert.Equal(stored["createdAtUtc"].ToUniversalTime(), stored["submittedOnUtc"].ToUniversalTime());
@@ -61,10 +43,10 @@ public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture
         Assert.False(entry.Contains("_id"));
         Assert.Equal(BsonType.ObjectId, entry["id"].BsonType);
         Assert.Equal(BsonType.Decimal128, entry["tonnes"].BsonType);
-        Assert.Equal("12.500", entry["tonnes"].AsDecimal128.ToString());
+        Assert.Equal(SamplePomSubmission.Tonnes, entry["tonnes"].AsDecimal128.ToString());
         Assert.Equal(fixture.Defaults.InitialActivity, entry["activity"].AsString);
-        Assert.Equal("Portable", entry["classification"]["batteryCategory"].AsString);
-        Assert.Equal("Alkaline", entry["classification"]["chemistry"].AsString);
+        Assert.Equal(BatteryClassification.Portable, entry["classification"]["batteryCategory"].AsString);
+        Assert.Equal(SamplePomSubmission.Chemistry, entry["classification"]["chemistry"].AsString);
         Assert.False(entry["classification"].AsBsonDocument.Contains("subCategory"));
         Assert.False(entry["classification"].AsBsonDocument.Contains("cellType"));
         Assert.False(entry["classification"].AsBsonDocument.Contains("equipmentState"));
@@ -96,9 +78,18 @@ public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture
         var body = CreateBody
             .Replace(PomSubmissionApiFixture.SchemeOrgId, schemeOrgId, StringComparison.Ordinal)
             .Replace(PomSubmissionApiFixture.MemberOrgId, memberOrgId, StringComparison.Ordinal)
-            .Replace("BPRN-EA-2026-", $"BPRN-EA-{year}-", StringComparison.Ordinal)
-            .Replace("\"compliancePeriodYear\": 2026", $"\"compliancePeriodYear\": {year}", StringComparison.Ordinal)
-            .Replace("\"compliancePeriodQuarter\": \"Quarter 2\"", $"\"compliancePeriodQuarter\": \"{quarter}\"", StringComparison.Ordinal);
+            .Replace(
+                $"BPRN-EA-{SamplePomSubmission.CompliancePeriodYear}-",
+                $"BPRN-EA-{year}-",
+                StringComparison.Ordinal)
+            .Replace(
+                $"\"compliancePeriodYear\": {SamplePomSubmission.CompliancePeriodYear}",
+                $"\"compliancePeriodYear\": {year}",
+                StringComparison.Ordinal)
+            .Replace(
+                $"\"compliancePeriodQuarter\": \"{SamplePomSubmission.CompliancePeriodQuarter}\"",
+                $"\"compliancePeriodQuarter\": \"{quarter}\"",
+                StringComparison.Ordinal);
         var response = await client.PostAsync("/pom-submissions", Json(body), cancellationToken);
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);

@@ -1,8 +1,8 @@
-using System.Diagnostics.CodeAnalysis;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Formatting.Compact;
+using System.Diagnostics.CodeAnalysis;
 
 namespace WasteBatteriesSubmitBackend.Utils.Auditing;
 
