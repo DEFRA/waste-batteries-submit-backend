@@ -28,6 +28,13 @@ public static class PomSubmissionValidationMessages
     public const string CurrentSubmissionExists =
         "A current submission already exists for this scheme, member, year and quarter.";
 
+    public const string CurrentSubmissionMissing =
+        "A current submission does not exist for this scheme, member, year and quarter.";
+
+    // The row found by validation was no longer current when the amendment was saved.
+    public const string CurrentSubmissionChanged =
+        "The current submission changed before this amendment was saved.";
+
     public const string PageNumberMinimum = "pageNumber must be at least 1.";
 
     public const string PageSizeMinimum = "pageSize must be at least 1.";

@@ -33,10 +33,10 @@ public class IntJsonConverterTests
         const string json = """{ "widgetCount": true }""";
 
         // Act
-        var act = () => JsonSerializer.Deserialize<Sample>(json, JsonSerializerOptions.Web);
+        Sample? Act() => JsonSerializer.Deserialize<Sample>(json, JsonSerializerOptions.Web);
 
         // Assert
-        var exception = Assert.Throws<JsonException>(act);
+        var exception = Assert.Throws<JsonException>(Act);
         Assert.Contains("widgetCount must be a JSON number.", exception.Message, StringComparison.Ordinal);
     }
 
@@ -47,10 +47,10 @@ public class IntJsonConverterTests
         const string json = """{ "compliancePeriodYear": "twelve" }""";
 
         // Act
-        var act = () => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
+        PomSubmissionRequest? Act() => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
 
         // Assert
-        var exception = Assert.Throws<JsonException>(act);
+        var exception = Assert.Throws<JsonException>(Act);
         Assert.Contains("compliancePeriodYear must be a JSON number.", exception.Message, StringComparison.Ordinal);
     }
 }

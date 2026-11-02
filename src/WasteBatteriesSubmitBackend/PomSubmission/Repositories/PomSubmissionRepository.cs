@@ -10,6 +10,22 @@ public interface IPomSubmissionRepository
 {
     Task CreateAsync(PomSubmissionModel submission, CancellationToken cancellationToken = default);
 
+    // The same insert, enlisted in the caller's transaction.
+    // A duplicate key is thrown to the caller. The transaction callback must let it propagate so the unit of work aborts.
+    Task CreateAsync(
+        IClientSessionHandle session,
+        PomSubmissionModel submission,
+        CancellationToken cancellationToken = default);
+
+    // Clears isCurrent and sets updatedAtUtc while this submission is still current.
+    // False means it was already replaced, and nothing was written.
+    // Call this before inserting the replacement. The unique index allows one current submission for the key.
+    Task<bool> SupersedeCurrentAsync(
+        IClientSessionHandle session,
+        string id,
+        DateTime updatedAtUtc,
+        CancellationToken cancellationToken = default);
+
     // Every submission matching the set criteria, in pages when a page size is set.
     // An id matches at most one. Years and quarters match any value in the list.
     Task<PaginatedList<PomSubmissionModel>> FindAsync(
@@ -23,11 +39,54 @@ public class PomSubmissionRepository(IMongoDbClientFactory connectionFactory, IL
 {
     public const string CollectionName = "pom-submissions";
 
-    public async Task CreateAsync(PomSubmissionModel submission, CancellationToken cancellationToken = default)
+    public Task CreateAsync(PomSubmissionModel submission, CancellationToken cancellationToken = default) =>
+        InsertAsync(session: null, submission, cancellationToken);
+
+    public Task CreateAsync(
+        IClientSessionHandle session,
+        PomSubmissionModel submission,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        return InsertAsync(session, submission, cancellationToken);
+    }
+
+    public async Task<bool> SupersedeCurrentAsync(
+        IClientSessionHandle session,
+        string id,
+        DateTime updatedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        var update = Builders<PomSubmissionModel>.Update
+            .Set(submission => submission.IsCurrent, false)
+            .Set(submission => submission.UpdatedAtUtc, updatedAtUtc);
+
+        var result = await Collection.UpdateOneAsync(
+            session,
+            Filter(new PomSubmissionQuery { Id = id, IsCurrent = true }),
+            update,
+            options: null,
+            cancellationToken);
+
+        return result.MatchedCount == 1;
+    }
+
+    private async Task InsertAsync(
+        IClientSessionHandle? session,
+        PomSubmissionModel submission,
+        CancellationToken cancellationToken)
     {
         try
         {
-            await Collection.InsertOneAsync(submission, cancellationToken: cancellationToken);
+            if (session is null)
+            {
+                await Collection.InsertOneAsync(submission, cancellationToken: cancellationToken);
+            }
+            else
+            {
+                await Collection.InsertOneAsync(session, submission, options: null, cancellationToken);
+            }
         }
         catch (MongoWriteException exception) when (exception.WriteError?.Category == ServerErrorCategory.DuplicateKey)
         {

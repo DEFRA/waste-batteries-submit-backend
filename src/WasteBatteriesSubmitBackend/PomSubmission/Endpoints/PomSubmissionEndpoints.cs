@@ -23,6 +23,13 @@ public static class PomSubmissionEndpoints
             .WithSummary("Create a placed-on-market submission")
             .ProducesValidationProblem();
 
+        // Same body as create. Scheme, member, year and quarter select the current submission.
+        // The response is the new submission that replaced it.
+        group.MapPatch(string.Empty, Amend)
+            .WithName("AmendPomSubmission")
+            .WithSummary("Amend the current placed-on-market submission")
+            .ProducesValidationProblem();
+
         // The document URL from create. A filtered, optionally paged read is the collection route below.
         group.MapGet("/{id}", Get)
             .WithName("GetPomSubmission")
@@ -44,6 +51,15 @@ public static class PomSubmissionEndpoints
     {
         var submission = await pomSubmissionService.CreateAsync(request, cancellationToken);
         return TypedResults.Created($"{RoutePrefix}/{submission.Id}", submission);
+    }
+
+    private static async Task<Ok<PomSubmissionModel>> Amend(
+        PomSubmissionRequest request,
+        [FromServices] IPomSubmissionService pomSubmissionService,
+        CancellationToken cancellationToken)
+    {
+        var submission = await pomSubmissionService.AmendAsync(request, cancellationToken);
+        return TypedResults.Ok(submission);
     }
 
     private static async Task<Results<Ok<PomSubmissionModel>, NotFound>> Get(

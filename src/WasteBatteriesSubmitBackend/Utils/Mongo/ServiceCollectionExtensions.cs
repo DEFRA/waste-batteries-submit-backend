@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
             .ValidateOnStart();
 
         services.AddSingleton<IMongoDbClientFactory, MongoDbClientFactory>();
+        services.AddSingleton<IUnitOfWork, UnitOfWork>();
 
         return services;
     }

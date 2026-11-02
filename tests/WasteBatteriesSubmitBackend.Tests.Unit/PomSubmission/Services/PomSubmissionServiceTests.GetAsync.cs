@@ -94,10 +94,10 @@ public partial class PomSubmissionServiceTests
         var service = Service(repository, logger);
 
         // Act
-        var act = () => service.GetAsync(id, TestContext.Current.CancellationToken);
+        Task<PomSubmissionModel?> Act() => service.GetAsync(id, TestContext.Current.CancellationToken);
 
         // Assert
-        var exception = await Assert.ThrowsAsync<ValidationException>(act);
+        var exception = await Assert.ThrowsAsync<ValidationException>(Act);
         var error = Assert.Single(exception.Errors);
         Assert.Equal("Id", error.PropertyName);
         Assert.Equal("id must be an ObjectId.", error.ErrorMessage);

@@ -176,10 +176,10 @@ public class PomSubmissionRepositoryFilterTests
         var query = new PomSubmissionQuery { IsCurrent = null };
 
         // Act
-        var act = () => PomSubmissionRepository.Filter(query);
+        FilterDefinition<PomSubmissionModel> Act() => PomSubmissionRepository.Filter(query);
 
         // Assert
-        var exception = Assert.Throws<ArgumentException>(act);
+        var exception = Assert.Throws<ArgumentException>(Act);
         Assert.Equal("query", exception.ParamName);
     }
 

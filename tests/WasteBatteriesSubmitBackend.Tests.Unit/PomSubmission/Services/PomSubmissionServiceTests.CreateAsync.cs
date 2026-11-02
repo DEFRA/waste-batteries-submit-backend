@@ -75,10 +75,10 @@ public partial class PomSubmissionServiceTests
         var service = Service(repository, logger);
 
         // Act
-        var act = () => service.CreateAsync(ValidRequest(), TestContext.Current.CancellationToken);
+        Task<PomSubmissionModel> Act() => service.CreateAsync(ValidRequest(), TestContext.Current.CancellationToken);
 
         // Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(act);
+        await Assert.ThrowsAsync<InvalidOperationException>(Act);
         Assert.Empty(logger.Entries);
     }
 
@@ -93,10 +93,10 @@ public partial class PomSubmissionServiceTests
         var request = ValidRequest() with { TonnageEntries = [] };
 
         // Act
-        var act = () => service.CreateAsync(request, TestContext.Current.CancellationToken);
+        Task<PomSubmissionModel> Act() => service.CreateAsync(request, TestContext.Current.CancellationToken);
 
         // Assert
-        await Assert.ThrowsAsync<ValidationException>(act);
+        await Assert.ThrowsAsync<ValidationException>(Act);
         await repository.Received(1).FindAsync(
             Arg.Any<PomSubmissionQuery>(),
             Arg.Any<PageRequest>(),
@@ -187,10 +187,10 @@ public partial class PomSubmissionServiceTests
         };
 
         // Act
-        var act = () => service.CreateAsync(request, TestContext.Current.CancellationToken);
+        Task<PomSubmissionModel> Act() => service.CreateAsync(request, TestContext.Current.CancellationToken);
 
         // Assert
-        await Assert.ThrowsAsync<ValidationException>(act);
+        await Assert.ThrowsAsync<ValidationException>(Act);
         await repository.DidNotReceive().FindAsync(
             Arg.Any<PomSubmissionQuery>(),
             Arg.Any<PageRequest>(),
@@ -231,10 +231,10 @@ public partial class PomSubmissionServiceTests
         };
 
         // Act
-        var act = () => service.CreateAsync(request, TestContext.Current.CancellationToken);
+        Task<PomSubmissionModel> Act() => service.CreateAsync(request, TestContext.Current.CancellationToken);
 
         // Assert
-        var exception = await Assert.ThrowsAsync<ValidationException>(act);
+        var exception = await Assert.ThrowsAsync<ValidationException>(Act);
         Assert.Contains(
             exception.Errors,
             error => error.PropertyName == "TonnageEntries"
@@ -256,10 +256,10 @@ public partial class PomSubmissionServiceTests
         var service = Service(repository, logger);
 
         // Act
-        var act = () => service.CreateAsync(ValidRequest(), TestContext.Current.CancellationToken);
+        Task<PomSubmissionModel> Act() => service.CreateAsync(ValidRequest(), TestContext.Current.CancellationToken);
 
         // Assert
-        var exception = await Assert.ThrowsAsync<ValidationException>(act);
+        var exception = await Assert.ThrowsAsync<ValidationException>(Act);
         var error = Assert.Single(exception.Errors);
         Assert.Equal("Submission", error.PropertyName);
         Assert.Equal(
@@ -285,10 +285,10 @@ public partial class PomSubmissionServiceTests
         var request = ValidRequest() with { MemberName = "" };
 
         // Act
-        var act = () => service.CreateAsync(request, TestContext.Current.CancellationToken);
+        Task<PomSubmissionModel> Act() => service.CreateAsync(request, TestContext.Current.CancellationToken);
 
         // Assert
-        var exception = await Assert.ThrowsAsync<ValidationException>(act);
+        var exception = await Assert.ThrowsAsync<ValidationException>(Act);
         Assert.Contains(exception.Errors, error => error.PropertyName == "MemberName");
         Assert.Contains(
             exception.Errors,
@@ -314,10 +314,10 @@ public partial class PomSubmissionServiceTests
         var service = Service(repository, logger);
 
         // Act
-        var act = () => service.CreateAsync(ValidRequest(), TestContext.Current.CancellationToken);
+        Task<PomSubmissionModel> Act() => service.CreateAsync(ValidRequest(), TestContext.Current.CancellationToken);
 
         // Assert
-        var exception = await Assert.ThrowsAsync<ValidationException>(act);
+        var exception = await Assert.ThrowsAsync<ValidationException>(Act);
         Assert.Contains(
             exception.Errors,
             error => error.PropertyName == "Submission"

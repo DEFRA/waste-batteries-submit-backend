@@ -6,8 +6,9 @@ using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Validators;
 
-// Shape of a posted submission. Whether a current submission already exists is a create-only
-// decision and lives in the service, which reads that submission once.
+// Shape of a posted submission. Whether that submission must already exist is decided by the
+// service, which reads the current row once. Create rejects a row that exists. Amend rejects
+// a missing row. A batch upsert can use the same read without either rejection.
 public sealed class PomSubmissionRequestValidator : AbstractValidator<PomSubmissionRequest>
 {
     public PomSubmissionRequestValidator()

@@ -10,6 +10,7 @@ using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
 using WasteBatteriesSubmitBackend.PomSubmission.Validators;
 using WasteBatteriesSubmitBackend.Tests.Common;
+using WasteBatteriesSubmitBackend.Utils.Mongo;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Services;
 
@@ -35,9 +36,13 @@ public partial class PomSubmissionServiceTests
         MaxGzipPageSize = MaxGzipPageSize
     });
 
-    private static PomSubmissionService Service(IPomSubmissionRepository repository, CapturingLogger<PomSubmissionService> logger) =>
+    private static PomSubmissionService Service(
+        IPomSubmissionRepository repository,
+        CapturingLogger<PomSubmissionService> logger,
+        IUnitOfWork? unitOfWork = null) =>
         new(
             repository,
+            unitOfWork ?? Substitute.For<IUnitOfWork>(),
             new PomSubmissionMapper(s_config),
             s_config,
             new PomSubmissionRequestValidator(),

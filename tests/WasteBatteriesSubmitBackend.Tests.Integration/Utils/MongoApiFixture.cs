@@ -18,7 +18,10 @@ namespace WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 //Testcontainers.MongoDb - see https://devblogs.microsoft.com/ise/testing-with-testcontainers/ and https://dotnet.testcontainers.org/modules/mongodb/
 public abstract class MongoApiFixture : IAsyncLifetime
 {
-    private readonly MongoDbContainer _container = new MongoDbBuilder("mongo:7").Build();
+    // Amendments commit two documents in one transaction. MongoDB only allows that on a replica set.
+    private readonly MongoDbContainer _container = new MongoDbBuilder("mongo:7")
+        .WithReplicaSet("rs0")
+        .Build();
     private WebApplicationFactory<Program>? _factory;
 
     protected MongoApiFixture(string databasePrefix)

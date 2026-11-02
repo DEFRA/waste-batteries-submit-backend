@@ -16,6 +16,8 @@ The target data model is the Compliance Scheme POM Submission page in the [waste
 
 `POST /pom-submissions` creates one first submission for one scheme member and one quarter. The caller needs a Defra ID bearer token. The response is `201 Created`, with `Location: /pom-submissions/{id}` and the stored submission as the body. Documents are stored in the `pom-submissions` collection.
 
+`PATCH /pom-submissions` amends the current submission for the scheme, member, year and quarter in that same JSON body. The caller needs the same bearer token. Field checks match create. A well-formed key with no current submission is a `400` validation problem: `A current submission does not exist for this scheme, member, year and quarter.` The response is `200 OK` and the new submission. That submission is a new document. `supersedesSubmissionId` is the id of the current row it replaced, `isCurrent` is true, `updatedAtUtc` is null, and `version` is the configured initial version. The replaced row is kept: `isCurrent` is false and `updatedAtUtc` is the new submission's `createdAtUtc`. Both writes commit or roll back in one transaction. A current row that was replaced before the save is a `400` validation problem, `The current submission changed before this amendment was saved.`, and neither write remains. A key that is not well formed is not looked up, so only the field errors are returned.
+
 `GET /pom-submissions/{id}` returns that stored submission as `200 OK` and the same JSON object. The body is plain JSON. Accepting gzip does not compress this response. `id` must be an ObjectId. A value that is not an ObjectId is a `400` validation problem. A well-formed id that is not stored is `404`. The read is by id, so a submission that is no longer current is still returned.
 
 `GET /pom-submissions` returns a page of those same submission objects. A single submission is read with `GET /pom-submissions/{id}`. List filters are combined with AND: `schemeOrgId`, `memberOrgId`, repeated `compliancePeriodYears`, repeated `compliancePeriodQuarters`, and `isCurrent`. At least one of `schemeOrgId`, `memberOrgId`, `compliancePeriodYears` or `compliancePeriodQuarters` is required. `isCurrent` does not satisfy that rule and defaults to true. A year list or a quarter list matches any of the supplied values. Omit `pageSize`, or set it higher than the limit for that request, and `pageSize` in the response is that limit. A caller that accepts gzip uses `PomSubmission:MaxGzipPageSize`. Any other caller uses `PomSubmission:MaxPageSize`. `pageNumber` then defaults to 1. A smaller `pageSize` is kept. A page past the end returns the last page. The body has `items`, `pageNumber`, `pageSize`, `totalPages`, `totalCount`, `hasPreviousPage` and `hasNextPage`. No match is `200` with an empty `items` array. A missing filter, or a bad organisation id, year, quarter or page, is a `400` validation problem. The same bearer token is required. The list is the only POM read that is gzipped. A list request that sends `Accept-Encoding: gzip` receives a gzip body.
@@ -51,13 +53,13 @@ The caller posts `schemeOrgId`, `memberOrgId`, `memberName`, `memberBprn`, `sche
 }
 ```
 
-The service sets `id`, `schemaVersion`, `version`, `status`, `isCurrent`, `submittedOnUtc`, `createdAtUtc`, `updatedAtUtc`, `supersedesSubmissionId`, each entry's `id` and `activity`, and `batteryCategory` (`Portable`). A first submission returns `schemaVersion` `1` and `version` `1`. `schemaVersion` is a constant. `1` is the classification that stores `batteryCategory` and `chemistry` only. `version`, `status` and `activity` come from the `PomSubmission` configuration, and the defaults are `1`, `Submitted` and `Placed`. `submittedOnUtc` equals `createdAtUtc` when the status is `Submitted`. `supersedesSubmissionId` and `updatedAtUtc` are null. Both `schemaVersion` and `version` are on the response. `schemaVersion` says which vocabulary the stored texts use. `version` is the concurrency token a later write sends back. Create does not check it. The declaration is omitted.
+The service sets `id`, `schemaVersion`, `version`, `status`, `isCurrent`, `submittedOnUtc`, `createdAtUtc`, `updatedAtUtc`, `supersedesSubmissionId`, each entry's `id` and `activity`, and `batteryCategory` (`Portable`). A first submission returns `schemaVersion` `1` and `version` `1`. `schemaVersion` is a constant. `1` is the classification that stores `batteryCategory` and `chemistry` only. `version`, `status` and `activity` come from the `PomSubmission` configuration, and the defaults are `1`, `Submitted` and `Placed`. `submittedOnUtc` equals `createdAtUtc` when the status is `Submitted`. On a first submission `supersedesSubmissionId` and `updatedAtUtc` are null. An amendment stores the same initial `version`. It does not add one to the replaced row's version. Both `schemaVersion` and `version` are on the response. `schemaVersion` says which vocabulary the stored texts use. `version` is the concurrency token a later write sends back. Create and amend do not check it. The declaration is omitted.
 
-A repeated classification is rejected. The comparison is `batteryCategory` and `chemistry`. Activity is not part of that key. A second submission is rejected while a current submission already exists for the same scheme, member, year and quarter. That lookup runs when those key fields are well formed, and it reads the collection once. Field failures, including that duplicate, are `400` validation problems and are logged at information.
+A repeated classification is rejected. The comparison is `batteryCategory` and `chemistry`. Activity is not part of that key. A second create is rejected while a current submission already exists for the same scheme, member, year and quarter. An amendment is rejected when no current submission exists for that key. That lookup runs when those key fields are well formed, and it reads the collection once. Field failures, including that duplicate or that missing row, are `400` validation problems and are logged at information.
 
 The unique index is `schemeOrgId`, `memberOrgId`, `compliancePeriodYear` and `compliancePeriodQuarter`, partial on `isCurrent: true`. A submission with `isCurrent` false can share that key. The other indexes are not unique: scheme plus year plus quarter, member plus year where `isCurrent` is true, `memberBprn`, chemistry plus battery category on the entries, and a sparse index on `supersedesSubmissionId`.
 
-Not built yet: amendments, the declaration, checking quarter, chemistry and activity against the closed vocabularies, resolving the member from the BPRN, inferring the compliance year, and checking `version` on write. The mapper can already set `supersedesSubmissionId` and a supplied `version`. The create path does not.
+Not built yet: the declaration, checking quarter, chemistry and activity against the closed vocabularies, resolving the member from the BPRN, inferring the compliance year, checking `version` on write, and the batch upsert. The mapper can already set `supersedesSubmissionId` and a supplied `version`. Create leaves `supersedesSubmissionId` null and uses the configured version. Amend sets `supersedesSubmissionId` and still uses the configured version. The current-submission read is shared. Create and amend turn a present or missing row into a validation error. A batch upsert can use that read to choose create or amend without either error, and can run those writes in one transaction. An outbox insert can use the same session.
 
 
 ### Docker Compose
@@ -85,30 +87,46 @@ A more extensive setup is available in [github.com/DEFRA/cdp-local-environment](
 See above.
 
 ```
-docker compose up -d mongodb
+docker compose up -d --wait mongodb
 ```
+
+The container starts a single-node replica set named `rs0`. The healthcheck initiates it and waits until the node is primary. `docker compose up` without `--wait` can return before that, and an amendment sent in that window fails.
 
 #### MongoDB locally
 
-Alternatively install MongoDB locally:
+Alternatively install MongoDB locally. Amendments use a multi-document transaction, so the local server has to be a single-node replica set. A standalone `mongod` rejects the transaction.
 
 - Install [MongoDB](https://www.mongodb.com/docs/manual/tutorial/#installation) on your local machine
 - Start MongoDB:
+
 ```bash
-sudo mongod --dbpath ~/mongodb-cdp
+sudo mongod --replSet rs0 --bind_ip_all --dbpath ~/mongodb-cdp
 ```
+
+- Initiate the set once. An existing standalone data directory can be initiated the same way:
+
+```javascript
+rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27017"}]})
+```
+
+Connect with `directConnection=true`. The development and Compose connection strings do. That keeps the driver on the server you named. A client that discovers the set would follow the member host, which inside Compose is not the host published to your machine.
+
+#### Retries
+
+Retryable reads and retryable writes stay at the MongoDB .NET driver default, which is on. The connection strings in this repo do not turn them off. A transient network error on a single-document read or write is retried by the driver. An amendment runs in one transaction. The driver retries that transaction when the error is labeled `TransientTransactionError`, and when the commit result is labeled `UnknownTransactionCommitResult`. The new document's id and timestamp are chosen before the transaction starts, so a retry writes the same document. Duplicate-key conflicts and validation failures are not retried. The transaction aborts and the previous current row is left unchanged.
 
 #### MongoDB in CDP environments
 
 In CDP environments a MongoDB instance is already set up
 and the credentials exposed as enviromment variables.
+That instance is a replica set, which is what the amendment transaction requires. The deployed connection string is supplied by the platform. Do not add `directConnection=true` there: the driver should discover the set.
 
 
 ### Inspect MongoDB
 
 To inspect the Database and Collections locally:
 ```bash
-mongosh
+mongosh "mongodb://127.0.0.1:27017/?directConnection=true"
 ```
 
 You can use the CDP Terminal to access the environments' MongoDB.
@@ -123,7 +141,7 @@ dotnet test
 
 `WasteBatteriesSubmitBackend.Tests.Unit` covers validators, mapping, the submission service and handlers without hosting the API.
 
-`WasteBatteriesSubmitBackend.Tests.Integration` hosts the API in process with `WebApplicationFactory`. The placed-on-market submission tests start MongoDB 7 with Testcontainers, so Docker must be running.
+`WasteBatteriesSubmitBackend.Tests.Integration` hosts the API in process with `WebApplicationFactory`. The placed-on-market submission tests start MongoDB 7 as a single-node replica set with Testcontainers, so Docker must be running. The replica set is what lets an amendment commit or roll back its two writes.
 
 ### Running
 

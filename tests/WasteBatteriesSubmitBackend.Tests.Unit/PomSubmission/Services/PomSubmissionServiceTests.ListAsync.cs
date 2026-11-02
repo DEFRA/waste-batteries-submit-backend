@@ -29,13 +29,13 @@ public partial class PomSubmissionServiceTests
         var service = Service(repository, logger);
 
         // Act
-        var act = () => service.GetAsync(
+        Task<PaginatedList<PomSubmissionModel>> Act() => service.GetAsync(
             new PomSubmissionListRequest { IsCurrent = false },
             false,
             TestContext.Current.CancellationToken);
 
         // Assert
-        var exception = await Assert.ThrowsAsync<ValidationException>(act);
+        var exception = await Assert.ThrowsAsync<ValidationException>(Act);
         var error = Assert.Single(exception.Errors);
         Assert.Equal("Filters", error.PropertyName);
         Assert.Equal(
@@ -264,10 +264,10 @@ public partial class PomSubmissionServiceTests
         };
 
         // Act
-        var act = () => service.GetAsync(request, false, TestContext.Current.CancellationToken);
+        Task<PaginatedList<PomSubmissionModel>> Act() => service.GetAsync(request, false, TestContext.Current.CancellationToken);
 
         // Assert
-        var exception = await Assert.ThrowsAsync<ValidationException>(act);
+        var exception = await Assert.ThrowsAsync<ValidationException>(Act);
         Assert.Contains(exception.Errors, error => error.PropertyName == "SchemeOrgId");
         Assert.Contains(exception.Errors, error => error.PropertyName == "MemberOrgId");
         Assert.Contains(exception.Errors, error => error.PropertyName == "CompliancePeriodYears[0]");

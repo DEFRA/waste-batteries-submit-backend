@@ -21,6 +21,8 @@ public interface IPomSubmissionService
 {
     Task<PomSubmissionModel> CreateAsync(PomSubmissionRequest request, CancellationToken cancellationToken = default);
 
+    Task<PomSubmissionModel> AmendAsync(PomSubmissionRequest request, CancellationToken cancellationToken = default);
+
     Task<PomSubmissionModel?> GetAsync(string id, CancellationToken cancellationToken = default);
 
     // gzipResponse selects the larger page limit. The list route sets it when the caller accepts gzip.
@@ -32,6 +34,7 @@ public interface IPomSubmissionService
 
 public class PomSubmissionService(
     IPomSubmissionRepository pomSubmissionRepository,
+    IUnitOfWork unitOfWork,
     IPomSubmissionMapper pomSubmissionMapper,
     IOptions<PomSubmissionConfig> pomSubmissionConfig,
     IValidator<PomSubmissionRequest> pomSubmissionRequestValidator,
@@ -41,43 +44,23 @@ public class PomSubmissionService(
 {
     // Saves a first submission.
     // The request validator checks the posted shape only. A current submission for the same
-    // scheme, member, year and quarter is read once here: a first submission is rejected when one exists.
+    // scheme, member, year and quarter is read once: a first submission is rejected when one exists.
     // TEMPORARY: Check vocabulary texts against the reference lists, and resolve scheme and member references.
     // TEMPORARY: Infer compliancePeriodYear from the submission window.
     public async Task<PomSubmissionModel> CreateAsync(PomSubmissionRequest request, CancellationToken cancellationToken = default)
     {
-        request = request.Trimmed();
-        var result = await pomSubmissionRequestValidator.ValidateAsync(request, cancellationToken);
-        var failures = new List<ValidationFailure>(result.Errors);
-
-        if (CanLookUpCurrentSubmission(request))
+        var prepared = await PrepareAsync(request, cancellationToken);
+        if (prepared.Current is not null)
         {
-            var matches = await GetAsync(
-                new PomSubmissionListRequest
-                {
-                    SchemeOrgId = request.SchemeOrgId,
-                    MemberOrgId = request.MemberOrgId,
-                    CompliancePeriodYears = [request.CompliancePeriodYear],
-                    CompliancePeriodQuarters = [request.CompliancePeriodQuarter]
-                },
-                gzipResponse: false,
-                cancellationToken);
-            var current = matches.Items.Count == 0 ? null : matches.Items[0];
-
-            if (current is not null)
-            {
-                failures.Add(new ValidationFailure(
-                    "Submission",
-                    PomSubmissionValidationMessages.CurrentSubmissionExists));
-            }
+            prepared.Failures.Add(SubmissionFailure(PomSubmissionValidationMessages.CurrentSubmissionExists));
         }
 
-        if (failures.Count > 0)
+        if (prepared.Failures.Count > 0)
         {
-            throw new ValidationException(failures);
+            throw new ValidationException(prepared.Failures);
         }
 
-        var submission = pomSubmissionMapper.ToNewSubmission(request, timeProvider.UtcNow);
+        var submission = pomSubmissionMapper.ToNewSubmission(prepared.Request, timeProvider.UtcNow);
 
         try
         {
@@ -88,11 +71,68 @@ public class PomSubmissionService(
             // The current-submission read above has passed, so this is the concurrent-create check.
             throw new ValidationException(
             [
-                new ValidationFailure("Submission", PomSubmissionValidationMessages.CurrentSubmissionExists)
+                SubmissionFailure(PomSubmissionValidationMessages.CurrentSubmissionExists)
             ]);
         }
 
         logger.CreatedPomSubmission(submission.Id, submission.SchemeOrgId, submission.MemberOrgId);
+        return submission;
+    }
+
+    // Saves a replacement for the current submission.
+    // Field checks match create. The same current-submission read must find a row.
+    // The replacement is a new submission with supersedesSubmissionId set to that row.
+    // That row's isCurrent is cleared and its updatedAtUtc is set in the same transaction as the insert.
+    public async Task<PomSubmissionModel> AmendAsync(PomSubmissionRequest request, CancellationToken cancellationToken = default)
+    {
+        var prepared = await PrepareAsync(request, cancellationToken);
+        if (CanLookUpCurrentSubmission(prepared.Request) && prepared.Current is null)
+        {
+            prepared.Failures.Add(SubmissionFailure(PomSubmissionValidationMessages.CurrentSubmissionMissing));
+        }
+
+        if (prepared.Failures.Count > 0)
+        {
+            throw new ValidationException(prepared.Failures);
+        }
+
+        var current = prepared.Current
+            ?? throw new ValidationException(
+            [
+                SubmissionFailure(PomSubmissionValidationMessages.CurrentSubmissionMissing)
+            ]);
+
+        var amendedAtUtc = timeProvider.UtcNow;
+        var submission = pomSubmissionMapper.ToNewSubmission(
+            prepared.Request,
+            amendedAtUtc,
+            supersedesSubmissionId: current.Id);
+
+        try
+        {
+            // Ids and the timestamp are allocated above. The transaction callback can run more than once.
+            await unitOfWork.ExecuteAsync(
+                async (transaction, transactionCancellationToken) =>
+                {
+                    await WriteAmendmentAsync(
+                        transaction,
+                        current.Id,
+                        submission,
+                        amendedAtUtc,
+                        transactionCancellationToken);
+                    return submission;
+                },
+                cancellationToken);
+        }
+        catch (DuplicateKeyOnSaveException)
+        {
+            throw new ValidationException(
+            [
+                SubmissionFailure(PomSubmissionValidationMessages.CurrentSubmissionChanged)
+            ]);
+        }
+
+        logger.AmendedPomSubmission(submission.Id, current.Id, submission.SchemeOrgId, submission.MemberOrgId);
         return submission;
     }
 
@@ -161,9 +201,73 @@ public class PomSubmissionService(
     private static IReadOnlyList<T>? Present<T>(IReadOnlyList<T>? values) =>
         values is { Count: > 0 } ? values : null;
 
-    // TEMPORARY: An amendment loads the current submission once, rejects when it is missing, writes a new
-    // submission with SupersedesSubmissionId and the next version, and clears isCurrent and sets
-    // updatedAtUtc on the previous submission in one transaction.
+    // Field checks, then one read of the current submission when the key is well formed.
+    // Create and amend turn that read into a validation error. A batch upsert keeps the read
+    // and chooses create or amend from Current, without either error.
+    private async Task<PreparedSubmission> PrepareAsync(
+        PomSubmissionRequest request,
+        CancellationToken cancellationToken)
+    {
+        request = request.Trimmed();
+        var result = await pomSubmissionRequestValidator.ValidateAsync(request, cancellationToken);
+        var failures = new List<ValidationFailure>(result.Errors);
+        PomSubmissionModel? current = null;
+
+        if (CanLookUpCurrentSubmission(request))
+        {
+            current = await FindCurrentAsync(request, cancellationToken);
+        }
+
+        return new PreparedSubmission(request, failures, current);
+    }
+
+    private async Task<PomSubmissionModel?> FindCurrentAsync(
+        PomSubmissionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var matches = await GetAsync(
+            new PomSubmissionListRequest
+            {
+                SchemeOrgId = request.SchemeOrgId,
+                MemberOrgId = request.MemberOrgId,
+                CompliancePeriodYears = [request.CompliancePeriodYear],
+                CompliancePeriodQuarters = [request.CompliancePeriodQuarter]
+            },
+            gzipResponse: false,
+            cancellationToken);
+        return matches.Items.Count == 0 ? null : matches.Items[0];
+    }
+
+    // The unique index allows one current submission for the key, so the current row is cleared
+    // before the replacement is inserted. Both writes use the caller's transaction.
+    // A batch upsert can call this for each existing submission, inside one unit of work.
+    // An outbox write can take the same session.
+    private async Task WriteAmendmentAsync(
+        IMongoTransaction transaction,
+        string currentSubmissionId,
+        PomSubmissionModel amendment,
+        DateTime updatedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var superseded = await pomSubmissionRepository.SupersedeCurrentAsync(
+            transaction.Session,
+            currentSubmissionId,
+            updatedAtUtc,
+            cancellationToken);
+
+        if (!superseded)
+        {
+            throw new ValidationException(
+            [
+                SubmissionFailure(PomSubmissionValidationMessages.CurrentSubmissionChanged)
+            ]);
+        }
+
+        await pomSubmissionRepository.CreateAsync(transaction.Session, amendment, cancellationToken);
+    }
+
+    private static ValidationFailure SubmissionFailure(string message) =>
+        new("Submission", message);
 
     // The current-submission key can be read only when these fields are well formed.
     private static bool CanLookUpCurrentSubmission(PomSubmissionRequest request) =>
@@ -171,4 +275,9 @@ public class PomSubmissionService(
         && ObjectId.TryParse(request.MemberOrgId, out _)
         && CalendarYear.Contains(request.CompliancePeriodYear)
         && !string.IsNullOrWhiteSpace(request.CompliancePeriodQuarter);
+
+    private sealed record PreparedSubmission(
+        PomSubmissionRequest Request,
+        List<ValidationFailure> Failures,
+        PomSubmissionModel? Current);
 }

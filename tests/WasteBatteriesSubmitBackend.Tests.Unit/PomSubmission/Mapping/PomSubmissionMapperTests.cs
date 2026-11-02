@@ -59,10 +59,10 @@ public class PomSubmissionMapperTests
         var request = SamplePomSubmission.Request() with { TonnageEntries = [] };
 
         // Act
-        var act = () => Mapper().ToNewSubmission(request, s_createdAt);
+        PomSubmissionModel Act() => Mapper().ToNewSubmission(request, s_createdAt);
 
         // Assert
-        var exception = Assert.Throws<ArgumentException>(act);
+        var exception = Assert.Throws<ArgumentException>(Act);
         Assert.Equal("tonnageEntries", exception.ParamName);
     }
 

@@ -60,10 +60,10 @@ public class PomSubmissionRequestJsonTests
             """;
 
         // Act
-        var act = () => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
+        PomSubmissionRequest? Act() => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
 
         // Assert
-        var exception = Assert.Throws<JsonException>(act);
+        var exception = Assert.Throws<JsonException>(Act);
         Assert.Contains("activity", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -74,10 +74,10 @@ public class PomSubmissionRequestJsonTests
         const string json = """{"memberName":"Northwind Batteries Ltd","regulatorNote":"ignore me"}""";
 
         // Act
-        var act = () => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
+        PomSubmissionRequest? Act() => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
 
         // Assert
-        var exception = Assert.Throws<JsonException>(act);
+        var exception = Assert.Throws<JsonException>(Act);
         Assert.Contains("regulatorNote", exception.Message);
     }
 
@@ -173,10 +173,10 @@ public class PomSubmissionRequestJsonTests
             """;
 
         // Act
-        var act = () => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
+        PomSubmissionRequest? Act() => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
 
         // Assert
-        var exception = Assert.Throws<JsonException>(act);
+        var exception = Assert.Throws<JsonException>(Act);
         Assert.Contains("batteryCategory", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -199,10 +199,10 @@ public class PomSubmissionRequestJsonTests
             """;
 
         // Act
-        var act = () => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
+        PomSubmissionRequest? Act() => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
 
         // Assert
-        var exception = Assert.Throws<JsonException>(act);
+        var exception = Assert.Throws<JsonException>(Act);
         Assert.Contains(property, exception.Message, StringComparison.Ordinal);
     }
 

@@ -29,6 +29,8 @@ public class MongoDbClientFactory : IMongoDbClientFactory
         if (string.IsNullOrWhiteSpace(databaseName))
             throw new ArgumentException("MongoDB database name cannot be empty");
 
+        // Retryable reads and writes stay at the driver default, which is on.
+        // A connection string can turn either off. Transient transaction errors are retried by UnitOfWork.
         var settings = MongoClientSettings.FromConnectionString(uri);
         _client = new MongoClient(settings);
         _mongoDatabase = _client.GetDatabase(databaseName);

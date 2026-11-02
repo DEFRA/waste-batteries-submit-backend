@@ -47,10 +47,10 @@ public class StringDecimal128SerializerTests
         };
 
         // Act
-        var act = () => BsonSerializer.Deserialize<TonnageEntry>(document);
+        TonnageEntry Act() => BsonSerializer.Deserialize<TonnageEntry>(document);
 
         // Assert
-        Assert.ThrowsAny<Exception>(act);
+        Assert.ThrowsAny<Exception>(Act);
     }
 
     [Fact]
@@ -66,9 +66,9 @@ public class StringDecimal128SerializerTests
         };
 
         // Act
-        var act = () => entry.ToBsonDocument();
+        BsonDocument Act() => entry.ToBsonDocument();
 
         // Assert
-        Assert.ThrowsAny<Exception>(act);
+        Assert.ThrowsAny<Exception>(Act);
     }
 }
