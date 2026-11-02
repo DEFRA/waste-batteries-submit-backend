@@ -364,8 +364,8 @@ public class PomSubmissionRequestValidatorTests
                 {
                     Classification = new BatteryClassification
                     {
-                        BatteryCategory = "Portable",
-                        Chemistry = "Alkaline"
+                        BatteryCategory = BatteryClassification.Portable,
+                        Chemistry = SamplePomSubmission.Chemistry
                     },
                     Tonnes = "12.5"
                 }

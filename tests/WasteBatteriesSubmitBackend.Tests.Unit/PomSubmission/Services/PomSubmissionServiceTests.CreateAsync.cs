@@ -14,9 +14,9 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Services;
 
 public partial class PomSubmissionServiceTests
 {
-    private static readonly int[] s_trimmedCompliancePeriodYear = [2026];
+    private static readonly int[] s_trimmedCompliancePeriodYear = [SamplePomSubmission.CompliancePeriodYear];
 
-    private static readonly string[] s_trimmedCompliancePeriodQuarter = ["Quarter 2"];
+    private static readonly string[] s_trimmedCompliancePeriodQuarter = [SamplePomSubmission.CompliancePeriodQuarter];
 
     [Fact]
     public async Task CreateAsync_WhenRequestIsValid_SavesSubmissionAndLogsIt()
@@ -164,10 +164,10 @@ public partial class PomSubmissionServiceTests
     }
 
     [Theory]
-    [InlineData("  not-an-id  ", "674a1b2c3d4e5f6789012346", 2026, "Quarter 2")]
-    [InlineData("674a1b2c3d4e5f6789012345", "not-an-id", 2026, "Quarter 2")]
-    [InlineData("674a1b2c3d4e5f6789012345", "674a1b2c3d4e5f6789012346", 0, "Quarter 2")]
-    [InlineData("674a1b2c3d4e5f6789012345", "674a1b2c3d4e5f6789012346", 2026, "   ")]
+    [InlineData("  not-an-id  ", SamplePomSubmission.MemberOrgId, SamplePomSubmission.CompliancePeriodYear, SamplePomSubmission.CompliancePeriodQuarter)]
+    [InlineData(SamplePomSubmission.SchemeOrgId, "not-an-id", SamplePomSubmission.CompliancePeriodYear, SamplePomSubmission.CompliancePeriodQuarter)]
+    [InlineData(SamplePomSubmission.SchemeOrgId, SamplePomSubmission.MemberOrgId, 0, SamplePomSubmission.CompliancePeriodQuarter)]
+    [InlineData(SamplePomSubmission.SchemeOrgId, SamplePomSubmission.MemberOrgId, SamplePomSubmission.CompliancePeriodYear, "   ")]
     public async Task CreateAsync_WhenCurrentSubmissionKeyIsNotWellFormed_DoesNotLookItUp(
         string schemeOrgId,
         string memberOrgId,
@@ -276,7 +276,7 @@ public partial class PomSubmissionServiceTests
         repository
             .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>(
-                [new PomSubmissionModel { Id = "674a1b2c3d4e5f6789012345", CreatedAtUtc = s_createdAt }],
+                [new PomSubmissionModel { Id = SamplePomSubmission.SchemeOrgId, CreatedAtUtc = s_createdAt }],
                 1,
                 1,
                 1));
@@ -306,7 +306,7 @@ public partial class PomSubmissionServiceTests
         repository
             .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>(
-                [new PomSubmissionModel { Id = "674a1b2c3d4e5f6789012345", CreatedAtUtc = s_createdAt }],
+                [new PomSubmissionModel { Id = SamplePomSubmission.SchemeOrgId, CreatedAtUtc = s_createdAt }],
                 1,
                 1,
                 1));

@@ -1,5 +1,6 @@
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.PomSubmission.Validators;
+using WasteBatteriesSubmitBackend.Tests.Common;
 using WasteBatteriesSubmitBackend.Tests.Unit.Utils.Validation;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Validators;
@@ -32,10 +33,10 @@ public class PomSubmissionListRequestValidatorTests
     {
         var request = filter switch
         {
-            "scheme" => new PomSubmissionListRequest { SchemeOrgId = "674a1b2c3d4e5f6789012346" },
+            "scheme" => new PomSubmissionListRequest { SchemeOrgId = SamplePomSubmission.SchemeOrgId },
             "member" => new PomSubmissionListRequest { MemberOrgId = "674a1b2c3d4e5f6789012347" },
-            "year" => new PomSubmissionListRequest { CompliancePeriodYears = [2026] },
-            "quarter" => new PomSubmissionListRequest { CompliancePeriodQuarters = ["Quarter 2"] },
+            "year" => new PomSubmissionListRequest { CompliancePeriodYears = [SamplePomSubmission.CompliancePeriodYear] },
+            "quarter" => new PomSubmissionListRequest { CompliancePeriodQuarters = [SamplePomSubmission.CompliancePeriodQuarter] },
             _ => throw new ArgumentOutOfRangeException(nameof(filter))
         };
 
@@ -50,10 +51,10 @@ public class PomSubmissionListRequestValidatorTests
         var result = await _validator.ValidateAsync(
             new PomSubmissionListRequest
             {
-                SchemeOrgId = "674a1b2c3d4e5f6789012346",
+                SchemeOrgId = SamplePomSubmission.SchemeOrgId,
                 MemberOrgId = "674a1b2c3d4e5f6789012347",
-                CompliancePeriodYears = [2024, 2026],
-                CompliancePeriodQuarters = ["Quarter 1", "Quarter 2"],
+                CompliancePeriodYears = [2024, SamplePomSubmission.CompliancePeriodYear],
+                CompliancePeriodQuarters = ["Quarter 1", SamplePomSubmission.CompliancePeriodQuarter],
                 IsCurrent = true,
                 PageNumber = 1,
                 PageSize = 25
@@ -93,7 +94,7 @@ public class PomSubmissionListRequestValidatorTests
         var result = await _validator.ValidateAsync(
             new PomSubmissionListRequest
             {
-                SchemeOrgId = "674a1b2c3d4e5f6789012346",
+                SchemeOrgId = SamplePomSubmission.SchemeOrgId,
                 PageNumber = 2
             },
             TestContext.Current.CancellationToken);

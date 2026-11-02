@@ -59,7 +59,7 @@ public class PomSubmissionRepository(IMongoDbClientFactory connectionFactory, IL
     }
 
     // IsCurrent defaults to true. A query that clears it and sets nothing else would read the whole collection.
-    private static FilterDefinition<PomSubmissionModel> Filter(PomSubmissionQuery query)
+    internal static FilterDefinition<PomSubmissionModel> Filter(PomSubmissionQuery query)
     {
         var builder = Builders<PomSubmissionModel>.Filter;
         var filters = new List<FilterDefinition<PomSubmissionModel>>();

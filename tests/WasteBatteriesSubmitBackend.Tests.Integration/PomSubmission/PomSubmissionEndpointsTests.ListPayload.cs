@@ -11,7 +11,7 @@ using WasteBatteriesSubmitBackend.Utils.Mongo;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
 
-// The checks to ensure that the payload does not exceed the expected limit is done in the PomSubmissionPageBudgetTests unit tests, since it was slow todo here
+// The checks to ensure that the payload does not exceed the expected limit is done in the PomSubmissionPageBudgetTests unit tests, since it was slow to do it here
 public partial class PomSubmissionEndpointsTests
 {
     private const string GzipSchemeOrgId = MeasuredPomSubmission.SchemeOrgId;

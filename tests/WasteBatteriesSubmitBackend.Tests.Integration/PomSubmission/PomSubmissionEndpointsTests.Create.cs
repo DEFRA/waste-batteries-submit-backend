@@ -78,8 +78,8 @@ public partial class PomSubmissionEndpointsTests
     }
 
     [Theory]
-    [InlineData("""{"memberName":"Northwind Batteries Ltd","tonnageEntries":[]}""")]
-    [InlineData("""{"memberName":"Northwind Batteries Ltd"}""")]
+    [InlineData($$"""{"memberName":"{{SamplePomSubmission.MemberName}}","tonnageEntries":[]}""")]
+    [InlineData($$"""{"memberName":"{{SamplePomSubmission.MemberName}}"}""")]
     [InlineData("""{"memberName":" ","tonnageEntries":[{"tonnes":"1.000"}]}""")]
     public async Task Create_WhenMemberNameOrTonnageIsMissing_ReturnsBadRequest(string body)
     {
@@ -147,10 +147,10 @@ public partial class PomSubmissionEndpointsTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var countBefore = await SubmissionCount(cancellationToken);
         using var client = fixture.CreateClient();
-        var body = """
+        var body = $$"""
             {
               "schemeOrgId": "not-an-id",
-              "memberOrgId": "674a1b2c3d4e5f6789012346",
+              "memberOrgId": "{{SamplePomSubmission.MemberOrgId}}",
               "memberName": "",
               "memberBprn": "BPRN-XX-2026-1",
               "schemeMembershipRef": "",

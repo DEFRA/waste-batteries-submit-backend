@@ -20,7 +20,7 @@ public partial class PomSubmissionServiceTests
         var service = Service(repository, logger);
         var stored = new PomSubmissionModel
         {
-            Id = "674a1b2c3d4e5f6789012345",
+            Id = SamplePomSubmission.SchemeOrgId,
             CreatedAtUtc = s_createdAt
         };
         repository
@@ -50,12 +50,12 @@ public partial class PomSubmissionServiceTests
             .Returns(new PaginatedList<PomSubmissionModel>([], 0, 1, 0));
 
         // Act
-        var submission = await service.GetAsync("674a1b2c3d4e5f6789012345", TestContext.Current.CancellationToken);
+        var submission = await service.GetAsync(SamplePomSubmission.SchemeOrgId, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.Null(submission);
         await repository.Received(1).FindAsync(
-            new PomSubmissionQuery { Id = "674a1b2c3d4e5f6789012345", IsCurrent = null },
+            new PomSubmissionQuery { Id = SamplePomSubmission.SchemeOrgId, IsCurrent = null },
             new PageRequest(),
             Arg.Any<CancellationToken>());
         Assert.Empty(logger.Entries);
@@ -73,11 +73,11 @@ public partial class PomSubmissionServiceTests
             .Returns(new PaginatedList<PomSubmissionModel>([], 0, 1, 0));
 
         // Act
-        await service.GetAsync("  674a1b2c3d4e5f6789012345  ", TestContext.Current.CancellationToken);
+        await service.GetAsync($"  {SamplePomSubmission.SchemeOrgId}  ", TestContext.Current.CancellationToken);
 
         // Assert
         await repository.Received(1).FindAsync(
-            new PomSubmissionQuery { Id = "674a1b2c3d4e5f6789012345", IsCurrent = null },
+            new PomSubmissionQuery { Id = SamplePomSubmission.SchemeOrgId, IsCurrent = null },
             new PageRequest(),
             Arg.Any<CancellationToken>());
     }

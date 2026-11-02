@@ -19,7 +19,7 @@ public partial class PomSubmissionEndpointsTests
         using var client = fixture.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/pom-submissions/674a1b2c3d4e5f6789012345", cancellationToken);
+        var response = await client.GetAsync($"/pom-submissions/{SamplePomSubmission.SchemeOrgId}", cancellationToken);
 
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -33,7 +33,7 @@ public partial class PomSubmissionEndpointsTests
         using var client = fixture.CreateAnonymousClient();
 
         // Act
-        var response = await client.GetAsync("/pom-submissions/674a1b2c3d4e5f6789012345", cancellationToken);
+        var response = await client.GetAsync($"/pom-submissions/{SamplePomSubmission.SchemeOrgId}", cancellationToken);
 
         // Assert
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -48,7 +48,7 @@ public partial class PomSubmissionEndpointsTests
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "not-the-test-token");
 
         // Act
-        var response = await client.GetAsync("/pom-submissions/674a1b2c3d4e5f6789012345", cancellationToken);
+        var response = await client.GetAsync($"/pom-submissions/{SamplePomSubmission.SchemeOrgId}", cancellationToken);
 
         // Assert
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);

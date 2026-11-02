@@ -12,9 +12,13 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Services;
 
 public partial class PomSubmissionServiceTests
 {
-    private static readonly int[] s_combinedCompliancePeriodYears = [2024, 2025, 2026];
+    private static readonly int[] s_combinedCompliancePeriodYears = [2024, 2025, SamplePomSubmission.CompliancePeriodYear];
 
-    private static readonly string[] s_combinedCompliancePeriodQuarters = ["Quarter 2", "Quarter 1"];
+    private static readonly int[] s_yearOnly = [SamplePomSubmission.CompliancePeriodYear];
+
+    private static readonly string[] s_combinedCompliancePeriodQuarters = [SamplePomSubmission.CompliancePeriodQuarter, "Quarter 1"];
+
+    private static readonly string[] s_quarterOnly = [SamplePomSubmission.CompliancePeriodQuarter];
 
     [Fact]
     public async Task GetAsync_WhenNoBusinessFilterIsSet_ThrowsValidationException()
@@ -58,10 +62,10 @@ public partial class PomSubmissionServiceTests
         await service.GetAsync(
             new PomSubmissionListRequest
             {
-                SchemeOrgId = "  674a1b2c3d4e5f6789012346  ",
+                SchemeOrgId = $"  {SamplePomSubmission.SchemeOrgId}  ",
                 MemberOrgId = "674a1b2c3d4e5f6789012347",
-                CompliancePeriodYears = [2024, 2025, 2026],
-                CompliancePeriodQuarters = ["  Quarter 2  ", "Quarter 1"],
+                CompliancePeriodYears = [2024, 2025, SamplePomSubmission.CompliancePeriodYear],
+                CompliancePeriodQuarters = [$"  {SamplePomSubmission.CompliancePeriodQuarter}  ", "Quarter 1"],
                 PageSize = 2
             },
             false,
@@ -71,7 +75,7 @@ public partial class PomSubmissionServiceTests
         await repository.Received(1).FindAsync(
             Arg.Is<PomSubmissionQuery>(query =>
                 query.Id == null
-                && query.SchemeOrgId == "674a1b2c3d4e5f6789012346"
+                && query.SchemeOrgId == SamplePomSubmission.SchemeOrgId
                 && query.MemberOrgId == "674a1b2c3d4e5f6789012347"
                 && query.IsCurrent == true
                 && query.CompliancePeriodYears != null
@@ -83,7 +87,7 @@ public partial class PomSubmissionServiceTests
     }
 
     [Theory]
-    [InlineData("674a1b2c3d4e5f6789012346", null)]
+    [InlineData(SamplePomSubmission.SchemeOrgId, null)]
     [InlineData(null, "674a1b2c3d4e5f6789012347")]
     public async Task GetAsync_WhenOneOrganisationIsSet_DefaultsToCurrent(
         string? schemeOrgId,
@@ -110,8 +114,11 @@ public partial class PomSubmissionServiceTests
         // Assert
         await repository.Received(1).FindAsync(
             Arg.Is<PomSubmissionQuery>(query =>
-                query.SchemeOrgId == schemeOrgId
+                query.Id == null
+                && query.SchemeOrgId == schemeOrgId
                 && query.MemberOrgId == memberOrgId
+                && query.CompliancePeriodYears == null
+                && query.CompliancePeriodQuarters == null
                 && query.IsCurrent == true),
             Arg.Any<PageRequest>(),
             Arg.Any<CancellationToken>());
@@ -132,25 +139,73 @@ public partial class PomSubmissionServiceTests
         await service.GetAsync(
             new PomSubmissionListRequest
             {
-                CompliancePeriodYears = [2026]
+                CompliancePeriodYears = [SamplePomSubmission.CompliancePeriodYear]
             },
             false,
             TestContext.Current.CancellationToken);
         await service.GetAsync(
             new PomSubmissionListRequest
             {
-                CompliancePeriodQuarters = ["Quarter 2"]
+                CompliancePeriodQuarters = [SamplePomSubmission.CompliancePeriodQuarter]
             },
             false,
             TestContext.Current.CancellationToken);
 
         // Assert
         await repository.Received(1).FindAsync(
-            Arg.Is<PomSubmissionQuery>(query => query.CompliancePeriodYears != null && query.IsCurrent == true),
+            Arg.Is<PomSubmissionQuery>(query =>
+                query.Id == null
+                && query.SchemeOrgId == null
+                && query.MemberOrgId == null
+                && query.CompliancePeriodYears != null
+                && query.CompliancePeriodYears.SequenceEqual(s_yearOnly)
+                && query.CompliancePeriodQuarters == null
+                && query.IsCurrent == true),
             Arg.Any<PageRequest>(),
             Arg.Any<CancellationToken>());
         await repository.Received(1).FindAsync(
-            Arg.Is<PomSubmissionQuery>(query => query.CompliancePeriodQuarters != null && query.IsCurrent == true),
+            Arg.Is<PomSubmissionQuery>(query =>
+                query.Id == null
+                && query.SchemeOrgId == null
+                && query.MemberOrgId == null
+                && query.CompliancePeriodYears == null
+                && query.CompliancePeriodQuarters != null
+                && query.CompliancePeriodQuarters.SequenceEqual(s_quarterOnly)
+                && query.IsCurrent == true),
+            Arg.Any<PageRequest>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetAsync_WhenYearAndQuarterListsAreEmpty_DoesNotApplyThem()
+    {
+        // Arrange
+        var repository = Substitute.For<IPomSubmissionRepository>();
+        var logger = new CapturingLogger<PomSubmissionService>();
+        var service = Service(repository, logger);
+        repository
+            .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new PaginatedList<PomSubmissionModel>([], 0, 1, 0));
+
+        // Act
+        await service.GetAsync(
+            new PomSubmissionListRequest
+            {
+                SchemeOrgId = SamplePomSubmission.SchemeOrgId,
+                CompliancePeriodYears = [],
+                CompliancePeriodQuarters = []
+            },
+            false,
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        await repository.Received(1).FindAsync(
+            Arg.Is<PomSubmissionQuery>(query =>
+                query.SchemeOrgId == SamplePomSubmission.SchemeOrgId
+                && query.MemberOrgId == null
+                && query.CompliancePeriodYears == null
+                && query.CompliancePeriodQuarters == null
+                && query.IsCurrent == true),
             Arg.Any<PageRequest>(),
             Arg.Any<CancellationToken>());
     }
@@ -170,7 +225,7 @@ public partial class PomSubmissionServiceTests
         await service.GetAsync(
             new PomSubmissionListRequest
             {
-                SchemeOrgId = "674a1b2c3d4e5f6789012346",
+                SchemeOrgId = SamplePomSubmission.SchemeOrgId,
                 IsCurrent = false,
                 PageNumber = 2,
                 PageSize = 10
@@ -180,7 +235,13 @@ public partial class PomSubmissionServiceTests
 
         // Assert
         await repository.Received(1).FindAsync(
-            Arg.Is<PomSubmissionQuery>(query => query.IsCurrent == false),
+            Arg.Is<PomSubmissionQuery>(query =>
+                query.Id == null
+                && query.SchemeOrgId == SamplePomSubmission.SchemeOrgId
+                && query.MemberOrgId == null
+                && query.CompliancePeriodYears == null
+                && query.CompliancePeriodQuarters == null
+                && query.IsCurrent == false),
             new PageRequest { PageNumber = 2, PageSize = 10 },
             Arg.Any<CancellationToken>());
     }
@@ -231,7 +292,7 @@ public partial class PomSubmissionServiceTests
 
         // Act
         await service.GetAsync(
-            new PomSubmissionListRequest { SchemeOrgId = "674a1b2c3d4e5f6789012346" },
+            new PomSubmissionListRequest { SchemeOrgId = SamplePomSubmission.SchemeOrgId },
             false,
             TestContext.Current.CancellationToken);
 
@@ -255,7 +316,7 @@ public partial class PomSubmissionServiceTests
         await service.GetAsync(
             new PomSubmissionListRequest
             {
-                SchemeOrgId = "674a1b2c3d4e5f6789012346",
+                SchemeOrgId = SamplePomSubmission.SchemeOrgId,
                 PageNumber = 3,
                 PageSize = MaxPageSize + 100
             },
@@ -282,7 +343,7 @@ public partial class PomSubmissionServiceTests
         await service.GetAsync(
             new PomSubmissionListRequest
             {
-                SchemeOrgId = "674a1b2c3d4e5f6789012346",
+                SchemeOrgId = SamplePomSubmission.SchemeOrgId,
                 PageNumber = 2
             },
             false,
@@ -306,7 +367,7 @@ public partial class PomSubmissionServiceTests
 
         // Act
         await service.GetAsync(
-            new PomSubmissionListRequest { SchemeOrgId = "674a1b2c3d4e5f6789012346" },
+            new PomSubmissionListRequest { SchemeOrgId = SamplePomSubmission.SchemeOrgId },
             gzipResponse: true,
             TestContext.Current.CancellationToken);
 
@@ -330,7 +391,7 @@ public partial class PomSubmissionServiceTests
         await service.GetAsync(
             new PomSubmissionListRequest
             {
-                SchemeOrgId = "674a1b2c3d4e5f6789012346",
+                SchemeOrgId = SamplePomSubmission.SchemeOrgId,
                 PageSize = MaxPageSize + 5
             },
             gzipResponse: true,
@@ -338,7 +399,7 @@ public partial class PomSubmissionServiceTests
         await service.GetAsync(
             new PomSubmissionListRequest
             {
-                SchemeOrgId = "674a1b2c3d4e5f6789012346",
+                SchemeOrgId = SamplePomSubmission.SchemeOrgId,
                 PageSize = MaxGzipPageSize + 5
             },
             gzipResponse: true,
