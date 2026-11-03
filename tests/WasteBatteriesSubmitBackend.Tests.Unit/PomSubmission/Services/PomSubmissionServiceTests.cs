@@ -45,8 +45,9 @@ public partial class PomSubmissionServiceTests
             unitOfWork ?? Substitute.For<IUnitOfWork>(),
             new PomSubmissionMapper(s_config),
             s_config,
-            new PomSubmissionRequestValidator(),
-            new PomSubmissionListRequestValidator(),
+            new PomSubmissionValidators(
+                new PomSubmissionRequestValidator(),
+                new PomSubmissionListRequestValidator()),
             new FixedTime(s_createdAt),
             logger);
 

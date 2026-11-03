@@ -37,8 +37,7 @@ public class PomSubmissionService(
     IUnitOfWork unitOfWork,
     IPomSubmissionMapper pomSubmissionMapper,
     IOptions<PomSubmissionConfig> pomSubmissionConfig,
-    IValidator<PomSubmissionRequest> pomSubmissionRequestValidator,
-    IValidator<PomSubmissionListRequest> pomSubmissionListRequestValidator,
+    PomSubmissionValidators validators,
     ITimeProvider timeProvider,
     ILogger<PomSubmissionService> logger) : IPomSubmissionService
 {
@@ -166,7 +165,7 @@ public class PomSubmissionService(
         CancellationToken cancellationToken = default)
     {
         request = request.Trimmed();
-        await pomSubmissionListRequestValidator.ValidateAndThrowAsync(request, cancellationToken);
+        await validators.List.ValidateAndThrowAsync(request, cancellationToken);
 
         var query = new PomSubmissionQuery
         {
@@ -209,7 +208,7 @@ public class PomSubmissionService(
         CancellationToken cancellationToken)
     {
         request = request.Trimmed();
-        var result = await pomSubmissionRequestValidator.ValidateAsync(request, cancellationToken);
+        var result = await validators.Request.ValidateAsync(request, cancellationToken);
         var failures = new List<ValidationFailure>(result.Errors);
         PomSubmissionModel? current = null;
 
