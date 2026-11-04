@@ -80,7 +80,8 @@ public class PomSubmissionService(
 
     // Saves a replacement for the current submission.
     // Field checks match create. The same current-submission read must find a row.
-    // The replacement is a new submission with supersedesSubmissionId set to that row.
+    // The replacement is a new submission with supersedesSubmissionId set to that row
+    // and version set to one more than that row.
     // That row's isCurrent is cleared and its updatedAtUtc is set in the same transaction as the insert.
     public async Task<PomSubmissionModel> AmendAsync(PomSubmissionRequest request, CancellationToken cancellationToken = default)
     {
@@ -105,6 +106,7 @@ public class PomSubmissionService(
         var submission = pomSubmissionMapper.ToNewSubmission(
             prepared.Request,
             amendedAtUtc,
+            version: current.Version + 1,
             supersedesSubmissionId: current.Id);
 
         try

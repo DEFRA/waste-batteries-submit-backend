@@ -62,8 +62,8 @@ public sealed record PomSubmissionModel : PomSubmissionBase
     // texts were written against.
     public int SchemaVersion { get; init; }
 
-    //Version is the optimistic concurrency token a later write
-    // sends back.
+    // An amendment writes one more than the submission it supersedes.
+    // A later write can send this value back as an optimistic concurrency token.
     public int Version { get; init; }
 
     // Null on a first submission. An amendment sets this to the id of the submission it replaces.

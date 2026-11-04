@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
+using MongoDB.Bson.IO;
 using MongoDB.Driver;
 using System.Net;
 using System.Net.Http.Headers;
@@ -10,6 +11,7 @@ using System.Text.Json;
 using WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.Tests.Common;
+using WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 using WasteBatteriesSubmitBackend.Utils.Mongo;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
@@ -263,7 +265,7 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal(created.Id, amended.GetProperty("supersedesSubmissionId").GetString());
         Assert.True(amended.GetProperty("isCurrent").GetBoolean());
         Assert.Equal(JsonValueKind.Null, amended.GetProperty("updatedAtUtc").ValueKind);
-        Assert.Equal(fixture.Defaults.InitialVersion, amended.GetProperty("version").GetInt32());
+        Assert.Equal(fixture.Defaults.InitialVersion + 1, amended.GetProperty("version").GetInt32());
         Assert.Equal("3.000", amended.GetProperty("tonnageEntries")[0].GetProperty("tonnes").GetString());
         Assert.Equal(PomSubmissionApiFixture.CreatedAt, amended.GetProperty("createdAtUtc").GetDateTime().ToUniversalTime());
 
@@ -273,10 +275,12 @@ public partial class PomSubmissionEndpointsTests
         Assert.False(previous["isCurrent"].AsBoolean);
         Assert.Equal(PomSubmissionApiFixture.CreatedAt, previous["updatedAtUtc"].ToUniversalTime());
         Assert.Equal(BsonNull.Value, previous["supersedesSubmissionId"]);
+        Assert.Equal(fixture.Defaults.InitialVersion, previous["version"].AsInt32);
         Assert.Equal(SamplePomSubmission.Tonnes, previous["tonnageEntries"][0]["tonnes"].AsDecimal128.ToString());
         Assert.True(replacement["isCurrent"].AsBoolean);
         Assert.Equal(BsonNull.Value, replacement["updatedAtUtc"]);
         Assert.Equal(created.Id, replacement["supersedesSubmissionId"].AsObjectId.ToString());
+        Assert.Equal(fixture.Defaults.InitialVersion + 1, replacement["version"].AsInt32);
         Assert.Equal("3.000", replacement["tonnageEntries"][0]["tonnes"].AsDecimal128.ToString());
 
         Assert.Equal(HttpStatusCode.OK, previousResponse.StatusCode);
@@ -308,6 +312,8 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal(
             $"Amended POM submission {amendedId} superseding {created.Id} for scheme {PomSubmissionApiFixture.SchemeOrgId} member {memberOrgId}",
             log.Message);
+
+        Snapshot.Match(StoredPair(previous, replacement));
     }
 
     [Fact]
@@ -346,13 +352,18 @@ public partial class PomSubmissionEndpointsTests
         var second = Assert.Single(stored, document => document["_id"].AsObjectId.ToString() == secondId);
         Assert.False(original["isCurrent"].AsBoolean);
         Assert.Equal(BsonNull.Value, original["supersedesSubmissionId"]);
+        Assert.Equal(fixture.Defaults.InitialVersion, original["version"].AsInt32);
         Assert.False(first["isCurrent"].AsBoolean);
         Assert.Equal(created.Id, first["supersedesSubmissionId"].AsObjectId.ToString());
+        Assert.Equal(fixture.Defaults.InitialVersion + 1, first["version"].AsInt32);
         Assert.Equal(PomSubmissionApiFixture.CreatedAt, first["updatedAtUtc"].ToUniversalTime());
         Assert.True(second["isCurrent"].AsBoolean);
         Assert.Equal(firstId, second["supersedesSubmissionId"].AsObjectId.ToString());
+        Assert.Equal(fixture.Defaults.InitialVersion + 2, second["version"].AsInt32);
         Assert.Equal(BsonNull.Value, second["updatedAtUtc"]);
         Assert.Equal("3.000", second["tonnageEntries"][0]["tonnes"].AsDecimal128.ToString());
+        Assert.Equal(fixture.Defaults.InitialVersion + 1, firstDocument.RootElement.GetProperty("version").GetInt32());
+        Assert.Equal(fixture.Defaults.InitialVersion + 2, secondDocument.RootElement.GetProperty("version").GetInt32());
     }
 
     [Fact]
@@ -453,6 +464,34 @@ public partial class PomSubmissionEndpointsTests
         {
             await fixture.Submissions.DeleteManyAsync(MemberFilter(memberOrgId), cancellationToken);
         }
+    }
+
+    // The previous row is first, then the replacement. Generated ids are pinned so the file stays stable,
+    // and the replacement still points at the previous row.
+    private static string StoredPair(BsonDocument previous, BsonDocument replacement)
+    {
+        var previousId = ObjectId.Parse("000000000000000000000001");
+        var replacementId = ObjectId.Parse("000000000000000000000002");
+        var memberOrgId = ObjectId.Parse("000000000000000000000003");
+        var pinnedPrevious = Pin(previous, previousId, memberOrgId, "000000000000000000000004");
+        var pinnedReplacement = Pin(replacement, replacementId, memberOrgId, "000000000000000000000005");
+        pinnedReplacement["supersedesSubmissionId"] = previousId;
+
+        return new BsonArray { pinnedPrevious, pinnedReplacement }.ToJson(new JsonWriterSettings
+        {
+            OutputMode = JsonOutputMode.CanonicalExtendedJson,
+            Indent = true,
+            NewLineChars = "\n"
+        });
+    }
+
+    private static BsonDocument Pin(BsonDocument document, ObjectId id, ObjectId memberOrgId, string tonnageEntryId)
+    {
+        var pinned = document.DeepClone().AsBsonDocument;
+        pinned["_id"] = id;
+        pinned["memberOrgId"] = memberOrgId;
+        pinned["tonnageEntries"][0].AsBsonDocument["id"] = ObjectId.Parse(tonnageEntryId);
+        return pinned;
     }
 
     private static string BodyForMember(string memberOrgId, string? tonnes = null)

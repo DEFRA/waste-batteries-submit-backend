@@ -35,6 +35,7 @@ public partial class PomSubmissionServiceTests
         var submission = await service.AmendAsync(request, TestContext.Current.CancellationToken);
 
         // Assert
+        Assert.Equal(current.Version + 1, submission.Version);
         await repository.Received(1).FindAsync(
             Arg.Is<PomSubmissionQuery>(query =>
                 query.SchemeOrgId == request.SchemeOrgId
@@ -56,7 +57,7 @@ public partial class PomSubmissionServiceTests
                     && saved.SupersedesSubmissionId == current.Id
                     && saved.IsCurrent
                     && saved.UpdatedAtUtc == null
-                    && saved.Version == 1
+                    && saved.Version == current.Version + 1
                     && saved.Status == "Submitted"
                     && saved.CreatedAtUtc == s_createdAt
                     && saved.MemberName == SamplePomSubmission.MemberName),
