@@ -51,7 +51,11 @@ static void ConfigureServices(WebApplicationBuilder builder)
     // Minimal APIs only throw on a bad body or query in Development by default. Elsewhere they write an
     // empty 400 and log at Debug. Throwing everywhere sends it through ExceptionLoggingHandler as problem details.
     services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
-    services.AddProblemDetails();
+    var traceHeader = configuration.GetValue<string>("TraceHeader");
+    services.AddProblemDetails(options =>
+    {
+        options.CustomizeProblemDetails = context => ProblemDetailsTraceId.Apply(context, traceHeader);
+    });
     services.AddValidation();
     services.AddHttpContextAccessor();
 
