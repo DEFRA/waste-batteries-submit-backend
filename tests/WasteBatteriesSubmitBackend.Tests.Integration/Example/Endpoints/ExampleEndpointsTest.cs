@@ -1,9 +1,3 @@
-using System.Net;
-using System.Net.Http.Json;
-using WasteBatteriesSubmitBackend.Example.Models;
-using WasteBatteriesSubmitBackend.Example;
-using WasteBatteriesSubmitBackend.Example.Repositories;
-using WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -11,6 +5,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
+using System.Net;
+using System.Net.Http.Json;
+using WasteBatteriesSubmitBackend.Example;
+using WasteBatteriesSubmitBackend.Example.Models;
+using WasteBatteriesSubmitBackend.Example.Repositories;
+using WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.Example.Endpoints;
 

@@ -1,6 +1,5 @@
-using System.Diagnostics.CodeAnalysis;
-using System.Text.Json.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
+using System.Text.Json.Serialization;
 using WasteBatteriesSubmitBackend.Utils.Text;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Models;
@@ -9,7 +8,6 @@ namespace WasteBatteriesSubmitBackend.PomSubmission.Models;
 // reference-data text (for example "Portable", "Alkaline"), not the id.
 // batteryCategory is required on the stored classification. The request JSON
 // must not include it. Every submission stores Portable.
-[ExcludeFromCodeCoverage]
 [BsonIgnoreExtraElements]
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record BatteryClassification

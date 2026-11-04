@@ -9,11 +9,15 @@ public static class PomSubmissionValidationMessages
 
     public const string MemberOrgIdObjectId = "memberOrgId must be an ObjectId.";
 
+    public const string IdObjectId = "id must be an ObjectId.";
+
     public const string MemberBprnFormat = "memberBprn must match BPRN-{EA|NRW|SEPA|NIEA}-{year}-{6 digits}.";
 
     public const string MemberBprnYear = "memberBprn must be the registration for compliancePeriodYear.";
 
     public const string CompliancePeriodYearRange = "compliancePeriodYear must be a calendar year.";
+
+    public const string CompliancePeriodYearsRange = "compliancePeriodYears must be a calendar year.";
 
     public const string TonnesFormat = "tonnes must be a string decimal with exactly 3 digits after the decimal point.";
 
@@ -23,4 +27,11 @@ public static class PomSubmissionValidationMessages
 
     public const string CurrentSubmissionExists =
         "A current submission already exists for this scheme, member, year and quarter.";
+
+    public const string PageNumberMinimum = "pageNumber must be at least 1.";
+
+    public const string PageSizeMinimum = "pageSize must be at least 1.";
+
+    public const string FilterRequired =
+        "At least one of schemeOrgId, memberOrgId, compliancePeriodYears or compliancePeriodQuarters is required.";
 }

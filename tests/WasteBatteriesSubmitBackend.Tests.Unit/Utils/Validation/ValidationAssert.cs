@@ -18,9 +18,8 @@ public static class ValidationAssert
     }
 
     public static List<(string PropertyName, string ErrorMessage)> Messages(ValidationResult result) =>
-        result.Errors
+        [.. result.Errors
             .Select(error => (error.PropertyName, error.ErrorMessage))
             .OrderBy(error => error.PropertyName, StringComparer.Ordinal)
-            .ThenBy(error => error.ErrorMessage, StringComparer.Ordinal)
-            .ToList();
+            .ThenBy(error => error.ErrorMessage, StringComparer.Ordinal)];
 }

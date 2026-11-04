@@ -1,6 +1,6 @@
-using System.Diagnostics.CodeAnalysis;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
+using System.Diagnostics.CodeAnalysis;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Models;
 
@@ -74,7 +74,7 @@ public sealed record PomSubmissionModel : PomSubmissionBase
 
     public string Status { get; init; } = string.Empty;
 
-    // TODO: Embed Declaration (the appropriate person's signature: id, firstName, lastName,
+    // TEMPORARY: Embed Declaration (the appropriate person's signature: id, firstName, lastName,
     // position, declaredAt) when signing is added. It is omitted from this version.
 
     public List<TonnageEntry> TonnageEntries { get; init; } = [];

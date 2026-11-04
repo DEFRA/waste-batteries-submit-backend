@@ -48,7 +48,7 @@ jobs:
           set -euo pipefail
           dotnet build --configuration Debug
           dotnet tool update dotnet-coverage --tool-path ./.tools/coverage
-          ./.tools/coverage/dotnet-coverage collect "bash scripts/run-tests.sh" -f cobertura -o coverage.cobertura.xml
+          ./.tools/coverage/dotnet-coverage collect "dotnet test --configuration Debug --no-build" -f cobertura -o coverage.cobertura.xml
 
       - name: Fail when line coverage is below 90%
         run: python3 scripts/assert-line-coverage.py coverage.cobertura.xml 90

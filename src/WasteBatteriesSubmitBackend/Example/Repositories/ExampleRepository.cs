@@ -1,11 +1,11 @@
-using WasteBatteriesSubmitBackend.Example.Models;
-using WasteBatteriesSubmitBackend.Utils.Mongo;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
+using WasteBatteriesSubmitBackend.Example.Models;
 using WasteBatteriesSubmitBackend.Utils.Auditing;
 using WasteBatteriesSubmitBackend.Utils.Logging;
+using WasteBatteriesSubmitBackend.Utils.Mongo;
 
 namespace WasteBatteriesSubmitBackend.Example.Repositories;
 

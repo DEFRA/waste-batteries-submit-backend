@@ -5,7 +5,7 @@ COPY . .
 WORKDIR "/src"
 # POM integration tests start MongoDB through Testcontainers. A docker build has
 # no Docker daemon, so those tests cannot run here. The pull request workflow
-# runs the full suite with scripts/run-tests.sh, where Docker is available.
+# runs the full suite with dotnet test, where Docker is available.
 RUN dotnet build WasteBatteriesSubmitBackend.slnx -c Debug \
  && dotnet tests/WasteBatteriesSubmitBackend.Tests.Unit/bin/Debug/net10.0/WasteBatteriesSubmitBackend.Tests.Unit.dll \
  && dotnet tests/WasteBatteriesSubmitBackend.Tests.Integration/bin/Debug/net10.0/WasteBatteriesSubmitBackend.Tests.Integration.dll \

@@ -1,6 +1,6 @@
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using System.Diagnostics.CodeAnalysis;
 using WasteBatteriesSubmitBackend.Config;
 
 namespace WasteBatteriesSubmitBackend.Authentication;

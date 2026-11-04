@@ -1,5 +1,7 @@
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.PomSubmission.Validators;
+using WasteBatteriesSubmitBackend.Tests.Common;
 using WasteBatteriesSubmitBackend.Tests.Unit.Utils.Validation;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Validators;
@@ -37,7 +39,7 @@ public class PomSubmissionRequestValidatorTests
     public async Task ValidateAsync_WhenSubmissionIsComplete_ReturnsValid()
     {
         // Arrange
-        var request = ValidRequest();
+        var request = SamplePomSubmission.Request();
 
         // Act
         var result = await Validator().ValidateAsync(request, TestContext.Current.CancellationToken);
@@ -282,7 +284,10 @@ public class PomSubmissionRequestValidatorTests
     [InlineData("NIEA")]
     public async Task ValidateAsync_WhenBprnRegulatorIsKnown_ReturnsValid(string regulator)
     {
-        var request = ValidRequest() with { MemberBprn = $"BPRN-{regulator}-2026-000123" };
+        var request = SamplePomSubmission.Request() with
+        {
+            MemberBprn = $"BPRN-{regulator}-{SamplePomSubmission.CompliancePeriodYear}-000123"
+        };
 
         var result = await Validator().ValidateAsync(request, TestContext.Current.CancellationToken);
 
@@ -294,7 +299,7 @@ public class PomSubmissionRequestValidatorTests
     [InlineData(CalendarYear.Maximum)]
     public async Task ValidateAsync_WhenCompliancePeriodYearIsAtTheBoundary_ReturnsValid(int year)
     {
-        var request = ValidRequest() with
+        var request = SamplePomSubmission.Request() with
         {
             CompliancePeriodYear = year,
             MemberBprn = $"BPRN-EA-{year}-000123"
@@ -350,7 +355,7 @@ public class PomSubmissionRequestValidatorTests
     public async Task ValidateAsync_WhenOneEntryIsNullAndAnotherIsInvalid_ReturnsBothErrors()
     {
         // Arrange
-        var request = ValidRequest() with
+        var request = SamplePomSubmission.Request() with
         {
             TonnageEntries =
             [
@@ -359,8 +364,8 @@ public class PomSubmissionRequestValidatorTests
                 {
                     Classification = new BatteryClassification
                     {
-                        BatteryCategory = "Portable",
-                        Chemistry = "Alkaline"
+                        BatteryCategory = BatteryClassification.Portable,
+                        Chemistry = SamplePomSubmission.Chemistry
                     },
                     Tonnes = "12.5"
                 }
@@ -386,8 +391,8 @@ public class PomSubmissionRequestValidatorTests
     public async Task ValidateAsync_WhenChemistryDiffers_ReturnsValid()
     {
         // Arrange
-        var entry = ValidRequest().TonnageEntries[0];
-        var request = ValidRequest() with
+        var entry = SamplePomSubmission.Request().TonnageEntries[0];
+        var request = SamplePomSubmission.Request() with
         {
             TonnageEntries =
             [
@@ -420,7 +425,7 @@ public class PomSubmissionRequestValidatorTests
     public async Task ValidateAsync_WhenRequestHasManyFailures_ReturnsEveryFailure()
     {
         // Arrange
-        var request = ValidRequest() with
+        var request = SamplePomSubmission.Request() with
         {
             SchemeOrgId = "not-an-id",
             MemberOrgId = "",
@@ -470,11 +475,11 @@ public class PomSubmissionRequestValidatorTests
         Func<PomSubmissionRequest, PomSubmissionRequest> mutate,
         string message)
     {
-        await ValidationAssert.AssertOnly(Validator(), mutate(ValidRequest()), propertyName, message);
+        await ValidationAssert.AssertOnly(Validator(), mutate(SamplePomSubmission.Request()), propertyName, message);
     }
 
     private static PomSubmissionRequest WithEntry(TonnageEntryBase entry) =>
-        ValidRequest() with { TonnageEntries = [entry] };
+        SamplePomSubmission.Request() with { TonnageEntries = [entry] };
 
     private static PomSubmissionRequest WithClassification(
         PomSubmissionRequest request,
@@ -494,28 +499,5 @@ public class PomSubmissionRequestValidatorTests
             Chemistry = ""
         },
         Tonnes = "12.5"
-    };
-
-    private static PomSubmissionRequest ValidRequest() => new()
-    {
-        SchemeOrgId = "674a1b2c3d4e5f6789012345",
-        MemberOrgId = "674a1b2c3d4e5f6789012346",
-        MemberName = "Northwind Batteries Ltd",
-        MemberBprn = "BPRN-EA-2026-000123",
-        SchemeMembershipRef = "SCH-00417",
-        CompliancePeriodYear = 2026,
-        CompliancePeriodQuarter = "Quarter 2",
-        DataBasis = "Actual",
-        TonnageEntries =
-        [
-            new TonnageEntryBase
-            {
-                Classification = new BatteryClassification
-                {
-                    Chemistry = "Alkaline"
-                },
-                Tonnes = "12.500"
-            }
-        ]
     };
 }

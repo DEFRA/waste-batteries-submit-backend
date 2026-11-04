@@ -12,7 +12,7 @@ public static class EndpointRouteBuilderExtensions
     {
         app.MapPomSubmissionEndpoints().RequireAuthorization();
 
-        // TODO: Remove before deploying
+        // TEMPORARY: Remove before deploying
         app.MapExampleEndpoints().RequireAuthorization();
         app.MapExampleDataEndpoints().RequireAuthorization();
 

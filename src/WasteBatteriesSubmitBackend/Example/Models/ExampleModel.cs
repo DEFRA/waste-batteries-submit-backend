@@ -1,8 +1,8 @@
-using System.Diagnostics.CodeAnalysis;
-using System.Text.Json.Serialization;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Bson.Serialization.IdGenerators;
+using System.Diagnostics.CodeAnalysis;
+using System.Text.Json.Serialization;
 
 namespace WasteBatteriesSubmitBackend.Example.Models;
 
