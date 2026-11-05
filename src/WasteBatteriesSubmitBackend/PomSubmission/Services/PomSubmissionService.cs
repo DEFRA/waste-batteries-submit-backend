@@ -6,7 +6,7 @@ using WasteBatteriesSubmitBackend.Config;
 using WasteBatteriesSubmitBackend.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
-using WasteBatteriesSubmitBackend.PomSubmission.Models.Queries;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Validators;
@@ -27,7 +27,7 @@ public interface IPomSubmissionService
 
     // gzipResponse selects the larger page limit. The list route sets it when the caller accepts gzip.
     Task<PaginatedList<PomSubmissionModel>> GetAsync(
-        PomSubmissionListRequest request,
+        PomSubmissionFilterRequest request,
         bool gzipResponse,
         CancellationToken cancellationToken = default);
 }
@@ -81,9 +81,9 @@ public class PomSubmissionService(
     // Saves a replacement for the submission.
     // The field checks match create.
     // The current-submission read (matching on scheme id, member id, year and quarter) must find an existing submission.
-    // The replacement is a new submission with supersedesSubmissionId set to that row
-    // and version set to one more than that row.
-    // That row's isCurrent is cleared and its updatedAtUtc is set in the same transaction as the insert.
+    // The replacement is a new submission with supersedesSubmissionId set to that existing/old submission
+    // and version set to one more than that existing/old submission.
+    // That existing/old submission's isCurrent is set to false and its updatedAtUtc is set in the same transaction as the new submission createdAtUtc.
     public async Task<PomSubmissionModel> AmendAsync(PomSubmissionRequest request, CancellationToken cancellationToken = default)
     {
         var prepared = await PrepareAsync(request, cancellationToken);
@@ -97,11 +97,7 @@ public class PomSubmissionService(
             throw new ValidationException(prepared.Failures);
         }
 
-        var current = prepared.Current
-            ?? throw new ValidationException(
-            [
-                SubmissionFailure(PomSubmissionValidationMessages.CurrentSubmissionMissing)
-            ]);
+        var current = prepared.Current!;
 
         var amendedAtUtc = timeProvider.UtcNow;
         var submission = pomSubmissionMapper.ToNewSubmission(
@@ -138,7 +134,8 @@ public class PomSubmissionService(
         return submission;
     }
 
-    // Returns the stored submission, or null when the id is not in the collection.
+    // Returns the stored submission, including one that is no longer current.
+    // Returns null when the id is not in the collection.
     public async Task<PomSubmissionModel?> GetAsync(string id, CancellationToken cancellationToken = default)
     {
         id = StringValues.TrimToEmpty(id);
@@ -151,26 +148,26 @@ public class PomSubmissionService(
         }
 
         var matches = await pomSubmissionRepository.FindAsync(
-            new PomSubmissionQuery { Id = id, IsCurrent = null },
+            new PomSubmissionFilter { Id = id, IsCurrent = null },
             new PageRequest(),
             cancellationToken);
         return matches.Items.Count == 0 ? null : matches.Items[0];
     }
 
     // Returns the submissions that match every supplied filter.
-    // IsCurrent on the query defaults to true. A caller who sets it replaces that default.
-    // A single submission, including one that is no longer current, is read by id on the document route.
+    // IsCurrent on the filter defaults to true. A caller who sets it replaces that default.
+    // If Scheme, Members, Years and quarters are supplied it is an "AND", returning a list of submissions.
     // A missing page size, or one above the maximum for this response, is limited to that maximum.
     // The maximum is the gzip page size when the response will be gzipped, and the plain page size otherwise.
     public async Task<PaginatedList<PomSubmissionModel>> GetAsync(
-        PomSubmissionListRequest request,
+        PomSubmissionFilterRequest request,
         bool gzipResponse,
         CancellationToken cancellationToken = default)
     {
         request = request.Trimmed();
-        await validators.List.ValidateAndThrowAsync(request, cancellationToken);
+        await validators.Filter.ValidateAndThrowAsync(request, cancellationToken);
 
-        var query = new PomSubmissionQuery
+        var filter = new PomSubmissionFilter
         {
             SchemeOrgId = request.SchemeOrgId,
             MemberOrgId = request.MemberOrgId,
@@ -180,11 +177,11 @@ public class PomSubmissionService(
 
         if (request.IsCurrent is bool isCurrent)
         {
-            query = query with { IsCurrent = isCurrent };
+            filter = filter with { IsCurrent = isCurrent };
         }
 
         return await pomSubmissionRepository.FindAsync(
-            query,
+            filter,
             new PageRequest
             {
                 PageNumber = request.PageNumber,
@@ -203,9 +200,8 @@ public class PomSubmissionService(
     private static IReadOnlyList<T>? Present<T>(IReadOnlyList<T>? values) =>
         values is { Count: > 0 } ? values : null;
 
-    // Field checks, then one read of the current submission when the key is well formed.
-    // Create and amend turn that read into a validation error. A batch upsert keeps the read
-    // and chooses create or amend from Current, without either error.
+    // Tidies up the request (e.g. trims the data), does field level validation check abnd gets the current submission using the submission key.
+    // Returns the tidied request, any validation errors and the current submission if it exists
     private async Task<PreparedSubmission> PrepareAsync(
         PomSubmissionRequest request,
         CancellationToken cancellationToken)
@@ -228,7 +224,7 @@ public class PomSubmissionService(
         CancellationToken cancellationToken)
     {
         var matches = await GetAsync(
-            new PomSubmissionListRequest
+            new PomSubmissionFilterRequest
             {
                 SchemeOrgId = request.SchemeOrgId,
                 MemberOrgId = request.MemberOrgId,
@@ -251,6 +247,8 @@ public class PomSubmissionService(
         DateTime updatedAtUtc,
         CancellationToken cancellationToken)
     {
+        // Call this before inserting the replacement. The unique index allows one current submission for the key.
+        // So we need to update the old/existing one (so isCurrent = false) before inserting the new amended submission.
         var superseded = await pomSubmissionRepository.SupersedeCurrentAsync(
             transaction.Session,
             currentSubmissionId,

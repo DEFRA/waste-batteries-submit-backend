@@ -3,12 +3,12 @@ using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Validators;
 
-// Both request validators are one dependency of the submission service.
+// The submission body and the collection filter each have a validator.
 public sealed class PomSubmissionValidators(
     IValidator<PomSubmissionRequest> request,
-    IValidator<PomSubmissionListRequest> list)
+    IValidator<PomSubmissionFilterRequest> filter)
 {
     public IValidator<PomSubmissionRequest> Request { get; } = request;
 
-    public IValidator<PomSubmissionListRequest> List { get; } = list;
+    public IValidator<PomSubmissionFilterRequest> Filter { get; } = filter;
 }

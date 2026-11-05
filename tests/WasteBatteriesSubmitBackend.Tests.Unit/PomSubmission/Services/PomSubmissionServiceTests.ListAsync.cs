@@ -2,7 +2,7 @@ using FluentValidation;
 using NSubstitute;
 using WasteBatteriesSubmitBackend.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
-using WasteBatteriesSubmitBackend.PomSubmission.Models.Queries;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
@@ -30,7 +30,7 @@ public partial class PomSubmissionServiceTests
 
         // Act
         Task<PaginatedList<PomSubmissionModel>> Act() => service.GetAsync(
-            new PomSubmissionListRequest { IsCurrent = false },
+            new PomSubmissionFilterRequest { IsCurrent = false },
             false,
             TestContext.Current.CancellationToken);
 
@@ -42,7 +42,7 @@ public partial class PomSubmissionServiceTests
             "At least one of schemeOrgId, memberOrgId, compliancePeriodYears or compliancePeriodQuarters is required.",
             error.ErrorMessage);
         await repository.DidNotReceive().FindAsync(
-            Arg.Any<PomSubmissionQuery>(),
+            Arg.Any<PomSubmissionFilter>(),
             Arg.Any<PageRequest>(),
             Arg.Any<CancellationToken>());
     }
@@ -55,12 +55,12 @@ public partial class PomSubmissionServiceTests
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger);
         repository
-            .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
+            .FindAsync(Arg.Any<PomSubmissionFilter>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>([], 0, 1, 2));
 
         // Act
         await service.GetAsync(
-            new PomSubmissionListRequest
+            new PomSubmissionFilterRequest
             {
                 SchemeOrgId = $"  {SamplePomSubmission.SchemeOrgId}  ",
                 MemberOrgId = "674a1b2c3d4e5f6789012347",
@@ -73,15 +73,15 @@ public partial class PomSubmissionServiceTests
 
         // Assert
         await repository.Received(1).FindAsync(
-            Arg.Is<PomSubmissionQuery>(query =>
-                query.Id == null
-                && query.SchemeOrgId == SamplePomSubmission.SchemeOrgId
-                && query.MemberOrgId == "674a1b2c3d4e5f6789012347"
-                && query.IsCurrent == true
-                && query.CompliancePeriodYears != null
-                && query.CompliancePeriodYears.SequenceEqual(s_combinedCompliancePeriodYears)
-                && query.CompliancePeriodQuarters != null
-                && query.CompliancePeriodQuarters.SequenceEqual(s_combinedCompliancePeriodQuarters)),
+            Arg.Is<PomSubmissionFilter>(filter =>
+                filter.Id == null
+                && filter.SchemeOrgId == SamplePomSubmission.SchemeOrgId
+                && filter.MemberOrgId == "674a1b2c3d4e5f6789012347"
+                && filter.IsCurrent == true
+                && filter.CompliancePeriodYears != null
+                && filter.CompliancePeriodYears.SequenceEqual(s_combinedCompliancePeriodYears)
+                && filter.CompliancePeriodQuarters != null
+                && filter.CompliancePeriodQuarters.SequenceEqual(s_combinedCompliancePeriodQuarters)),
             new PageRequest { PageSize = 2 },
             Arg.Any<CancellationToken>());
     }
@@ -98,12 +98,12 @@ public partial class PomSubmissionServiceTests
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger);
         repository
-            .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
+            .FindAsync(Arg.Any<PomSubmissionFilter>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>([], 0, 1, 0));
 
         // Act
         await service.GetAsync(
-            new PomSubmissionListRequest
+            new PomSubmissionFilterRequest
             {
                 SchemeOrgId = schemeOrgId,
                 MemberOrgId = memberOrgId
@@ -113,13 +113,13 @@ public partial class PomSubmissionServiceTests
 
         // Assert
         await repository.Received(1).FindAsync(
-            Arg.Is<PomSubmissionQuery>(query =>
-                query.Id == null
-                && query.SchemeOrgId == schemeOrgId
-                && query.MemberOrgId == memberOrgId
-                && query.CompliancePeriodYears == null
-                && query.CompliancePeriodQuarters == null
-                && query.IsCurrent == true),
+            Arg.Is<PomSubmissionFilter>(filter =>
+                filter.Id == null
+                && filter.SchemeOrgId == schemeOrgId
+                && filter.MemberOrgId == memberOrgId
+                && filter.CompliancePeriodYears == null
+                && filter.CompliancePeriodQuarters == null
+                && filter.IsCurrent == true),
             Arg.Any<PageRequest>(),
             Arg.Any<CancellationToken>());
     }
@@ -132,19 +132,19 @@ public partial class PomSubmissionServiceTests
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger);
         repository
-            .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
+            .FindAsync(Arg.Any<PomSubmissionFilter>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>([], 0, 1, 0));
 
         // Act
         await service.GetAsync(
-            new PomSubmissionListRequest
+            new PomSubmissionFilterRequest
             {
                 CompliancePeriodYears = [SamplePomSubmission.CompliancePeriodYear]
             },
             false,
             TestContext.Current.CancellationToken);
         await service.GetAsync(
-            new PomSubmissionListRequest
+            new PomSubmissionFilterRequest
             {
                 CompliancePeriodQuarters = [SamplePomSubmission.CompliancePeriodQuarter]
             },
@@ -153,25 +153,25 @@ public partial class PomSubmissionServiceTests
 
         // Assert
         await repository.Received(1).FindAsync(
-            Arg.Is<PomSubmissionQuery>(query =>
-                query.Id == null
-                && query.SchemeOrgId == null
-                && query.MemberOrgId == null
-                && query.CompliancePeriodYears != null
-                && query.CompliancePeriodYears.SequenceEqual(s_yearOnly)
-                && query.CompliancePeriodQuarters == null
-                && query.IsCurrent == true),
+            Arg.Is<PomSubmissionFilter>(filter =>
+                filter.Id == null
+                && filter.SchemeOrgId == null
+                && filter.MemberOrgId == null
+                && filter.CompliancePeriodYears != null
+                && filter.CompliancePeriodYears.SequenceEqual(s_yearOnly)
+                && filter.CompliancePeriodQuarters == null
+                && filter.IsCurrent == true),
             Arg.Any<PageRequest>(),
             Arg.Any<CancellationToken>());
         await repository.Received(1).FindAsync(
-            Arg.Is<PomSubmissionQuery>(query =>
-                query.Id == null
-                && query.SchemeOrgId == null
-                && query.MemberOrgId == null
-                && query.CompliancePeriodYears == null
-                && query.CompliancePeriodQuarters != null
-                && query.CompliancePeriodQuarters.SequenceEqual(s_quarterOnly)
-                && query.IsCurrent == true),
+            Arg.Is<PomSubmissionFilter>(filter =>
+                filter.Id == null
+                && filter.SchemeOrgId == null
+                && filter.MemberOrgId == null
+                && filter.CompliancePeriodYears == null
+                && filter.CompliancePeriodQuarters != null
+                && filter.CompliancePeriodQuarters.SequenceEqual(s_quarterOnly)
+                && filter.IsCurrent == true),
             Arg.Any<PageRequest>(),
             Arg.Any<CancellationToken>());
     }
@@ -184,12 +184,12 @@ public partial class PomSubmissionServiceTests
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger);
         repository
-            .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
+            .FindAsync(Arg.Any<PomSubmissionFilter>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>([], 0, 1, 0));
 
         // Act
         await service.GetAsync(
-            new PomSubmissionListRequest
+            new PomSubmissionFilterRequest
             {
                 SchemeOrgId = SamplePomSubmission.SchemeOrgId,
                 CompliancePeriodYears = [],
@@ -200,12 +200,12 @@ public partial class PomSubmissionServiceTests
 
         // Assert
         await repository.Received(1).FindAsync(
-            Arg.Is<PomSubmissionQuery>(query =>
-                query.SchemeOrgId == SamplePomSubmission.SchemeOrgId
-                && query.MemberOrgId == null
-                && query.CompliancePeriodYears == null
-                && query.CompliancePeriodQuarters == null
-                && query.IsCurrent == true),
+            Arg.Is<PomSubmissionFilter>(filter =>
+                filter.SchemeOrgId == SamplePomSubmission.SchemeOrgId
+                && filter.MemberOrgId == null
+                && filter.CompliancePeriodYears == null
+                && filter.CompliancePeriodQuarters == null
+                && filter.IsCurrent == true),
             Arg.Any<PageRequest>(),
             Arg.Any<CancellationToken>());
     }
@@ -218,12 +218,12 @@ public partial class PomSubmissionServiceTests
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger);
         repository
-            .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
+            .FindAsync(Arg.Any<PomSubmissionFilter>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>([], 0, 1, 0));
 
         // Act
         await service.GetAsync(
-            new PomSubmissionListRequest
+            new PomSubmissionFilterRequest
             {
                 SchemeOrgId = SamplePomSubmission.SchemeOrgId,
                 IsCurrent = false,
@@ -235,13 +235,13 @@ public partial class PomSubmissionServiceTests
 
         // Assert
         await repository.Received(1).FindAsync(
-            Arg.Is<PomSubmissionQuery>(query =>
-                query.Id == null
-                && query.SchemeOrgId == SamplePomSubmission.SchemeOrgId
-                && query.MemberOrgId == null
-                && query.CompliancePeriodYears == null
-                && query.CompliancePeriodQuarters == null
-                && query.IsCurrent == false),
+            Arg.Is<PomSubmissionFilter>(filter =>
+                filter.Id == null
+                && filter.SchemeOrgId == SamplePomSubmission.SchemeOrgId
+                && filter.MemberOrgId == null
+                && filter.CompliancePeriodYears == null
+                && filter.CompliancePeriodQuarters == null
+                && filter.IsCurrent == false),
             new PageRequest { PageNumber = 2, PageSize = 10 },
             Arg.Any<CancellationToken>());
     }
@@ -253,7 +253,7 @@ public partial class PomSubmissionServiceTests
         var repository = Substitute.For<IPomSubmissionRepository>();
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger);
-        var request = new PomSubmissionListRequest
+        var request = new PomSubmissionFilterRequest
         {
             SchemeOrgId = "not-an-id",
             MemberOrgId = "not-an-id",
@@ -275,7 +275,7 @@ public partial class PomSubmissionServiceTests
         Assert.Contains(exception.Errors, error => error.PropertyName == "PageNumber");
         Assert.Contains(exception.Errors, error => error.PropertyName == "PageSize");
         await repository.DidNotReceive().FindAsync(
-            Arg.Any<PomSubmissionQuery>(),
+            Arg.Any<PomSubmissionFilter>(),
             Arg.Any<PageRequest>(),
             Arg.Any<CancellationToken>());
         Assert.Empty(logger.Entries);
@@ -292,13 +292,13 @@ public partial class PomSubmissionServiceTests
 
         // Act
         await service.GetAsync(
-            new PomSubmissionListRequest { SchemeOrgId = SamplePomSubmission.SchemeOrgId },
+            new PomSubmissionFilterRequest { SchemeOrgId = SamplePomSubmission.SchemeOrgId },
             false,
             TestContext.Current.CancellationToken);
 
         // Assert
         await repository.Received(1).FindAsync(
-            Arg.Any<PomSubmissionQuery>(),
+            Arg.Any<PomSubmissionFilter>(),
             new PageRequest { PageSize = MaxPageSize },
             Arg.Any<CancellationToken>());
     }
@@ -314,7 +314,7 @@ public partial class PomSubmissionServiceTests
 
         // Act
         await service.GetAsync(
-            new PomSubmissionListRequest
+            new PomSubmissionFilterRequest
             {
                 SchemeOrgId = SamplePomSubmission.SchemeOrgId,
                 PageNumber = 3,
@@ -325,7 +325,7 @@ public partial class PomSubmissionServiceTests
 
         // Assert
         await repository.Received(1).FindAsync(
-            Arg.Any<PomSubmissionQuery>(),
+            Arg.Any<PomSubmissionFilter>(),
             new PageRequest { PageNumber = 3, PageSize = MaxPageSize },
             Arg.Any<CancellationToken>());
     }
@@ -341,7 +341,7 @@ public partial class PomSubmissionServiceTests
 
         // Act
         await service.GetAsync(
-            new PomSubmissionListRequest
+            new PomSubmissionFilterRequest
             {
                 SchemeOrgId = SamplePomSubmission.SchemeOrgId,
                 PageNumber = 2
@@ -351,7 +351,7 @@ public partial class PomSubmissionServiceTests
 
         // Assert
         await repository.Received(1).FindAsync(
-            Arg.Any<PomSubmissionQuery>(),
+            Arg.Any<PomSubmissionFilter>(),
             new PageRequest { PageNumber = 2, PageSize = MaxPageSize },
             Arg.Any<CancellationToken>());
     }
@@ -367,13 +367,13 @@ public partial class PomSubmissionServiceTests
 
         // Act
         await service.GetAsync(
-            new PomSubmissionListRequest { SchemeOrgId = SamplePomSubmission.SchemeOrgId },
+            new PomSubmissionFilterRequest { SchemeOrgId = SamplePomSubmission.SchemeOrgId },
             gzipResponse: true,
             TestContext.Current.CancellationToken);
 
         // Assert
         await repository.Received(1).FindAsync(
-            Arg.Any<PomSubmissionQuery>(),
+            Arg.Any<PomSubmissionFilter>(),
             new PageRequest { PageSize = MaxGzipPageSize },
             Arg.Any<CancellationToken>());
     }
@@ -389,7 +389,7 @@ public partial class PomSubmissionServiceTests
 
         // Act
         await service.GetAsync(
-            new PomSubmissionListRequest
+            new PomSubmissionFilterRequest
             {
                 SchemeOrgId = SamplePomSubmission.SchemeOrgId,
                 PageSize = MaxPageSize + 5
@@ -397,7 +397,7 @@ public partial class PomSubmissionServiceTests
             gzipResponse: true,
             TestContext.Current.CancellationToken);
         await service.GetAsync(
-            new PomSubmissionListRequest
+            new PomSubmissionFilterRequest
             {
                 SchemeOrgId = SamplePomSubmission.SchemeOrgId,
                 PageSize = MaxGzipPageSize + 5
@@ -407,11 +407,11 @@ public partial class PomSubmissionServiceTests
 
         // Assert
         await repository.Received(1).FindAsync(
-            Arg.Any<PomSubmissionQuery>(),
+            Arg.Any<PomSubmissionFilter>(),
             new PageRequest { PageSize = MaxPageSize + 5 },
             Arg.Any<CancellationToken>());
         await repository.Received(1).FindAsync(
-            Arg.Any<PomSubmissionQuery>(),
+            Arg.Any<PomSubmissionFilter>(),
             new PageRequest { PageSize = MaxGzipPageSize },
             Arg.Any<CancellationToken>());
     }

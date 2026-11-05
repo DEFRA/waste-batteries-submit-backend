@@ -4,7 +4,7 @@ using WasteBatteriesSubmitBackend.Config;
 using WasteBatteriesSubmitBackend.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
-using WasteBatteriesSubmitBackend.PomSubmission.Models.Queries;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
@@ -24,7 +24,7 @@ public partial class PomSubmissionServiceTests
 
     private static void ReturnNoSubmissions(IPomSubmissionRepository repository) =>
         repository
-            .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
+            .FindAsync(Arg.Any<PomSubmissionFilter>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>([], 0, 1, 0));
 
     private static readonly IOptions<PomSubmissionConfig> s_config = Options.Create(new PomSubmissionConfig
@@ -47,7 +47,7 @@ public partial class PomSubmissionServiceTests
             s_config,
             new PomSubmissionValidators(
                 new PomSubmissionRequestValidator(),
-                new PomSubmissionListRequestValidator()),
+                new PomSubmissionFilterRequestValidator()),
             new FixedTime(s_createdAt),
             logger);
 

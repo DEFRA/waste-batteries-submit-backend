@@ -69,7 +69,7 @@ public static class PomSubmissionEndpoints
     }
 
     private static async Task<Ok<PaginatedList<PomSubmissionModel>>> GetList(
-        [AsParameters] PomSubmissionListRequest request,
+        [AsParameters] PomSubmissionFilterRequest request,
         HttpRequest httpRequest,
         [FromServices] IPomSubmissionService pomSubmissionService,
         CancellationToken cancellationToken)

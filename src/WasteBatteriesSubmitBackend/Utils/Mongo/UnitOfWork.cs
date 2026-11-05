@@ -3,7 +3,7 @@ using MongoDB.Driver;
 namespace WasteBatteriesSubmitBackend.Utils.Mongo;
 
 // The session for one transaction. It is valid only until ExecuteAsync returns.
-// Repository writes take Session so they commit or roll back together. A later outbox insert uses the same session.
+// Repository writes take Session so they commit or roll back together.
 public interface IMongoTransaction
 {
     IClientSessionHandle Session { get; }
@@ -23,7 +23,7 @@ public interface IUnitOfWork
 public sealed class UnitOfWork(IMongoDbClientFactory clientFactory) : IUnitOfWork
 {
     // Snapshot plus majority is what a multi-document transaction uses to make the two writes atomic.
-    private static readonly TransactionOptions TransactionOptions = new(
+    private static readonly TransactionOptions s_transactionOptions = new(
         readConcern: ReadConcern.Snapshot,
         readPreference: ReadPreference.Primary,
         writeConcern: WriteConcern.WMajority);
@@ -36,7 +36,7 @@ public sealed class UnitOfWork(IMongoDbClientFactory clientFactory) : IUnitOfWor
         return await session.WithTransactionAsync(
             (handle, transactionCancellationToken) =>
                 work(new MongoTransaction(handle), transactionCancellationToken),
-            TransactionOptions,
+            s_transactionOptions,
             cancellationToken);
     }
 

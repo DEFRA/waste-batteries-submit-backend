@@ -3,10 +3,11 @@ using WasteBatteriesSubmitBackend.Utils.Text;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 
-// Query for the collection read. Each set filter is applied. Several filters are combined with AND.
+// Filters and page for the collection GET. Each set filter is applied. Several filters are combined with AND.
 // Repeated years match any of those years, and repeated quarters match any of those quarters.
 // Query names are the public filter names. The list endpoint binds this type with AsParameters.
-public sealed record PomSubmissionListRequest
+// The page stays on this request. PomSubmissionFilter is the same filters without it.
+public sealed record PomSubmissionFilterRequest
 {
     [FromQuery(Name = "schemeOrgId")]
     public string? SchemeOrgId { get; init; }
@@ -29,7 +30,7 @@ public sealed record PomSubmissionListRequest
     [FromQuery(Name = "pageSize")]
     public int? PageSize { get; init; }
 
-    public PomSubmissionListRequest Trimmed() => this with
+    public PomSubmissionFilterRequest Trimmed() => this with
     {
         SchemeOrgId = StringValues.TrimToNull(SchemeOrgId),
         MemberOrgId = StringValues.TrimToNull(MemberOrgId),

@@ -5,16 +5,16 @@ using WasteBatteriesSubmitBackend.Tests.Unit.Utils.Validation;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Validators;
 
-public class PomSubmissionListRequestValidatorTests
+public class PomSubmissionFilterRequestValidatorTests
 {
-    private readonly PomSubmissionListRequestValidator _validator = new();
+    private readonly PomSubmissionFilterRequestValidator _validator = new();
 
     [Fact]
     public async Task ValidateAsync_WhenNoBusinessFilterIsSet_ReturnsThatError()
     {
         await ValidationAssert.AssertOnly(
             _validator,
-            new PomSubmissionListRequest
+            new PomSubmissionFilterRequest
             {
                 IsCurrent = true,
                 CompliancePeriodYears = [],
@@ -33,10 +33,10 @@ public class PomSubmissionListRequestValidatorTests
     {
         var request = filter switch
         {
-            "scheme" => new PomSubmissionListRequest { SchemeOrgId = SamplePomSubmission.SchemeOrgId },
-            "member" => new PomSubmissionListRequest { MemberOrgId = "674a1b2c3d4e5f6789012347" },
-            "year" => new PomSubmissionListRequest { CompliancePeriodYears = [SamplePomSubmission.CompliancePeriodYear] },
-            "quarter" => new PomSubmissionListRequest { CompliancePeriodQuarters = [SamplePomSubmission.CompliancePeriodQuarter] },
+            "scheme" => new PomSubmissionFilterRequest { SchemeOrgId = SamplePomSubmission.SchemeOrgId },
+            "member" => new PomSubmissionFilterRequest { MemberOrgId = "674a1b2c3d4e5f6789012347" },
+            "year" => new PomSubmissionFilterRequest { CompliancePeriodYears = [SamplePomSubmission.CompliancePeriodYear] },
+            "quarter" => new PomSubmissionFilterRequest { CompliancePeriodQuarters = [SamplePomSubmission.CompliancePeriodQuarter] },
             _ => throw new ArgumentOutOfRangeException(nameof(filter))
         };
 
@@ -49,7 +49,7 @@ public class PomSubmissionListRequestValidatorTests
     public async Task ValidateAsync_WhenEveryFilterIsWellFormed_IsValid()
     {
         var result = await _validator.ValidateAsync(
-            new PomSubmissionListRequest
+            new PomSubmissionFilterRequest
             {
                 SchemeOrgId = SamplePomSubmission.SchemeOrgId,
                 MemberOrgId = "674a1b2c3d4e5f6789012347",
@@ -68,7 +68,7 @@ public class PomSubmissionListRequestValidatorTests
     public async Task ValidateAsync_WhenTheSuppliedValuesAreInvalid_ReturnsEveryError()
     {
         var result = await _validator.ValidateAsync(
-            new PomSubmissionListRequest
+            new PomSubmissionFilterRequest
             {
                 SchemeOrgId = "not-an-id",
                 MemberOrgId = "not-an-id",
@@ -92,7 +92,7 @@ public class PomSubmissionListRequestValidatorTests
     public async Task ValidateAsync_WhenPageNumberIsSetWithoutPageSize_IsValid()
     {
         var result = await _validator.ValidateAsync(
-            new PomSubmissionListRequest
+            new PomSubmissionFilterRequest
             {
                 SchemeOrgId = SamplePomSubmission.SchemeOrgId,
                 PageNumber = 2

@@ -1,10 +1,11 @@
-namespace WasteBatteriesSubmitBackend.PomSubmission.Models.Queries;
+namespace WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 
-// Criteria for reading submissions. Only the fields that are set are applied, and they are combined with AND.
+// Filters for a repository read. Pagination is a separate PageRequest.
+// Only the fields that are set are applied, and they are combined with AND.
 // A year list or a quarter list matches any of its values.
 // The collection read sets any mixture of the organisation, year and quarter fields.
 // Id is the document read, which clears IsCurrent so a submission that is no longer current is still returned.
-public sealed record PomSubmissionQuery
+public sealed record PomSubmissionFilter
 {
     public string? Id { get; init; }
 

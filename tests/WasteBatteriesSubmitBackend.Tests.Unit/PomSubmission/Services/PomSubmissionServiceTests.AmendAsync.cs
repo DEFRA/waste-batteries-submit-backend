@@ -6,7 +6,7 @@ using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using WasteBatteriesSubmitBackend.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
-using WasteBatteriesSubmitBackend.PomSubmission.Models.Queries;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
 using WasteBatteriesSubmitBackend.Tests.Common;
@@ -37,14 +37,14 @@ public partial class PomSubmissionServiceTests
         // Assert
         Assert.Equal(current.Version + 1, submission.Version);
         await repository.Received(1).FindAsync(
-            Arg.Is<PomSubmissionQuery>(query =>
-                query.SchemeOrgId == request.SchemeOrgId
-                && query.MemberOrgId == request.MemberOrgId
-                && query.CompliancePeriodYears != null
-                && query.CompliancePeriodYears.SequenceEqual(new[] { request.CompliancePeriodYear })
-                && query.CompliancePeriodQuarters != null
-                && query.CompliancePeriodQuarters.SequenceEqual(new[] { request.CompliancePeriodQuarter })
-                && query.IsCurrent == true),
+            Arg.Is<PomSubmissionFilter>(filter =>
+                filter.SchemeOrgId == request.SchemeOrgId
+                && filter.MemberOrgId == request.MemberOrgId
+                && filter.CompliancePeriodYears != null
+                && filter.CompliancePeriodYears.SequenceEqual(new[] { request.CompliancePeriodYear })
+                && filter.CompliancePeriodQuarters != null
+                && filter.CompliancePeriodQuarters.SequenceEqual(new[] { request.CompliancePeriodQuarter })
+                && filter.IsCurrent == true),
             new PageRequest { PageSize = MaxPageSize },
             Arg.Any<CancellationToken>());
         Received.InOrder(() =>
@@ -271,7 +271,7 @@ public partial class PomSubmissionServiceTests
         // Assert
         await Assert.ThrowsAsync<ValidationException>(Act);
         await repository.Received(1).FindAsync(
-            Arg.Any<PomSubmissionQuery>(),
+            Arg.Any<PomSubmissionFilter>(),
             Arg.Any<PageRequest>(),
             Arg.Any<CancellationToken>());
         await unitOfWork.DidNotReceive().ExecuteAsync(
@@ -320,14 +320,14 @@ public partial class PomSubmissionServiceTests
 
         // Assert
         await repository.Received(1).FindAsync(
-            Arg.Is<PomSubmissionQuery>(query =>
-                query.SchemeOrgId == SamplePomSubmission.SchemeOrgId
-                && query.MemberOrgId == SamplePomSubmission.MemberOrgId
-                && query.CompliancePeriodYears != null
-                && query.CompliancePeriodYears.SequenceEqual(s_trimmedCompliancePeriodYear)
-                && query.CompliancePeriodQuarters != null
-                && query.CompliancePeriodQuarters.SequenceEqual(s_trimmedCompliancePeriodQuarter)
-                && query.IsCurrent == true),
+            Arg.Is<PomSubmissionFilter>(filter =>
+                filter.SchemeOrgId == SamplePomSubmission.SchemeOrgId
+                && filter.MemberOrgId == SamplePomSubmission.MemberOrgId
+                && filter.CompliancePeriodYears != null
+                && filter.CompliancePeriodYears.SequenceEqual(s_trimmedCompliancePeriodYear)
+                && filter.CompliancePeriodQuarters != null
+                && filter.CompliancePeriodQuarters.SequenceEqual(s_trimmedCompliancePeriodQuarter)
+                && filter.IsCurrent == true),
             new PageRequest { PageSize = MaxPageSize },
             Arg.Any<CancellationToken>());
         await repository.Received(1).CreateAsync(
@@ -374,7 +374,7 @@ public partial class PomSubmissionServiceTests
         // Assert
         await Assert.ThrowsAsync<ValidationException>(Act);
         await repository.DidNotReceive().FindAsync(
-            Arg.Any<PomSubmissionQuery>(),
+            Arg.Any<PomSubmissionFilter>(),
             Arg.Any<PageRequest>(),
             Arg.Any<CancellationToken>());
         await unitOfWork.DidNotReceive().ExecuteAsync(
@@ -440,7 +440,7 @@ public partial class PomSubmissionServiceTests
             IsCurrent = true
         };
         repository
-            .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
+            .FindAsync(Arg.Any<PomSubmissionFilter>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>([current], 1, 1, 1));
         return current;
     }
