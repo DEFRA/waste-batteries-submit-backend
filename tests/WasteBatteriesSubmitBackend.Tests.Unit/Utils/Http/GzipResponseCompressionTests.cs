@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Http;
-using WasteBatteriesSubmitBackend.PomSubmission;
+using WasteBatteriesSubmitBackend.Utils.Http;
 
-namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission;
+namespace WasteBatteriesSubmitBackend.Tests.Unit.Utils.Http;
 
-public class PomSubmissionResponseCompressionTests
+public class GzipResponseCompressionTests
 {
     [Theory]
     [InlineData("gzip", true)]
@@ -22,6 +22,6 @@ public class PomSubmissionResponseCompressionTests
             context.Request.Headers.AcceptEncoding = header;
         }
 
-        Assert.Equal(acceptsGzip, PomSubmissionResponseCompression.ClientAcceptsGzip(context.Request));
+        Assert.Equal(acceptsGzip, GzipResponseCompression.ClientAcceptsGzip(context.Request));
     }
 }

@@ -14,7 +14,7 @@ public sealed record PomSubmissionModel : PomSubmissionBase
 
     private const string SubmittedStatus = "Submitted";
 
-    // MongoDB deserialises through this constructor. The other constructor is for create.
+    // MongoDB deserialises through this constructor.
     [BsonConstructor]
     [SetsRequiredMembers]
     public PomSubmissionModel()
@@ -22,6 +22,7 @@ public sealed record PomSubmissionModel : PomSubmissionBase
         Id = null!;
     }
 
+    // For a new submission (on create and amend)
     // : base(header) uses the compiler copy constructor, so shared header fields are not assigned again.
     [SetsRequiredMembers]
     internal PomSubmissionModel(

@@ -48,6 +48,7 @@ public class PomSubmissionRepository(IMongoDbClientFactory connectionFactory, IL
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(session);
+
         return InsertAsync(session, submission, cancellationToken);
     }
 
@@ -58,6 +59,7 @@ public class PomSubmissionRepository(IMongoDbClientFactory connectionFactory, IL
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(session);
+
         var update = Builders<PomSubmissionModel>.Update
             .Set(submission => submission.IsCurrent, false)
             .Set(submission => submission.UpdatedAtUtc, updatedAtUtc);

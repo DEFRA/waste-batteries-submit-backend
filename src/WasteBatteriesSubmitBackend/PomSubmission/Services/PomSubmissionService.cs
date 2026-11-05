@@ -78,8 +78,9 @@ public class PomSubmissionService(
         return submission;
     }
 
-    // Saves a replacement for the current submission.
-    // Field checks match create. The same current-submission read must find a row.
+    // Saves a replacement for the submission.
+    // The field checks match create.
+    // The current-submission read (matching on scheme id, member id, year and quarter) must find an existing submission.
     // The replacement is a new submission with supersedesSubmissionId set to that row
     // and version set to one more than that row.
     // That row's isCurrent is cleared and its updatedAtUtc is set in the same transaction as the insert.
