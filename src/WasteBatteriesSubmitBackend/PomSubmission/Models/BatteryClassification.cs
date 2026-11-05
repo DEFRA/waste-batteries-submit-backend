@@ -1,27 +1,12 @@
 using MongoDB.Bson.Serialization.Attributes;
 using System.Text.Json.Serialization;
-using WasteBatteriesSubmitBackend.Utils.Text;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Models;
 
-// Embedded value object. It has no id of its own. Each dimension stores the
-// reference-data text (for example "Portable", "Alkaline"), not the id.
-// batteryCategory is required on the stored classification. The request JSON
-// must not include it. Every submission stores Portable.
+// Stored classification. The mapper sets batteryCategory from PomSubmission:InitialBatteryCategory.
 [BsonIgnoreExtraElements]
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record BatteryClassification
+public sealed record BatteryClassification : BatteryClassificationBase
 {
-    public const string Portable = "Portable";
-
-    [JsonConverter(typeof(BatteryCategoryJsonConverter))]
-    public string BatteryCategory { get; init; } = Portable;
-
-    public string Chemistry { get; init; } = string.Empty;
-
-    public BatteryClassification Trimmed() => this with
-    {
-        BatteryCategory = Portable,
-        Chemistry = StringValues.TrimToEmpty(Chemistry)
-    };
+    public string BatteryCategory { get; init; } = string.Empty;
 }

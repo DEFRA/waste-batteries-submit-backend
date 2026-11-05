@@ -45,7 +45,7 @@ public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture
         Assert.Equal(BsonType.Decimal128, entry["tonnes"].BsonType);
         Assert.Equal(SamplePomSubmission.Tonnes, entry["tonnes"].AsDecimal128.ToString());
         Assert.Equal(fixture.Defaults.InitialActivity, entry["activity"].AsString);
-        Assert.Equal(BatteryClassification.Portable, entry["classification"]["batteryCategory"].AsString);
+        Assert.Equal(fixture.Defaults.InitialBatteryCategory, entry["classification"]["batteryCategory"].AsString);
         Assert.Equal(SamplePomSubmission.Chemistry, entry["classification"]["chemistry"].AsString);
         Assert.False(entry["classification"].AsBsonDocument.Contains("subCategory"));
         Assert.False(entry["classification"].AsBsonDocument.Contains("cellType"));

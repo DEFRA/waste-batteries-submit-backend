@@ -24,6 +24,7 @@ public static class AppSettings
             InitialStatus = Text(section, "InitialStatus"),
             InitialVersion = Number(section, "InitialVersion"),
             InitialActivity = Text(section, "InitialActivity"),
+            InitialBatteryCategory = Text(section, "InitialBatteryCategory"),
             MaxPageSize = Number(section, "MaxPageSize"),
             MaxGzipPageSize = Number(section, "MaxGzipPageSize")
         };

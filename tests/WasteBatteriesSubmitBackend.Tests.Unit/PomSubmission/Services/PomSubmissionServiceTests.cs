@@ -32,6 +32,7 @@ public partial class PomSubmissionServiceTests
         InitialStatus = "Submitted",
         InitialVersion = 1,
         InitialActivity = "Placed",
+        InitialBatteryCategory = "Portable",
         MaxPageSize = MaxPageSize,
         MaxGzipPageSize = MaxGzipPageSize
     });

@@ -19,7 +19,6 @@ public class PomSubmissionRequestValidatorTests
     private const string DataBasisRequired = "'Data Basis' must not be empty.";
     private const string TonnageEntriesRequired = "'Tonnage Entries' must not be empty.";
     private const string ClassificationRequired = "'Classification' must not be empty.";
-    private const string BatteryCategoryRequired = "'Classification Battery Category' must not be empty.";
     private const string ChemistryRequired = "'Classification Chemistry' must not be empty.";
     private const string TonnesRequired = "'Tonnes' must not be empty.";
 
@@ -115,15 +114,6 @@ public class PomSubmissionRequestValidatorTests
     }
 
     [Fact]
-    public async Task ValidateAsync_WhenBatteryCategoryIsNull_ReturnsOnlyTheRequiredError()
-    {
-        await AssertRequired(
-            "TonnageEntries[0].Classification.BatteryCategory",
-            request => WithClassification(request, classification => classification with { BatteryCategory = null! }),
-            BatteryCategoryRequired);
-    }
-
-    [Fact]
     public async Task ValidateAsync_WhenChemistryIsNull_ReturnsOnlyTheRequiredError()
     {
         await AssertRequired(
@@ -210,17 +200,6 @@ public class PomSubmissionRequestValidatorTests
             "TonnageEntries",
             request => request with { TonnageEntries = [] },
             TonnageEntriesRequired);
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task ValidateAsync_WhenBatteryCategoryIsBlank_ReturnsOnlyTheRequiredError(string value)
-    {
-        await AssertRequired(
-            "TonnageEntries[0].Classification.BatteryCategory",
-            request => WithClassification(request, classification => classification with { BatteryCategory = value }),
-            BatteryCategoryRequired);
     }
 
     [Theory]
@@ -362,9 +341,8 @@ public class PomSubmissionRequestValidatorTests
                 null!,
                 new TonnageEntryBase
                 {
-                    Classification = new BatteryClassification
+                    Classification = new BatteryClassificationBase
                     {
-                        BatteryCategory = BatteryClassification.Portable,
                         Chemistry = SamplePomSubmission.Chemistry
                     },
                     Tonnes = "12.5"
@@ -458,10 +436,8 @@ public class PomSubmissionRequestValidatorTests
             ("DataBasis", DataBasisRequired),
             ("TonnageEntries", ClassificationRepeated),
             ("TonnageEntries[0].Tonnes", TonnesFormat),
-            ("TonnageEntries[0].Classification.BatteryCategory", BatteryCategoryRequired),
             ("TonnageEntries[0].Classification.Chemistry", ChemistryRequired),
             ("TonnageEntries[1].Tonnes", TonnesFormat),
-            ("TonnageEntries[1].Classification.BatteryCategory", BatteryCategoryRequired),
             ("TonnageEntries[1].Classification.Chemistry", ChemistryRequired)
         ];
         Assert.Equal(
@@ -483,7 +459,7 @@ public class PomSubmissionRequestValidatorTests
 
     private static PomSubmissionRequest WithClassification(
         PomSubmissionRequest request,
-        Func<BatteryClassification, BatteryClassification> mutate)
+        Func<BatteryClassificationBase, BatteryClassificationBase> mutate)
     {
         var entry = request.TonnageEntries[0];
         return WithEntry(entry with { Classification = mutate(entry.Classification) });
@@ -493,9 +469,8 @@ public class PomSubmissionRequestValidatorTests
 
     private static TonnageEntryBase InvalidEntry() => new()
     {
-        Classification = new BatteryClassification
+        Classification = new BatteryClassificationBase
         {
-            BatteryCategory = "",
             Chemistry = ""
         },
         Tonnes = "12.5"

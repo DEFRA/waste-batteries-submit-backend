@@ -27,7 +27,8 @@ public partial class PomSubmissionEndpointsTests
             count,
             fixture.Defaults.InitialActivity,
             fixture.Defaults.InitialStatus,
-            fixture.Defaults.InitialVersion);
+            fixture.Defaults.InitialVersion,
+            fixture.Defaults.InitialBatteryCategory);
         await MeasuredSubmissions().InsertManyAsync(items, cancellationToken: cancellationToken);
         using var client = PayloadClient();
 

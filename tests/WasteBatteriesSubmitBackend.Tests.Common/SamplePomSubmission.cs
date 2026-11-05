@@ -3,7 +3,7 @@ using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 
 namespace WasteBatteriesSubmitBackend.Tests.Common;
 
-// The valid create body. Posted JSON omits batteryCategory; deserialising it defaults that to Portable.
+// The valid create body. Posted JSON omits batteryCategory. The mapper sets it from configuration.
 // Request() reads this JSON, so the model and the body stay the same document.
 public static class SamplePomSubmission
 {

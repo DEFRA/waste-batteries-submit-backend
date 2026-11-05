@@ -81,7 +81,6 @@ public sealed class PomSubmissionRequestValidator : AbstractValidator<PomSubmiss
                     .WithMessage(PomSubmissionValidationMessages.Required)
                     .DependentRules(() =>
                     {
-                        Required(entry.RuleFor(item => item.Classification.BatteryCategory));
                         Required(entry.RuleFor(item => item.Classification.Chemistry));
                     });
             });
@@ -110,11 +109,8 @@ public sealed class PomSubmissionRequestValidator : AbstractValidator<PomSubmiss
                 continue;
             }
 
-            var classification = entry.Classification;
-            var key = string.Join(
-                '\u001f',
-                classification.BatteryCategory ?? string.Empty,
-                classification.Chemistry ?? string.Empty);
+            // batteryCategory is the same configured value on every stored entry, so the request key is chemistry.
+            var key = entry.Classification.Chemistry ?? string.Empty;
             if (!seen.Add(key))
             {
                 return false;

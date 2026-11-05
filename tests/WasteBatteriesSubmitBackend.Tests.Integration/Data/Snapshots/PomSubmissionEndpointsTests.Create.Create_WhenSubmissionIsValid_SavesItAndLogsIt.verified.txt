@@ -15,8 +15,8 @@
   "status" : "Submitted",
   "tonnageEntries" : [{
       "classification" : {
-        "batteryCategory" : "Portable",
-        "chemistry" : "Alkaline"
+        "chemistry" : "Alkaline",
+        "batteryCategory" : "Portable"
       },
       "tonnes" : { "$numberDecimal" : "12.500" },
       "id" : { "$oid" : "000000000000000000000002" },

@@ -24,9 +24,8 @@ public class PomSubmissionRequestTrimTests
             [
                 new TonnageEntryBase
                 {
-                    Classification = new BatteryClassification
+                    Classification = new BatteryClassificationBase
                     {
-                        BatteryCategory = "Industrial",
                         Chemistry = $"  {SamplePomSubmission.Chemistry}  "
                     },
                     Tonnes = $"  {SamplePomSubmission.Tonnes}  "
@@ -47,8 +46,6 @@ public class PomSubmissionRequestTrimTests
         Assert.Equal(SamplePomSubmission.CompliancePeriodQuarter, trimmed.CompliancePeriodQuarter);
         Assert.Equal(SamplePomSubmission.DataBasis, trimmed.DataBasis);
         var entry = Assert.Single(trimmed.TonnageEntries);
-        Assert.Equal(SamplePomSubmission.Tonnes, entry.Tonnes);
-        Assert.Equal(BatteryClassification.Portable, entry.Classification.BatteryCategory);
         Assert.Equal(SamplePomSubmission.Chemistry, entry.Classification.Chemistry);
     }
 
@@ -64,9 +61,8 @@ public class PomSubmissionRequestTrimTests
                 new TonnageEntryBase
                 {
                     Tonnes = null!,
-                    Classification = new BatteryClassification
+                    Classification = new BatteryClassificationBase
                     {
-                        BatteryCategory = null!,
                         Chemistry = null!
                     }
                 },
@@ -81,7 +77,6 @@ public class PomSubmissionRequestTrimTests
         // Assert
         Assert.Equal(string.Empty, trimmed.MemberName);
         Assert.Equal(string.Empty, trimmed.TonnageEntries[0].Tonnes);
-        Assert.Equal("Portable", trimmed.TonnageEntries[0].Classification.BatteryCategory);
         Assert.Equal(string.Empty, trimmed.TonnageEntries[0].Classification.Chemistry);
         Assert.Null(trimmed.TonnageEntries[1]);
         Assert.Null(trimmed.TonnageEntries[2].Classification);

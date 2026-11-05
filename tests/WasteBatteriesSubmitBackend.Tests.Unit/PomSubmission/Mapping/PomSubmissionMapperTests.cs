@@ -46,7 +46,7 @@ public class PomSubmissionMapperTests
         var entry = Assert.Single(submission.TonnageEntries);
         Assert.True(ObjectId.TryParse(entry.Id, out _));
         Assert.NotEqual(submission.Id, entry.Id);
-        Assert.Equal(BatteryClassification.Portable, entry.Classification.BatteryCategory);
+        Assert.Equal("Portable", entry.Classification.BatteryCategory);
         Assert.Equal(request.TonnageEntries[0].Classification.Chemistry, entry.Classification.Chemistry);
         Assert.Equal("Placed", entry.Activity);
         Assert.Equal(request.TonnageEntries[0].Tonnes, entry.Tonnes);
@@ -103,7 +103,8 @@ public class PomSubmissionMapperTests
         {
             InitialStatus = "Filed",
             InitialVersion = 4,
-            InitialActivity = "Held"
+            InitialActivity = "Held",
+            InitialBatteryCategory = "Industrial"
         }));
         var request = new PomSubmissionRequest
         {
@@ -118,6 +119,7 @@ public class PomSubmissionMapperTests
         Assert.Equal(4, submission.Version);
         Assert.Equal(PomSubmissionModel.CurrentSchemaVersion, submission.SchemaVersion);
         Assert.Equal("Held", submission.TonnageEntries[0].Activity);
+        Assert.Equal("Industrial", submission.TonnageEntries[0].Classification.BatteryCategory);
         Assert.Equal(s_createdAt, submission.CreatedAtUtc);
         Assert.Null(submission.SubmittedOnUtc);
     }
@@ -130,7 +132,8 @@ public class PomSubmissionMapperTests
         {
             InitialStatus = "sUbMiTtEd",
             InitialVersion = 1,
-            InitialActivity = "Placed"
+            InitialActivity = "Placed",
+            InitialBatteryCategory = "Portable"
         }));
         var request = new PomSubmissionRequest
         {
@@ -192,6 +195,7 @@ public class PomSubmissionMapperTests
         {
             InitialStatus = "Submitted",
             InitialVersion = 1,
-            InitialActivity = "Placed"
+            InitialActivity = "Placed",
+            InitialBatteryCategory = "Portable"
         }));
 }

@@ -126,9 +126,8 @@ public partial class PomSubmissionServiceTests
             [
                 new TonnageEntryBase
                 {
-                    Classification = new BatteryClassification
+                    Classification = new BatteryClassificationBase
                     {
-                        BatteryCategory = "Industrial",
                         Chemistry = $"  {SamplePomSubmission.Chemistry}  "
                     },
                     Tonnes = $"  {SamplePomSubmission.Tonnes}  "
@@ -158,7 +157,7 @@ public partial class PomSubmissionServiceTests
                 && saved.SchemeMembershipRef == SamplePomSubmission.SchemeMembershipRef
                 && saved.DataBasis == SamplePomSubmission.DataBasis
                 && saved.TonnageEntries[0].Tonnes == SamplePomSubmission.Tonnes
-                && saved.TonnageEntries[0].Classification.BatteryCategory == BatteryClassification.Portable
+                && saved.TonnageEntries[0].Classification.BatteryCategory == s_config.Value.InitialBatteryCategory
                 && saved.TonnageEntries[0].Classification.Chemistry == SamplePomSubmission.Chemistry),
             Arg.Any<CancellationToken>());
     }
@@ -213,7 +212,7 @@ public partial class PomSubmissionServiceTests
             [
                 new TonnageEntryBase
                 {
-                    Classification = new BatteryClassification
+                    Classification = new BatteryClassificationBase
                     {
                         Chemistry = $"  {SamplePomSubmission.Chemistry}  "
                     },
@@ -221,7 +220,7 @@ public partial class PomSubmissionServiceTests
                 },
                 new TonnageEntryBase
                 {
-                    Classification = new BatteryClassification
+                    Classification = new BatteryClassificationBase
                     {
                         Chemistry = SamplePomSubmission.Chemistry
                     },

@@ -131,7 +131,7 @@ public class PomSubmissionRequestJsonTests
     }
 
     [Fact]
-    public void Deserialize_WhenBatteryCategoryIsOmitted_DefaultsItToPortable()
+    public void Deserialize_WhenBatteryCategoryIsOmitted_LeavesItUnset()
     {
         // Arrange
         const string json = """
@@ -150,8 +150,10 @@ public class PomSubmissionRequestJsonTests
 
         // Assert
         Assert.NotNull(request);
-        Assert.Equal("Portable", request.TonnageEntries[0].Classification.BatteryCategory);
         Assert.Equal("Alkaline", request.TonnageEntries[0].Classification.Chemistry);
+        Assert.Equal(
+            """{"chemistry":"Alkaline"}""",
+            JsonSerializer.Serialize(request.TonnageEntries[0].Classification, JsonSerializerOptions.Web));
     }
 
     [Theory]
@@ -216,6 +218,6 @@ public class PomSubmissionRequestJsonTests
         var json = JsonSerializer.Serialize(classification, JsonSerializerOptions.Web);
 
         // Assert
-        Assert.Equal("""{"batteryCategory":"Portable","chemistry":"Alkaline"}""", json);
+        Assert.Equal("""{"batteryCategory":"","chemistry":"Alkaline"}""", json);
     }
 }
