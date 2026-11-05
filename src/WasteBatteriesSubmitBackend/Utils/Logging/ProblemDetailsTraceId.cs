@@ -39,15 +39,7 @@ internal static class ProblemDetailsTraceId
             return null;
         }
 
-        foreach (var value in values)
-        {
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                return value;
-            }
-        }
-
-        return null;
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
 
     private static string? ActivityTraceId()
