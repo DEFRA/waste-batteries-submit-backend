@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using WasteBatteriesSubmitBackend.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Responses;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
 using WasteBatteriesSubmitBackend.Utils.Http;
 
@@ -28,6 +29,11 @@ public static class PomSubmissionEndpoints
             .WithSummary("Amend the current placed-on-market submission")
             .ProducesValidationProblem();
 
+        group.MapPost("/upsert-batch", UpsertBatch)
+            .WithName("UpsertBatchPomSubmissions")
+            .WithSummary("Create or amend a batch of placed-on-market submissions")
+            .ProducesValidationProblem();
+
         group.MapGet("/{id}", Get)
             .WithName("GetPomSubmission")
             .WithSummary("Get a placed-on-market submission")
@@ -41,6 +47,8 @@ public static class PomSubmissionEndpoints
         return group;
     }
 
+    // The body is a JSON object with the minimum needed to save a submission.
+    // The response is the saved submission with all the additional values - e.g. ids, defaulted values etc
     private static async Task<Created<PomSubmissionModel>> Create(
         PomSubmissionRequest request,
         [FromServices] IPomSubmissionService pomSubmissionService,
@@ -50,6 +58,8 @@ public static class PomSubmissionEndpoints
         return TypedResults.Created($"{RoutePrefix}/{submission.Id}", submission);
     }
 
+    // The body is a JSON object with the minimum needed to save a submission, matches the Create endpoint.
+    // The response is the saved submission with all the additional values - e.g. ids, defaulted values etc
     private static async Task<Ok<PomSubmissionModel>> Amend(
         PomSubmissionRequest request,
         [FromServices] IPomSubmissionService pomSubmissionService,
@@ -59,6 +69,19 @@ public static class PomSubmissionEndpoints
         return TypedResults.Ok(submission);
     }
 
+    // The body is a JSON array. Each element has the same shape as a single create or amend.
+    // The response is one short result per item, in the same order: the new id, the key,
+    // the request index, and whether that item was created or amended.
+    private static async Task<Ok<IReadOnlyList<PomSubmissionUpsertResult>>> UpsertBatch(
+        [FromBody] List<PomSubmissionRequest> requests,
+        [FromServices] IPomSubmissionService pomSubmissionService,
+        CancellationToken cancellationToken)
+    {
+        var results = await pomSubmissionService.UpsertBatchAsync(requests, cancellationToken);
+        return TypedResults.Ok(results);
+    }
+
+    // Get a single submission by id.
     private static async Task<Results<Ok<PomSubmissionModel>, NotFound>> Get(
         [FromRoute] string id,
         [FromServices] IPomSubmissionService pomSubmissionService,
@@ -68,6 +91,7 @@ public static class PomSubmissionEndpoints
         return submission is not null ? TypedResults.Ok(submission) : TypedResults.NotFound();
     }
 
+    // Get a list of submissions that match the filters (combined using "AND") that are passed in.
     private static async Task<Ok<PaginatedList<PomSubmissionModel>>> GetList(
         [AsParameters] PomSubmissionFilterRequest request,
         HttpRequest httpRequest,

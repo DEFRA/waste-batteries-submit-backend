@@ -28,7 +28,9 @@ internal static class ProblemDetailsTraceId
             return activityTraceId;
         }
 
-        return requestIdentifier;
+        // The framework's fallback is the W3C activity id, 00-{trace-id}-{span-id}-{flags}.
+        // Logs store the trace-id, so that is the part a caller can search for.
+        return TraceId(requestIdentifier);
     }
 
     private static string? ReadHeader(HttpContext httpContext, string? traceHeaderName)
@@ -45,6 +47,46 @@ internal static class ProblemDetailsTraceId
     private static string? ActivityTraceId()
     {
         var activity = Activity.Current;
-        return activity?.TraceId.ToHexString();
+        if (activity is null)
+        {
+            return null;
+        }
+
+        var traceId = activity.TraceId.ToHexString();
+        return traceId == "00000000000000000000000000000000" ? null : traceId;
+    }
+
+    // version "-" trace-id "-" parent-id "-" flags. The trace-id is 32 hex characters.
+    private static string TraceId(string requestIdentifier)
+    {
+        if (requestIdentifier.Length == 55
+            && requestIdentifier[2] == '-'
+            && requestIdentifier[35] == '-'
+            && requestIdentifier[52] == '-')
+        {
+            var traceId = requestIdentifier.Substring(3, 32);
+            if (IsHex(traceId))
+            {
+                return traceId.ToLowerInvariant();
+            }
+        }
+
+        return requestIdentifier;
+    }
+
+    private static bool IsHex(string value)
+    {
+        foreach (var character in value)
+        {
+            var hex = character is >= '0' and <= '9'
+                || character is >= 'a' and <= 'f'
+                || character is >= 'A' and <= 'F';
+            if (!hex)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
