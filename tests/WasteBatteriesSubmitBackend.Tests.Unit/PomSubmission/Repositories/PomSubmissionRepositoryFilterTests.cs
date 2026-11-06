@@ -1,7 +1,7 @@
 using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
-using WasteBatteriesSubmitBackend.PomSubmission.Models.Queries;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.Tests.Common;
 using WasteBatteriesSubmitBackend.Utils.Mongo;
@@ -21,14 +21,14 @@ public class PomSubmissionRepositoryFilterTests
     public void Filter_WhenOnlyTheIdIsSet_MatchesThatDocument()
     {
         // Arrange
-        var query = new PomSubmissionQuery
+        var submissionFilter = new PomSubmissionFilter
         {
             Id = SamplePomSubmission.SchemeOrgId,
             IsCurrent = null
         };
 
         // Act
-        var filter = PomSubmissionRepository.Filter(query);
+        var filter = PomSubmissionRepository.Filter(submissionFilter);
 
         // Assert
         Assert.Equal(IdClause(SamplePomSubmission.SchemeOrgId), Render(filter));
@@ -38,14 +38,14 @@ public class PomSubmissionRepositoryFilterTests
     public void Filter_WhenOnlyTheSchemeIsSet_MatchesThatScheme()
     {
         // Arrange
-        var query = new PomSubmissionQuery
+        var submissionFilter = new PomSubmissionFilter
         {
             SchemeOrgId = SamplePomSubmission.SchemeOrgId,
             IsCurrent = null
         };
 
         // Act
-        var filter = PomSubmissionRepository.Filter(query);
+        var filter = PomSubmissionRepository.Filter(submissionFilter);
 
         // Assert
         Assert.Equal(ObjectIdClause("schemeOrgId", SamplePomSubmission.SchemeOrgId), Render(filter));
@@ -55,14 +55,14 @@ public class PomSubmissionRepositoryFilterTests
     public void Filter_WhenOnlyTheMemberIsSet_MatchesThatMember()
     {
         // Arrange
-        var query = new PomSubmissionQuery
+        var submissionFilter = new PomSubmissionFilter
         {
             MemberOrgId = SamplePomSubmission.MemberOrgId,
             IsCurrent = null
         };
 
         // Act
-        var filter = PomSubmissionRepository.Filter(query);
+        var filter = PomSubmissionRepository.Filter(submissionFilter);
 
         // Assert
         Assert.Equal(ObjectIdClause("memberOrgId", SamplePomSubmission.MemberOrgId), Render(filter));
@@ -72,14 +72,14 @@ public class PomSubmissionRepositoryFilterTests
     public void Filter_WhenYearsAreSet_MatchesAnyOfThoseYears()
     {
         // Arrange
-        var query = new PomSubmissionQuery
+        var submissionFilter = new PomSubmissionFilter
         {
             CompliancePeriodYears = [2024, SamplePomSubmission.CompliancePeriodYear],
             IsCurrent = null
         };
 
         // Act
-        var filter = PomSubmissionRepository.Filter(query);
+        var filter = PomSubmissionRepository.Filter(submissionFilter);
 
         // Assert
         Assert.Equal(
@@ -91,14 +91,14 @@ public class PomSubmissionRepositoryFilterTests
     public void Filter_WhenQuartersAreSet_MatchesAnyOfThoseQuarters()
     {
         // Arrange
-        var query = new PomSubmissionQuery
+        var submissionFilter = new PomSubmissionFilter
         {
             CompliancePeriodQuarters = ["Quarter 1", SamplePomSubmission.CompliancePeriodQuarter],
             IsCurrent = null
         };
 
         // Act
-        var filter = PomSubmissionRepository.Filter(query);
+        var filter = PomSubmissionRepository.Filter(submissionFilter);
 
         // Assert
         Assert.Equal(
@@ -112,10 +112,10 @@ public class PomSubmissionRepositoryFilterTests
     public void Filter_WhenOnlyIsCurrentIsSet_MatchesThatFlag(bool isCurrent)
     {
         // Arrange
-        var query = new PomSubmissionQuery { IsCurrent = isCurrent };
+        var submissionFilter = new PomSubmissionFilter { IsCurrent = isCurrent };
 
         // Act
-        var filter = PomSubmissionRepository.Filter(query);
+        var filter = PomSubmissionRepository.Filter(submissionFilter);
 
         // Assert
         Assert.Equal($$"""{ "isCurrent" : {{isCurrent.ToString().ToLowerInvariant()}} }""", Render(filter));
@@ -125,7 +125,7 @@ public class PomSubmissionRepositoryFilterTests
     public void Filter_WhenEveryCriterionIsSet_CombinesThemWithAnd()
     {
         // Arrange
-        var query = new PomSubmissionQuery
+        var submissionFilter = new PomSubmissionFilter
         {
             Id = SamplePomSubmission.SchemeOrgId,
             SchemeOrgId = SamplePomSubmission.SchemeOrgId,
@@ -136,7 +136,7 @@ public class PomSubmissionRepositoryFilterTests
         };
 
         // Act
-        var filter = PomSubmissionRepository.Filter(query);
+        var filter = PomSubmissionRepository.Filter(submissionFilter);
 
         // Assert
         Assert.Equal(
@@ -154,7 +154,7 @@ public class PomSubmissionRepositoryFilterTests
     public void Filter_WhenACriterionIsUnsetOrEmpty_LeavesItOut()
     {
         // Arrange
-        var query = new PomSubmissionQuery
+        var submissionFilter = new PomSubmissionFilter
         {
             SchemeOrgId = SamplePomSubmission.SchemeOrgId,
             CompliancePeriodYears = [],
@@ -163,7 +163,7 @@ public class PomSubmissionRepositoryFilterTests
         };
 
         // Act
-        var filter = PomSubmissionRepository.Filter(query);
+        var filter = PomSubmissionRepository.Filter(submissionFilter);
 
         // Assert
         Assert.Equal(ObjectIdClause("schemeOrgId", SamplePomSubmission.SchemeOrgId), Render(filter));
@@ -173,14 +173,14 @@ public class PomSubmissionRepositoryFilterTests
     public void Filter_WhenNothingIsSet_Throws()
     {
         // Arrange
-        var query = new PomSubmissionQuery { IsCurrent = null };
+        var submissionFilter = new PomSubmissionFilter { IsCurrent = null };
 
         // Act
-        var act = () => PomSubmissionRepository.Filter(query);
+        FilterDefinition<PomSubmissionModel> Act() => PomSubmissionRepository.Filter(submissionFilter);
 
         // Assert
-        var exception = Assert.Throws<ArgumentException>(act);
-        Assert.Equal("query", exception.ParamName);
+        var exception = Assert.Throws<ArgumentException>(Act);
+        Assert.Equal("filter", exception.ParamName);
     }
 
     private static string IdClause(string id) =>

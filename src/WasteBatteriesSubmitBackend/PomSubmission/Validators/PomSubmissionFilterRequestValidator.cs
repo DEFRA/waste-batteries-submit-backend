@@ -5,9 +5,9 @@ using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 namespace WasteBatteriesSubmitBackend.PomSubmission.Validators;
 
 // Shape of a collection read. At least one business filter is required. isCurrent does not count.
-public sealed class PomSubmissionListRequestValidator : AbstractValidator<PomSubmissionListRequest>
+public sealed class PomSubmissionFilterRequestValidator : AbstractValidator<PomSubmissionFilterRequest>
 {
-    public PomSubmissionListRequestValidator()
+    public PomSubmissionFilterRequestValidator()
     {
         ClassLevelCascadeMode = CascadeMode.Continue;
         RuleLevelCascadeMode = CascadeMode.Continue;
@@ -46,7 +46,7 @@ public sealed class PomSubmissionListRequestValidator : AbstractValidator<PomSub
             .WithMessage(PomSubmissionValidationMessages.FilterRequired);
     }
 
-    private static bool HasBusinessFilter(PomSubmissionListRequest request) =>
+    private static bool HasBusinessFilter(PomSubmissionFilterRequest request) =>
         request.SchemeOrgId is not null
         || request.MemberOrgId is not null
         || request.CompliancePeriodYears is { Length: > 0 }

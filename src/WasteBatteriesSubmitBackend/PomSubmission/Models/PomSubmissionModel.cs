@@ -14,7 +14,7 @@ public sealed record PomSubmissionModel : PomSubmissionBase
 
     private const string SubmittedStatus = "Submitted";
 
-    // MongoDB deserialises through this constructor. The other constructor is for create.
+    // MongoDB deserialises through this constructor.
     [BsonConstructor]
     [SetsRequiredMembers]
     public PomSubmissionModel()
@@ -22,6 +22,7 @@ public sealed record PomSubmissionModel : PomSubmissionBase
         Id = null!;
     }
 
+    // For a new submission (on create and amend)
     // : base(header) uses the compiler copy constructor, so shared header fields are not assigned again.
     [SetsRequiredMembers]
     internal PomSubmissionModel(
@@ -62,8 +63,8 @@ public sealed record PomSubmissionModel : PomSubmissionBase
     // texts were written against.
     public int SchemaVersion { get; init; }
 
-    //Version is the optimistic concurrency token a later write
-    // sends back.
+    // An amendment writes one more than the submission it supersedes.
+    // A later write can send this value back as an optimistic concurrency token.
     public int Version { get; init; }
 
     // Null on a first submission. An amendment sets this to the id of the submission it replaces.

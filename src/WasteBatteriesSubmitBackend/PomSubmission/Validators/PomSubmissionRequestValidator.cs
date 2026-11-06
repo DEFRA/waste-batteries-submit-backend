@@ -6,8 +6,9 @@ using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Validators;
 
-// Shape of a posted submission. Whether a current submission already exists is a create-only
-// decision and lives in the service, which reads that submission once.
+// Shape of a posted submission. Whether that submission must already exist is decided by the
+// service, which reads the current row once. Create rejects a row that exists. Amend rejects
+// a missing row. A batch upsert can use the same read without either rejection.
 public sealed class PomSubmissionRequestValidator : AbstractValidator<PomSubmissionRequest>
 {
     public PomSubmissionRequestValidator()
@@ -80,7 +81,6 @@ public sealed class PomSubmissionRequestValidator : AbstractValidator<PomSubmiss
                     .WithMessage(PomSubmissionValidationMessages.Required)
                     .DependentRules(() =>
                     {
-                        Required(entry.RuleFor(item => item.Classification.BatteryCategory));
                         Required(entry.RuleFor(item => item.Classification.Chemistry));
                     });
             });
@@ -109,11 +109,8 @@ public sealed class PomSubmissionRequestValidator : AbstractValidator<PomSubmiss
                 continue;
             }
 
-            var classification = entry.Classification;
-            var key = string.Join(
-                '\u001f',
-                classification.BatteryCategory ?? string.Empty,
-                classification.Chemistry ?? string.Empty);
+            // batteryCategory is the same configured value on every stored entry, so the request key is chemistry.
+            var key = entry.Classification.Chemistry ?? string.Empty;
             if (!seen.Add(key))
             {
                 return false;

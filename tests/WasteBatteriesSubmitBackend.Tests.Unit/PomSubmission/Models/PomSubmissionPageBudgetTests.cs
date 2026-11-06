@@ -95,13 +95,15 @@ public class PomSubmissionPageBudgetTests
             count,
             AppSettings.PomSubmission.InitialActivity,
             AppSettings.PomSubmission.InitialStatus,
-            AppSettings.PomSubmission.InitialVersion);
+            AppSettings.PomSubmission.InitialVersion,
+            AppSettings.PomSubmission.InitialBatteryCategory);
 
     private static PomSubmissionModel FullSubmission() =>
         MeasuredPomSubmission.Full(
             AppSettings.PomSubmission.InitialActivity,
             AppSettings.PomSubmission.InitialStatus,
-            AppSettings.PomSubmission.InitialVersion);
+            AppSettings.PomSubmission.InitialVersion,
+            AppSettings.PomSubmission.InitialBatteryCategory);
 
     private static int LargestPageUnderLimit(PomSubmissionModel submission)
     {

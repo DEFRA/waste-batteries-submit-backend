@@ -27,12 +27,13 @@ public static class MeasuredPomSubmission
         int count,
         string activity,
         string status,
-        int version)
+        int version,
+        string batteryCategory)
     {
         var items = new PomSubmissionModel[count];
         for (var index = 0; index < count; index++)
         {
-            items[index] = Distinct(schemeOrgId, index, activity, status, version);
+            items[index] = Distinct(schemeOrgId, index, activity, status, version, batteryCategory);
         }
 
         Array.Sort(items, CompareNewestFirst);
@@ -65,11 +66,17 @@ public static class MeasuredPomSubmission
     }
 
     // Distinct at index 0. Repeating it measures the uncompressed page; the row is the same length as the gzip rows.
-    public static PomSubmissionModel Full(string activity, string status, int version) =>
-        Distinct(SchemeOrgId, 0, activity, status, version);
+    public static PomSubmissionModel Full(string activity, string status, int version, string batteryCategory) =>
+        Distinct(SchemeOrgId, 0, activity, status, version, batteryCategory);
 
     // Each submission differs. Identical copies compress far more than a real list.
-    public static PomSubmissionModel Distinct(string schemeOrgId, int index, string activity, string status, int version)
+    public static PomSubmissionModel Distinct(
+        string schemeOrgId,
+        int index,
+        string activity,
+        string status,
+        int version,
+        string batteryCategory)
     {
         const string chemistry = "Nickel-metal hydride";
         var header = new PomSubmissionRequest
@@ -84,7 +91,7 @@ public static class MeasuredPomSubmission
             DataBasis = index % 2 == 0 ? "Estimated" : "Actual",
             TonnageEntries = [.. Enumerable.Range(1, TonnageEntryCount).Select(entry => new TonnageEntryBase
             {
-                Classification = new BatteryClassification
+                Classification = new BatteryClassificationBase
                 {
                     Chemistry = $"{chemistry} {entry:00}"
                 },
@@ -92,7 +99,7 @@ public static class MeasuredPomSubmission
             })]
         };
 
-        return Stored(header, index, CreatedAt.AddMinutes(index), activity, status, version);
+        return Stored(header, index, CreatedAt.AddMinutes(index), activity, status, version, batteryCategory);
     }
 
     private static void WritePage(
@@ -121,13 +128,14 @@ public static class MeasuredPomSubmission
         DateTime createdAt,
         string activity,
         string status,
-        int version) =>
+        int version,
+        string batteryCategory) =>
         new(
             header,
             $"674a1b2c3d4e5f69{index:x8}",
             createdAt,
             [.. header.TonnageEntries.Select((entry, entryIndex) =>
-                entry.ToStoredEntry($"{index:x8}{entryIndex:x8}674a1b2c", activity))],
+                entry.ToStoredEntry($"{index:x8}{entryIndex:x8}674a1b2c", activity, batteryCategory))],
             status,
             version);
 }

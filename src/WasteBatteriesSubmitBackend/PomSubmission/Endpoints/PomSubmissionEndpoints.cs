@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using WasteBatteriesSubmitBackend.Models;
-using WasteBatteriesSubmitBackend.PomSubmission;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
+using WasteBatteriesSubmitBackend.Utils.Http;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Endpoints;
 
@@ -23,7 +23,11 @@ public static class PomSubmissionEndpoints
             .WithSummary("Create a placed-on-market submission")
             .ProducesValidationProblem();
 
-        // The document URL from create. A filtered, optionally paged read is the collection route below.
+        group.MapPatch(string.Empty, Amend)
+            .WithName("AmendPomSubmission")
+            .WithSummary("Amend the current placed-on-market submission")
+            .ProducesValidationProblem();
+
         group.MapGet("/{id}", Get)
             .WithName("GetPomSubmission")
             .WithSummary("Get a placed-on-market submission")
@@ -46,6 +50,15 @@ public static class PomSubmissionEndpoints
         return TypedResults.Created($"{RoutePrefix}/{submission.Id}", submission);
     }
 
+    private static async Task<Ok<PomSubmissionModel>> Amend(
+        PomSubmissionRequest request,
+        [FromServices] IPomSubmissionService pomSubmissionService,
+        CancellationToken cancellationToken)
+    {
+        var submission = await pomSubmissionService.AmendAsync(request, cancellationToken);
+        return TypedResults.Ok(submission);
+    }
+
     private static async Task<Results<Ok<PomSubmissionModel>, NotFound>> Get(
         [FromRoute] string id,
         [FromServices] IPomSubmissionService pomSubmissionService,
@@ -56,14 +69,14 @@ public static class PomSubmissionEndpoints
     }
 
     private static async Task<Ok<PaginatedList<PomSubmissionModel>>> GetList(
-        [AsParameters] PomSubmissionListRequest request,
+        [AsParameters] PomSubmissionFilterRequest request,
         HttpRequest httpRequest,
         [FromServices] IPomSubmissionService pomSubmissionService,
         CancellationToken cancellationToken)
     {
         var page = await pomSubmissionService.GetAsync(
             request,
-            PomSubmissionResponseCompression.ClientAcceptsGzip(httpRequest),
+            GzipResponseCompression.ClientAcceptsGzip(httpRequest),
             cancellationToken);
         return TypedResults.Ok(page);
     }

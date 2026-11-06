@@ -1,19 +1,34 @@
 using MongoDB.Driver;
 using WasteBatteriesSubmitBackend.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
-using WasteBatteriesSubmitBackend.PomSubmission.Models.Queries;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 using WasteBatteriesSubmitBackend.Utils.Mongo;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 
 public interface IPomSubmissionRepository
 {
-    Task CreateAsync(PomSubmissionModel submission, CancellationToken cancellationToken = default);
+    Task CreateAsync(PomSubmissionModel submission, 
+        CancellationToken cancellationToken = default);
 
-    // Every submission matching the set criteria, in pages when a page size is set.
-    // An id matches at most one. Years and quarters match any value in the list.
+    Task CreateAsync(
+        IClientSessionHandle session,
+        PomSubmissionModel submission,
+        CancellationToken cancellationToken = default);
+
+    // Sets isCurrent to false and sets updatedAtUtc assuming that the submission is still current.
+    // False means it was already updated, and nothing was written.
+    Task<bool> SupersedeCurrentAsync(
+        IClientSessionHandle session,
+        string id,
+        DateTime updatedAtUtc,
+        CancellationToken cancellationToken = default);
+
+    // Returns every submission matching the PomSubmissionFilter and PageRequest.
+    // A submission id matches at most one.
+    // If Scheme, Members, Years and quarters are supplied it is an "AND", returning a list of submissions.
     Task<PaginatedList<PomSubmissionModel>> FindAsync(
-        PomSubmissionQuery query,
+        PomSubmissionFilter filter,
         PageRequest page,
         CancellationToken cancellationToken = default);
 }
@@ -23,11 +38,56 @@ public class PomSubmissionRepository(IMongoDbClientFactory connectionFactory, IL
 {
     public const string CollectionName = "pom-submissions";
 
-    public async Task CreateAsync(PomSubmissionModel submission, CancellationToken cancellationToken = default)
+    public Task CreateAsync(PomSubmissionModel submission, CancellationToken cancellationToken = default) =>
+        InsertAsync(session: null, submission, cancellationToken);
+
+    public Task CreateAsync(
+        IClientSessionHandle session,
+        PomSubmissionModel submission,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        return InsertAsync(session, submission, cancellationToken);
+    }
+
+    public async Task<bool> SupersedeCurrentAsync(
+        IClientSessionHandle session,
+        string id,
+        DateTime updatedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        var update = Builders<PomSubmissionModel>.Update
+            .Set(submission => submission.IsCurrent, false)
+            .Set(submission => submission.UpdatedAtUtc, updatedAtUtc);
+
+        var result = await Collection.UpdateOneAsync(
+            session,
+            Filter(new PomSubmissionFilter { Id = id, IsCurrent = true }),
+            update,
+            options: null,
+            cancellationToken);
+
+        return result.MatchedCount == 1;
+    }
+
+    private async Task InsertAsync(
+        IClientSessionHandle? session,
+        PomSubmissionModel submission,
+        CancellationToken cancellationToken)
     {
         try
         {
-            await Collection.InsertOneAsync(submission, cancellationToken: cancellationToken);
+            if (session is null)
+            {
+                await Collection.InsertOneAsync(submission, cancellationToken: cancellationToken);
+            }
+            else
+            {
+                await Collection.InsertOneAsync(session, submission, options: null, cancellationToken);
+            }
         }
         catch (MongoWriteException exception) when (exception.WriteError?.Category == ServerErrorCategory.DuplicateKey)
         {
@@ -37,14 +97,14 @@ public class PomSubmissionRepository(IMongoDbClientFactory connectionFactory, IL
     }
 
     public async Task<PaginatedList<PomSubmissionModel>> FindAsync(
-        PomSubmissionQuery query,
+        PomSubmissionFilter filter,
         PageRequest page,
         CancellationToken cancellationToken = default)
     {
-        var filter = Filter(query);
-        var totalCount = (int)await Collection.CountDocumentsAsync(filter, cancellationToken: cancellationToken);
+        var definition = Filter(filter);
+        var totalCount = (int)await Collection.CountDocumentsAsync(definition, cancellationToken: cancellationToken);
         var window = PageWindow.Resolve(page.PageNumber, page.PageSize, totalCount);
-        var find = Collection.Find(filter);
+        var find = Collection.Find(definition);
         find = find
             .SortByDescending(submission => submission.CreatedAtUtc)
             .ThenByDescending(submission => submission.Id);
@@ -58,45 +118,45 @@ public class PomSubmissionRepository(IMongoDbClientFactory connectionFactory, IL
         return new PaginatedList<PomSubmissionModel>(items, totalCount, window.PageNumber, window.PageSize);
     }
 
-    // IsCurrent defaults to true. A query that clears it and sets nothing else would read the whole collection.
-    internal static FilterDefinition<PomSubmissionModel> Filter(PomSubmissionQuery query)
+    // IsCurrent defaults to true. A filter that clears it and sets nothing else would read the whole collection.
+    internal static FilterDefinition<PomSubmissionModel> Filter(PomSubmissionFilter filter)
     {
         var builder = Builders<PomSubmissionModel>.Filter;
         var filters = new List<FilterDefinition<PomSubmissionModel>>();
 
-        if (query.Id is not null)
+        if (filter.Id is not null)
         {
-            filters.Add(builder.Eq(submission => submission.Id, query.Id));
+            filters.Add(builder.Eq(submission => submission.Id, filter.Id));
         }
 
-        if (query.SchemeOrgId is not null)
+        if (filter.SchemeOrgId is not null)
         {
-            filters.Add(builder.Eq(submission => submission.SchemeOrgId, query.SchemeOrgId));
+            filters.Add(builder.Eq(submission => submission.SchemeOrgId, filter.SchemeOrgId));
         }
 
-        if (query.MemberOrgId is not null)
+        if (filter.MemberOrgId is not null)
         {
-            filters.Add(builder.Eq(submission => submission.MemberOrgId, query.MemberOrgId));
+            filters.Add(builder.Eq(submission => submission.MemberOrgId, filter.MemberOrgId));
         }
 
-        if (query.CompliancePeriodYears is { Count: > 0 })
+        if (filter.CompliancePeriodYears is { Count: > 0 })
         {
-            filters.Add(builder.In(submission => submission.CompliancePeriodYear, query.CompliancePeriodYears));
+            filters.Add(builder.In(submission => submission.CompliancePeriodYear, filter.CompliancePeriodYears));
         }
 
-        if (query.CompliancePeriodQuarters is { Count: > 0 })
+        if (filter.CompliancePeriodQuarters is { Count: > 0 })
         {
-            filters.Add(builder.In(submission => submission.CompliancePeriodQuarter, query.CompliancePeriodQuarters));
+            filters.Add(builder.In(submission => submission.CompliancePeriodQuarter, filter.CompliancePeriodQuarters));
         }
 
-        if (query.IsCurrent is bool isCurrent)
+        if (filter.IsCurrent is bool isCurrent)
         {
             filters.Add(builder.Eq(submission => submission.IsCurrent, isCurrent));
         }
 
         if (filters.Count == 0)
         {
-            throw new ArgumentException("A submission query needs at least one criterion.", nameof(query));
+            throw new ArgumentException("A submission filter needs at least one criterion.", nameof(filter));
         }
 
         return builder.And(filters);

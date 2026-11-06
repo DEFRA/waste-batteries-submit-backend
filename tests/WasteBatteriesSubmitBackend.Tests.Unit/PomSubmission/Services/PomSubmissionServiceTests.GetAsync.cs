@@ -2,7 +2,7 @@ using FluentValidation;
 using NSubstitute;
 using WasteBatteriesSubmitBackend.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
-using WasteBatteriesSubmitBackend.PomSubmission.Models.Queries;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
 using WasteBatteriesSubmitBackend.Tests.Common;
@@ -25,7 +25,7 @@ public partial class PomSubmissionServiceTests
         };
         repository
             .FindAsync(
-                new PomSubmissionQuery { Id = stored.Id, IsCurrent = null },
+                new PomSubmissionFilter { Id = stored.Id, IsCurrent = null },
                 new PageRequest(),
                 Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>([stored], 1, 1, 1));
@@ -46,7 +46,7 @@ public partial class PomSubmissionServiceTests
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger);
         repository
-            .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
+            .FindAsync(Arg.Any<PomSubmissionFilter>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>([], 0, 1, 0));
 
         // Act
@@ -55,7 +55,7 @@ public partial class PomSubmissionServiceTests
         // Assert
         Assert.Null(submission);
         await repository.Received(1).FindAsync(
-            new PomSubmissionQuery { Id = SamplePomSubmission.SchemeOrgId, IsCurrent = null },
+            new PomSubmissionFilter { Id = SamplePomSubmission.SchemeOrgId, IsCurrent = null },
             new PageRequest(),
             Arg.Any<CancellationToken>());
         Assert.Empty(logger.Entries);
@@ -69,7 +69,7 @@ public partial class PomSubmissionServiceTests
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger);
         repository
-            .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
+            .FindAsync(Arg.Any<PomSubmissionFilter>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>([], 0, 1, 0));
 
         // Act
@@ -77,7 +77,7 @@ public partial class PomSubmissionServiceTests
 
         // Assert
         await repository.Received(1).FindAsync(
-            new PomSubmissionQuery { Id = SamplePomSubmission.SchemeOrgId, IsCurrent = null },
+            new PomSubmissionFilter { Id = SamplePomSubmission.SchemeOrgId, IsCurrent = null },
             new PageRequest(),
             Arg.Any<CancellationToken>());
     }
@@ -94,15 +94,15 @@ public partial class PomSubmissionServiceTests
         var service = Service(repository, logger);
 
         // Act
-        var act = () => service.GetAsync(id, TestContext.Current.CancellationToken);
+        Task<PomSubmissionModel?> Act() => service.GetAsync(id, TestContext.Current.CancellationToken);
 
         // Assert
-        var exception = await Assert.ThrowsAsync<ValidationException>(act);
+        var exception = await Assert.ThrowsAsync<ValidationException>(Act);
         var error = Assert.Single(exception.Errors);
         Assert.Equal("Id", error.PropertyName);
         Assert.Equal("id must be an ObjectId.", error.ErrorMessage);
         await repository.DidNotReceive().FindAsync(
-            Arg.Any<PomSubmissionQuery>(),
+            Arg.Any<PomSubmissionFilter>(),
             Arg.Any<PageRequest>(),
             Arg.Any<CancellationToken>());
         Assert.Empty(logger.Entries);

@@ -8,24 +8,29 @@
     replaces the pin. Directory.Build.targets fails the build when that happens.
     A version with no upper bound is only a minimum, so the Updates tab lists every
     newer release. A range keeps versions outside it off that list. Applying an
-    update still writes a csproj override, which Directory.Build.targets rejects.
+    update still writes a csproj override. Directory.Build.targets rejects that
+    override for an exact pin. Snappier and SharpCompress accept any version at or above their minimum.
   -->
   <PropertyGroup>
+    <MinimumSnappierVersion>1.1.0</MinimumSnappierVersion>
     <PinnedSnappierVersion>1.3.1</PinnedSnappierVersion>
-    <PinnedSharpCompressVersion>0.50.7</PinnedSharpCompressVersion>
+    <MinimumSharpCompressVersion>0.48.0</MinimumSharpCompressVersion>
+    <PinnedSharpCompressVersion>0.50.8</PinnedSharpCompressVersion>
     <PinnedMicrosoftOpenApiVersion>[2.13.0,3.0.0)</PinnedMicrosoftOpenApiVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <!--
       Snappier before 1.1.0 is vulnerable (https://github.com/advisories/GHSA-pggp-6c3x-2vxg).
-      Update to any newer release. Do not go below 1.1.0.
+      PinnedSnappierVersion is the version restored when a project does not set its own.
+      A newer version is allowed. Do not go below MinimumSnappierVersion.
     -->
     <PackageReference Include="Snappier" Version="$(PinnedSnappierVersion)" />
 
     <!--
       SharpCompress before 0.48.0 is vulnerable (https://github.com/advisories/GHSA-6c8g-7p36-r338).
-      Update to any newer release. Do not go below 0.48.0.
+      PinnedSharpCompressVersion is the version restored when a project does not set its own.
+      A newer version is allowed. Do not go below MinimumSharpCompressVersion.
     -->
     <PackageReference Include="SharpCompress" Version="$(PinnedSharpCompressVersion)" />
 

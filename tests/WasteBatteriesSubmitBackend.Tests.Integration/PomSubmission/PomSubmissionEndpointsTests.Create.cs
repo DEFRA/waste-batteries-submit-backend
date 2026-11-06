@@ -293,7 +293,7 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal(fixture.Defaults.InitialVersion, created.GetProperty("version").GetInt32());
         Assert.Equal(SamplePomSubmission.Tonnes, created.GetProperty("tonnageEntries")[0].GetProperty("tonnes").GetString());
         var classification = created.GetProperty("tonnageEntries")[0].GetProperty("classification");
-        Assert.Equal(BatteryClassification.Portable, classification.GetProperty("batteryCategory").GetString());
+        Assert.Equal(fixture.Defaults.InitialBatteryCategory, classification.GetProperty("batteryCategory").GetString());
         Assert.Equal(SamplePomSubmission.Chemistry, classification.GetProperty("chemistry").GetString());
         Assert.False(classification.TryGetProperty("subCategory", out _));
         Assert.False(classification.TryGetProperty("cellType", out _));

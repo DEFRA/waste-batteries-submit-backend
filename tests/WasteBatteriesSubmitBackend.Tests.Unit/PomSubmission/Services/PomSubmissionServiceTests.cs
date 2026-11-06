@@ -4,12 +4,13 @@ using WasteBatteriesSubmitBackend.Config;
 using WasteBatteriesSubmitBackend.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
-using WasteBatteriesSubmitBackend.PomSubmission.Models.Queries;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
 using WasteBatteriesSubmitBackend.PomSubmission.Validators;
 using WasteBatteriesSubmitBackend.Tests.Common;
+using WasteBatteriesSubmitBackend.Utils.Mongo;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.PomSubmission.Services;
 
@@ -23,7 +24,7 @@ public partial class PomSubmissionServiceTests
 
     private static void ReturnNoSubmissions(IPomSubmissionRepository repository) =>
         repository
-            .FindAsync(Arg.Any<PomSubmissionQuery>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
+            .FindAsync(Arg.Any<PomSubmissionFilter>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(new PaginatedList<PomSubmissionModel>([], 0, 1, 0));
 
     private static readonly IOptions<PomSubmissionConfig> s_config = Options.Create(new PomSubmissionConfig
@@ -31,17 +32,23 @@ public partial class PomSubmissionServiceTests
         InitialStatus = "Submitted",
         InitialVersion = 1,
         InitialActivity = "Placed",
+        InitialBatteryCategory = "Portable",
         MaxPageSize = MaxPageSize,
         MaxGzipPageSize = MaxGzipPageSize
     });
 
-    private static PomSubmissionService Service(IPomSubmissionRepository repository, CapturingLogger<PomSubmissionService> logger) =>
+    private static PomSubmissionService Service(
+        IPomSubmissionRepository repository,
+        CapturingLogger<PomSubmissionService> logger,
+        IUnitOfWork? unitOfWork = null) =>
         new(
             repository,
+            unitOfWork ?? Substitute.For<IUnitOfWork>(),
             new PomSubmissionMapper(s_config),
             s_config,
-            new PomSubmissionRequestValidator(),
-            new PomSubmissionListRequestValidator(),
+            new PomSubmissionValidators(
+                new PomSubmissionRequestValidator(),
+                new PomSubmissionFilterRequestValidator()),
             new FixedTime(s_createdAt),
             logger);
 

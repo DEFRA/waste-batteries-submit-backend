@@ -12,23 +12,26 @@ The target data model is the Compliance Scheme POM Submission page in the [waste
 * [Dependabot](#dependabot)
 
 
-### Placed-on-market submissions
+### Placed-on-market submission endpoints
 
-`POST /pom-submissions` creates one first submission for one scheme member and one quarter. The caller needs a Defra ID bearer token. The response is `201 Created`, with `Location: /pom-submissions/{id}` and the stored submission as the body. Documents are stored in the `pom-submissions` collection.
+All requests expect a Defra ID bearer token.
 
-`GET /pom-submissions/{id}` returns that stored submission as `200 OK` and the same JSON object. The body is plain JSON. Accepting gzip does not compress this response. `id` must be an ObjectId. A value that is not an ObjectId is a `400` validation problem. A well-formed id that is not stored is `404`. The read is by id, so a submission that is no longer current is still returned.
+`POST /pom-submissions` creates one initial submission for one scheme, member, year and quarter. The response is `201 Created`, with `Location: /pom-submissions/{id}` and the stored submission as the body. Documents are stored in the `pom-submissions` collection.
 
-`GET /pom-submissions` returns a page of those same submission objects. A single submission is read with `GET /pom-submissions/{id}`. List filters are combined with AND: `schemeOrgId`, `memberOrgId`, repeated `compliancePeriodYears`, repeated `compliancePeriodQuarters`, and `isCurrent`. At least one of `schemeOrgId`, `memberOrgId`, `compliancePeriodYears` or `compliancePeriodQuarters` is required. `isCurrent` does not satisfy that rule and defaults to true. A year list or a quarter list matches any of the supplied values. Omit `pageSize`, or set it higher than the limit for that request, and `pageSize` in the response is that limit. A caller that accepts gzip uses `PomSubmission:MaxGzipPageSize`. Any other caller uses `PomSubmission:MaxPageSize`. `pageNumber` then defaults to 1. A smaller `pageSize` is kept. A page past the end returns the last page. The body has `items`, `pageNumber`, `pageSize`, `totalPages`, `totalCount`, `hasPreviousPage` and `hasNextPage`. No match is `200` with an empty `items` array. A missing filter, or a bad organisation id, year, quarter or page, is a `400` validation problem. The same bearer token is required. The list is the only POM read that is gzipped. A list request that sends `Accept-Encoding: gzip` receives a gzip body.
+`PATCH /pom-submissions` amends the current submission, using the supplied scheme, member, year and quarter to find it. The amendment inserts a new version and sets the previous submission so it is no longer current. The response is `200 OK` and the new stored submission is the body. Both the new submission and updating the existing submission commit or roll back in one transaction.
+
+`GET /pom-submissions/{id}` returns the stored submission as `200 OK`. Accepting gzip does not compress this response. The read is by id, so a submission that is no longer current is still returned.
+
+`GET /pom-submissions` returns a page of submission objects. The filters are combined with AND: `schemeOrgId`, `memberOrgId`, `compliancePeriodYears` (array), `compliancePeriodQuarters` (array), and `isCurrent` (optional, defaults to true). At least one of `schemeOrgId`, `memberOrgId`, `compliancePeriodYears` or `compliancePeriodQuarters` is required. `isCurrent` alone does not satisfy that rule.
+A missing `pageSize`, or one above the limit for that request, is replaced by `MaxPageSize` or `MaxGzipPageSize` (see below). A smaller `pageSize` is kept. `pageNumber` defaults to 1. A page past the end returns the last page. The JSON body has `items`, `pageNumber`, `pageSize`, `totalPages`, `totalCount`, `hasPreviousPage` and `hasNextPage`. No match is `200` with an empty `items` array. The list is gzip-compressed when the caller accepts gzip. A single submission is not. 
+
+#### Page sizes when getting list of submissions
 
 `PomSubmission:MaxPageSize` is the page size when the caller does not accept gzip. `PomSubmission:MaxGzipPageSize` is the page size when `Accept-Encoding` includes `gzip` or `*` with a quality above 0. `gzip;q=0` does not accept gzip, so the smaller limit applies and the body is plain JSON. A caller that does not accept gzip still receives `200` and uncompressed JSON. The response does not fail.
 
-Both numbers were calculated for the current `PomSubmissionModel` shape, including its 80 tonnage entries. If that class changes, measure the plain JSON and the gzip response again and update both settings. Until that is done, the limits are for the old shape and a page can pass the 10 MiB CDP payload limit (10,485,760 bytes). The unit tests read `MaxPageSize` and `MaxGzipPageSize` and fail when either full page is not under 10 MiB.
+Both numbers were calculated for the current `PomSubmissionModel` shape, using the maximum likely array and field characters.  See `MeasuredPomSubmission.Distinct` for details of this. If that class changes, measure the plain JSON and the gzip response again and update both settings. Until that is done, the limits are for the old shape and a page can pass the 10 MiB CDP payload limit (10,485,760 bytes). The unit tests in `PomSubmissionPageBudgetTests` read `MaxPageSize` and `MaxGzipPageSize` and fail when either full page is not under 10 MiB.
 
-The measured submission has a 160-character member name, a 40-character scheme membership reference, BPRN `BPRN-NIEA-2026-000123`, data basis `Estimated`, tonnes `99999.999`, and chemistry `Nickel-metal hydride` with a two-digit suffix on every entry. One of those objects is 13,578 bytes. As uncompressed JSON, 772 of them stay under 10 MiB and 773 do not. 750 is 772 rounded down. The shorter example fields are about 12,207 bytes each and would fit 858 submissions. That larger count is not the plain-JSON limit, because long member names and long chemistry text would then pass 10 MiB. The plain-JSON unit test serialises `MaxPageSize` of these long submissions and fails when that page is not under 10 MiB.
-
-The gzip limit uses that same long submission, with each submission different (member, tonnes, and ids). Identical copies compress far more than a real list, so they are not the measure. Gzip is `Optimal`, which is what the API uses. Tonnes are stored as `Decimal128` and written back as a string. Measured on `GET /pom-submissions` with `Accept-Encoding: gzip`, 17,364 distinct submissions gzip to 10,485,744 bytes, which is 16 bytes under 10 MiB. 17,365 is 10,486,326 bytes and does not fit. 17,500 was over the limit on that endpoint (10,567,695 bytes). 17000 is 17,364 rounded down, so the configured page is not sitting on the limit. The unit test gzips a page of `MaxGzipPageSize` of these submissions, using the tonnes text the store writes back, and fails when that gzip is not under 10 MiB. It does not insert them. An integration test stores two of them, reads the gzip list, and requires that JSON to match the JSON the unit test gzips. A change to the response breaks that match, which is the signal to measure the page again.
-
-The caller posts `schemeOrgId`, `memberOrgId`, `memberName`, `memberBprn`, `schemeMembershipRef`, `compliancePeriodYear`, `compliancePeriodQuarter`, `dataBasis` and at least one `tonnageEntries` item. `schemeOrgId` and `memberOrgId` are ObjectIds. `memberBprn` matches `BPRN-{EA|NRW|SEPA|NIEA}-{year}-{6 digits}`, and that year equals `compliancePeriodYear`. `compliancePeriodYear` is a four-digit year on the request. Each entry posts `chemistry` and `tonnes`. `tonnes` is a string with exactly three digits after the decimal point, stored as `Decimal128` and returned as that string. `batteryCategory` is required on the stored classification. The request must not include it, and posting it is a bad request. The service sets it to `Portable` for every submission. `subCategory`, `cellType` and `equipmentState` are not on the classification. Posting one of them, or any other property the request model does not declare, is a bad request and is logged as an error.
+#### Request JSON
 
 ```json
 {
@@ -51,13 +54,27 @@ The caller posts `schemeOrgId`, `memberOrgId`, `memberName`, `memberBprn`, `sche
 }
 ```
 
-The service sets `id`, `schemaVersion`, `version`, `status`, `isCurrent`, `submittedOnUtc`, `createdAtUtc`, `updatedAtUtc`, `supersedesSubmissionId`, each entry's `id` and `activity`, and `batteryCategory` (`Portable`). A first submission returns `schemaVersion` `1` and `version` `1`. `schemaVersion` is a constant. `1` is the classification that stores `batteryCategory` and `chemistry` only. `version`, `status` and `activity` come from the `PomSubmission` configuration, and the defaults are `1`, `Submitted` and `Placed`. `submittedOnUtc` equals `createdAtUtc` when the status is `Submitted`. `supersedesSubmissionId` and `updatedAtUtc` are null. Both `schemaVersion` and `version` are on the response. `schemaVersion` says which vocabulary the stored texts use. `version` is the concurrency token a later write sends back. Create does not check it. The declaration is omitted.
+The service sets these on the stored submission and includes them in responses:
 
-A repeated classification is rejected. The comparison is `batteryCategory` and `chemistry`. Activity is not part of that key. A second submission is rejected while a current submission already exists for the same scheme, member, year and quarter. That lookup runs when those key fields are well formed, and it reads the collection once. Field failures, including that duplicate, are `400` validation problems and are logged at information.
+- `id`
+- `schemaVersion` (constant 1; a stored-shape change is a code change)
+- `version` (from `PomSubmission:InitialVersion`, default 1; an amendment stores one more than the submission it replaces)
+- `status` (from `PomSubmission:InitialStatus`, default Submitted)
+- `isCurrent` (true on a new or amended submission; the superseded submission is set to false)
+- `submittedOnUtc` (set to `createdAtUtc` when the status text is Submitted)
+- `createdAtUtc`
+- `updatedAtUtc` (null on create; set on the superseded submission)
+- `supersedesSubmissionId` (null on create; set on the amendment)
 
-The unique index is `schemeOrgId`, `memberOrgId`, `compliancePeriodYear` and `compliancePeriodQuarter`, partial on `isCurrent: true`. A submission with `isCurrent` false can share that key. The other indexes are not unique: scheme plus year plus quarter, member plus year where `isCurrent` is true, `memberBprn`, chemistry plus battery category on the entries, and a sparse index on `supersedesSubmissionId`.
+Each tonnage entry also stores:
 
-Not built yet: amendments, the declaration, checking quarter, chemistry and activity against the closed vocabularies, resolving the member from the BPRN, inferring the compliance year, and checking `version` on write. The mapper can already set `supersedesSubmissionId` and a supplied `version`. The create path does not.
+- `id`
+- `activity` (from `PomSubmission:InitialActivity`, default Placed)
+- `batteryCategory` (from `PomSubmission:InitialBatteryCategory`, default Portable; not accepted on the request) 
+
+The unique index for a submission in the database is `schemeOrgId`, `memberOrgId`, `compliancePeriodYear` and `compliancePeriodQuarter`, partial on `isCurrent: true`. A submission with `isCurrent` false can share that key. 
+
+The other indexes are not unique: scheme plus year plus quarter, member plus year where `isCurrent` is true, `memberBprn`, chemistry plus battery category on the entries, and a sparse index on `supersedesSubmissionId`.
 
 
 ### Docker Compose
@@ -85,30 +102,46 @@ A more extensive setup is available in [github.com/DEFRA/cdp-local-environment](
 See above.
 
 ```
-docker compose up -d mongodb
+docker compose up -d --wait mongodb
 ```
+
+The container starts a single-node replica set named `rs0`. The healthcheck initiates it and waits until the node is primary. `docker compose up` without `--wait` can return before that, and an amendment sent in that window fails.
 
 #### MongoDB locally
 
-Alternatively install MongoDB locally:
+Alternatively install MongoDB locally. Amendments use a multi-document transaction, so the local server has to be a single-node replica set. A standalone `mongod` rejects the transaction.
 
 - Install [MongoDB](https://www.mongodb.com/docs/manual/tutorial/#installation) on your local machine
 - Start MongoDB:
+
 ```bash
-sudo mongod --dbpath ~/mongodb-cdp
+sudo mongod --replSet rs0 --bind_ip_all --dbpath ~/mongodb-cdp
 ```
+
+- Initiate the set once. An existing standalone data directory can be initiated the same way:
+
+```javascript
+rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27017"}]})
+```
+
+Connect with `directConnection=true`. The development and Compose connection strings do. That keeps the driver on the server you named. A client that discovers the set would follow the member host, which inside Compose is not the host published to your machine.
+
+#### Retries
+
+Retryable reads and retryable writes stay at the MongoDB .NET driver default, which is on. The connection strings in this repo do not turn them off. A transient network error on a single-document read or write is retried by the driver. An amendment runs in one transaction. The driver retries that transaction when the error is labeled `TransientTransactionError`, and when the commit result is labeled `UnknownTransactionCommitResult`. The new document's id and timestamp are chosen before the transaction starts, so a retry writes the same document. Duplicate-key conflicts and validation failures are not retried. The transaction aborts and the previous current row is left unchanged.
 
 #### MongoDB in CDP environments
 
 In CDP environments a MongoDB instance is already set up
-and the credentials exposed as enviromment variables.
+and the credentials exposed as environment variables.
+That instance is a replica set, which is what the amendment transaction requires. The deployed connection string is supplied by the platform. Do not add `directConnection=true` there: the driver should discover the set.
 
 
 ### Inspect MongoDB
 
 To inspect the Database and Collections locally:
 ```bash
-mongosh
+mongosh "mongodb://127.0.0.1:27017/?directConnection=true"
 ```
 
 You can use the CDP Terminal to access the environments' MongoDB.
@@ -123,7 +156,7 @@ dotnet test
 
 `WasteBatteriesSubmitBackend.Tests.Unit` covers validators, mapping, the submission service and handlers without hosting the API.
 
-`WasteBatteriesSubmitBackend.Tests.Integration` hosts the API in process with `WebApplicationFactory`. The placed-on-market submission tests start MongoDB 7 with Testcontainers, so Docker must be running.
+`WasteBatteriesSubmitBackend.Tests.Integration` hosts the API in process with `WebApplicationFactory`. The placed-on-market submission tests start MongoDB 7 as a single-node replica set with Testcontainers, so Docker must be running. The replica set is what lets an amendment commit or roll back its two writes.
 
 ### Running
 

@@ -23,7 +23,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPomSubmissionMapper, PomSubmissionMapper>();
         services.AddSingleton<IPomSubmissionRepository, PomSubmissionRepository>();
         services.AddScoped<IValidator<PomSubmissionRequest>, PomSubmissionRequestValidator>();
-        services.AddScoped<IValidator<PomSubmissionListRequest>, PomSubmissionListRequestValidator>();
+        services.AddScoped<IValidator<PomSubmissionFilterRequest>, PomSubmissionFilterRequestValidator>();
+        services.AddScoped<PomSubmissionValidators>();
         services.AddScoped<IPomSubmissionService, PomSubmissionService>();
         return services;
     }

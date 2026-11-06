@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using WasteBatteriesSubmitBackend.Models;
-using WasteBatteriesSubmitBackend.PomSubmission.Models.Queries;
+using WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
@@ -9,7 +9,7 @@ namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
 public partial class PomSubmissionEndpointsTests
 {
     [Fact]
-    public async Task FindAsync_WhenQueryHasNoCriteria_Throws()
+    public async Task FindAsync_WhenTheFilterHasNoCriteria_Throws()
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -18,13 +18,13 @@ public partial class PomSubmissionEndpointsTests
         // Act
         async Task Act() =>
             await repository.FindAsync(
-                new PomSubmissionQuery { IsCurrent = null },
+                new PomSubmissionFilter { IsCurrent = null },
                 new PageRequest(),
                 cancellationToken);
 
         // Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(Act);
-        Assert.Equal("query", exception.ParamName);
+        Assert.Equal("filter", exception.ParamName);
     }
 
     [Fact]

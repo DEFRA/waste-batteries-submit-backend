@@ -60,10 +60,10 @@ public class PomSubmissionRequestJsonTests
             """;
 
         // Act
-        var act = () => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
+        PomSubmissionRequest? Act() => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
 
         // Assert
-        var exception = Assert.Throws<JsonException>(act);
+        var exception = Assert.Throws<JsonException>(Act);
         Assert.Contains("activity", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -74,10 +74,10 @@ public class PomSubmissionRequestJsonTests
         const string json = """{"memberName":"Northwind Batteries Ltd","regulatorNote":"ignore me"}""";
 
         // Act
-        var act = () => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
+        PomSubmissionRequest? Act() => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
 
         // Assert
-        var exception = Assert.Throws<JsonException>(act);
+        var exception = Assert.Throws<JsonException>(Act);
         Assert.Contains("regulatorNote", exception.Message);
     }
 
@@ -131,7 +131,7 @@ public class PomSubmissionRequestJsonTests
     }
 
     [Fact]
-    public void Deserialize_WhenBatteryCategoryIsOmitted_DefaultsItToPortable()
+    public void Deserialize_WhenBatteryCategoryIsOmitted_LeavesItUnset()
     {
         // Arrange
         const string json = """
@@ -150,8 +150,10 @@ public class PomSubmissionRequestJsonTests
 
         // Assert
         Assert.NotNull(request);
-        Assert.Equal("Portable", request.TonnageEntries[0].Classification.BatteryCategory);
         Assert.Equal("Alkaline", request.TonnageEntries[0].Classification.Chemistry);
+        Assert.Equal(
+            """{"chemistry":"Alkaline"}""",
+            JsonSerializer.Serialize(request.TonnageEntries[0].Classification, JsonSerializerOptions.Web));
     }
 
     [Theory]
@@ -173,10 +175,10 @@ public class PomSubmissionRequestJsonTests
             """;
 
         // Act
-        var act = () => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
+        PomSubmissionRequest? Act() => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
 
         // Assert
-        var exception = Assert.Throws<JsonException>(act);
+        var exception = Assert.Throws<JsonException>(Act);
         Assert.Contains("batteryCategory", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -199,10 +201,10 @@ public class PomSubmissionRequestJsonTests
             """;
 
         // Act
-        var act = () => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
+        PomSubmissionRequest? Act() => JsonSerializer.Deserialize<PomSubmissionRequest>(json, JsonSerializerOptions.Web);
 
         // Assert
-        var exception = Assert.Throws<JsonException>(act);
+        var exception = Assert.Throws<JsonException>(Act);
         Assert.Contains(property, exception.Message, StringComparison.Ordinal);
     }
 
@@ -216,6 +218,6 @@ public class PomSubmissionRequestJsonTests
         var json = JsonSerializer.Serialize(classification, JsonSerializerOptions.Web);
 
         // Assert
-        Assert.Equal("""{"batteryCategory":"Portable","chemistry":"Alkaline"}""", json);
+        Assert.Equal("""{"batteryCategory":"","chemistry":"Alkaline"}""", json);
     }
 }

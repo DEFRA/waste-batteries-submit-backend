@@ -1,13 +1,13 @@
 using Microsoft.AspNetCore.ResponseCompression;
 using System.IO.Compression;
-using WasteBatteriesSubmitBackend.PomSubmission.Endpoints;
 
-namespace WasteBatteriesSubmitBackend.PomSubmission;
+namespace WasteBatteriesSubmitBackend.Utils.Http;
 
-// Gzip for the POM submission list. A single submission is plain JSON. The list is the response that can reach the CDP payload limit.
-public static class PomSubmissionResponseCompression
+// Gzip for a collection GET. A document under the same prefix is plain JSON.
+// The list is the response that can reach the CDP payload limit.
+public static class GzipResponseCompression
 {
-    public static IServiceCollection AddPomSubmissionResponseCompression(this IServiceCollection services)
+    public static IServiceCollection AddGzipResponseCompression(this IServiceCollection services)
     {
         services.AddResponseCompression(options =>
         {
@@ -25,16 +25,18 @@ public static class PomSubmissionResponseCompression
         return services;
     }
 
-    public static void UsePomSubmissionResponseCompression(this WebApplication app)
+    // routePrefix is the collection path. The document route is {routePrefix}/{id}, and that stays plain.
+    // Routing also sends {routePrefix}/ to the list, which takes the gzip page size, so that path is compressed too.
+    public static void UseGzipResponseCompression(this WebApplication app, string routePrefix)
     {
-        app.UseWhen(IsPomSubmissionList, branch => branch.UseResponseCompression());
+        app.UseWhen(
+            context => IsCollectionGet(context, routePrefix),
+            branch => branch.UseResponseCompression());
     }
 
-    // The document route is /pom-submissions/{id}. Only the collection path is compressed.
-    // Routing also sends /pom-submissions/ to the list, which takes the gzip page size, so it must be compressed too.
-    private static bool IsPomSubmissionList(HttpContext context) =>
+    private static bool IsCollectionGet(HttpContext context, string routePrefix) =>
         HttpMethods.IsGet(context.Request.Method)
-        && context.Request.Path.StartsWithSegments(PomSubmissionEndpoints.RoutePrefix, out var remaining)
+        && context.Request.Path.StartsWithSegments(routePrefix, out var remaining)
         && (!remaining.HasValue || remaining == "/");
 
     // The list page limit uses this same decision. gzip;q=0 refuses gzip. * accepts it.

@@ -28,7 +28,10 @@ public sealed class PomSubmissionMapper(IOptions<PomSubmissionConfig> options) :
     {
         var defaults = options.Value;
         var tonnageEntries = (request.TonnageEntries ?? []).ConvertAll(
-            tonnageEntry => tonnageEntry.ToStoredEntry(ObjectId.GenerateNewId().ToString(), defaults.InitialActivity));
+            tonnageEntry => tonnageEntry.ToStoredEntry(
+                ObjectId.GenerateNewId().ToString(),
+                defaults.InitialActivity,
+                defaults.InitialBatteryCategory));
 
         return new PomSubmissionModel(
             request,
