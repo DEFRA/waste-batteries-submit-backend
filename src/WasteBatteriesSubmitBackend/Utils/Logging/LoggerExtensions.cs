@@ -49,6 +49,16 @@ internal static partial class LoggerExtensions
         string memberOrgId);
 
     [LoggerMessage(
+        EventId = 6,
+        Level = LogLevel.Information,
+        Message = "Upserted batch of {SubmissionCount} POM submissions ({CreatedCount} created, {AmendedCount} amended)")]
+    public static partial void UpsertedPomSubmissionBatch(
+        this ILogger logger,
+        int submissionCount,
+        int createdCount,
+        int amendedCount);
+
+    [LoggerMessage(
         EventId = 1000,
         Level = LogLevel.Information,
         Message = "Searching for {Name}, found {Result}")]

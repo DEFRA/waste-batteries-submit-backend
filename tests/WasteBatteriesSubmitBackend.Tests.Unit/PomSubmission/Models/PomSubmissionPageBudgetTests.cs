@@ -18,6 +18,9 @@ public class PomSubmissionPageBudgetTests
     private const int ExtraStandardResponses = 50;
     private const int ExtraGzipResponses = 1000;
 
+    // 1,526 maximum requests fit in 10 MiB. 1,500 leaves the same kind of headroom as the list page.
+    private const int RoundedBatchSize = 1500;
+
     //Assume that it is 10MB as the limit for the payloads
     private const int CdpPayloadLimitBytes = 10 * 1024 * 1024;
 
@@ -87,6 +90,33 @@ public class PomSubmissionPageBudgetTests
         Assert.True(
             gzipBytes >= CdpPayloadLimitBytes,
             $"Gzip of {overLimitCount} submissions is {gzipBytes} bytes, which is under the {CdpPayloadLimitBytes} byte limit. Raise MaxGzipPageSize.");
+    }
+
+    [Fact]
+    public void UpsertBatchRequestLimit_StaysUnderTheUncompressedCdpPayloadLimit()
+    {
+        // Act
+        var bytes = MeasuredPomSubmission.BatchRequestBytes(RoundedBatchSize);
+
+        // Assert
+        Assert.True(
+            bytes < CdpPayloadLimitBytes,
+            $"A batch of {RoundedBatchSize} submissions is {bytes} bytes, which is over the {CdpPayloadLimitBytes} byte limit. Lower the frontend batch limit.");
+    }
+
+    [Fact]
+    public void UpsertBatchRequestLimit_PlusExtraSubmissions_ExceedsTheUncompressedCdpPayloadLimit()
+    {
+        // Arrange
+        var overLimitCount = RoundedBatchSize + ExtraStandardResponses;
+
+        // Act
+        var bytes = MeasuredPomSubmission.BatchRequestBytes(overLimitCount);
+
+        // Assert
+        Assert.True(
+            bytes >= CdpPayloadLimitBytes,
+            $"A batch of {overLimitCount} submissions is {bytes} bytes, which is under the {CdpPayloadLimitBytes} byte limit. Raise the frontend batch limit.");
     }
 
     private static PomSubmissionModel[] MeasuredPage(int count) =>

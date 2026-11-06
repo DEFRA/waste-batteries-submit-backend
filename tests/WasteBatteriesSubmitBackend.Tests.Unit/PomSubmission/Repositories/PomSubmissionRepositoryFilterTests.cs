@@ -183,6 +183,83 @@ public class PomSubmissionRepositoryFilterTests
         Assert.Equal("filter", exception.ParamName);
     }
 
+    [Fact]
+    public void FilterCurrent_WhenOneKeyIsSet_MatchesThatCurrentRow()
+    {
+        // Arrange
+        var keys = new[] { SampleKey() };
+
+        // Act
+        var filter = PomSubmissionRepository.FilterCurrent(keys);
+
+        // Assert
+        Assert.Equal(CurrentClause(SampleKey()), Render(filter));
+    }
+
+    [Fact]
+    public void FilterCurrent_WhenSeveralKeysAreSet_MatchesAnyOfThoseCurrentRows()
+    {
+        // Arrange
+        var first = SampleKey();
+        var second = SampleKey() with { MemberOrgId = OtherMemberOrgId, CompliancePeriodQuarter = "Quarter 1" };
+
+        // Act
+        var filter = PomSubmissionRepository.FilterCurrent([first, second]);
+
+        // Assert
+        Assert.Equal(
+            "{ \"isCurrent\" : true, \"$or\" : ["
+            + CurrentMatch(first)
+            + ", "
+            + CurrentMatch(second)
+            + "] }",
+            Render(filter));
+    }
+
+    [Fact]
+    public void FilterCurrent_WhenNoKeyIsSupplied_Throws()
+    {
+        // Act
+        FilterDefinition<PomSubmissionModel> Act() => PomSubmissionRepository.FilterCurrent([]);
+
+        // Assert
+        var exception = Assert.Throws<ArgumentException>(Act);
+        Assert.Equal("keys", exception.ParamName);
+    }
+
+    [Fact]
+    public void FilterCurrent_WhenKeysAreNull_Throws()
+    {
+        // Act
+        FilterDefinition<PomSubmissionModel> Act() => PomSubmissionRepository.FilterCurrent(null!);
+
+        // Assert
+        var exception = Assert.Throws<ArgumentNullException>(Act);
+        Assert.Equal("keys", exception.ParamName);
+    }
+
+    private static PomSubmissionKey SampleKey() =>
+        new(
+            SamplePomSubmission.SchemeOrgId,
+            SamplePomSubmission.MemberOrgId,
+            SamplePomSubmission.CompliancePeriodYear,
+            SamplePomSubmission.CompliancePeriodQuarter);
+
+    private static string CurrentClause(PomSubmissionKey key) =>
+        "{ \"isCurrent\" : true, \"$or\" : [" + CurrentMatch(key) + "] }";
+
+    private static string CurrentMatch(PomSubmissionKey key) =>
+        "{ "
+        + "\"schemeOrgId\" : { \"$oid\" : \""
+        + key.SchemeOrgId
+        + "\" }, \"memberOrgId\" : { \"$oid\" : \""
+        + key.MemberOrgId
+        + "\" }, \"compliancePeriodYear\" : "
+        + key.CompliancePeriodYear
+        + ", \"compliancePeriodQuarter\" : \""
+        + key.CompliancePeriodQuarter
+        + "\" }";
+
     private static string IdClause(string id) =>
         $$"""{ "_id" : { "$oid" : "{{id}}" } }""";
 
