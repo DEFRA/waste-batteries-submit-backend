@@ -11,6 +11,7 @@ using System.Text.Json;
 using WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
+using WasteBatteriesSubmitBackend.PomSubmission.Services;
 using WasteBatteriesSubmitBackend.Tests.Common;
 using WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 using WasteBatteriesSubmitBackend.Utils.Mongo;
@@ -259,6 +260,8 @@ public partial class PomSubmissionEndpointsTests
         var memberOrgId = ObjectId.GenerateNewId().ToString();
         using var client = fixture.CreateClient();
         var body = BatchBody(Padded(BodyForMember(memberOrgId)));
+        const string batchLog = "Upserted batch of 1 POM submissions (1 created, 0 amended)";
+        var batchLogsBefore = BatchLogCount(batchLog);
 
         // Act
         var response = await client.PostAsync("/pom-submissions/upsert-batch", Json(body), cancellationToken);
@@ -283,9 +286,7 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal(BsonNull.Value, stored["supersedesSubmissionId"]);
         Assert.Equal(PomSubmissionApiFixture.CreatedAt, stored["createdAtUtc"].ToUniversalTime());
 
-        var log = Assert.Single(
-            fixture.Logger.Entries,
-            entry => entry.Message == "Upserted batch of 1 POM submissions (1 created, 0 amended)");
+        var log = AssertOneNewBatchLog(batchLog, batchLogsBefore);
         Assert.Equal(LogLevel.Information, log.Level);
         Assert.Equal(6, log.EventId.Id);
         Snapshot.Match(PinCreated(stored));
@@ -302,6 +303,8 @@ public partial class PomSubmissionEndpointsTests
         var body = BatchBody(
             BodyForMember(firstMemberOrgId),
             BodyForMember(secondMemberOrgId, "3.000"));
+        const string batchLog = "Upserted batch of 2 POM submissions (2 created, 0 amended)";
+        var batchLogsBefore = BatchLogCount(batchLog);
 
         // Act
         var response = await client.PostAsync("/pom-submissions/upsert-batch", Json(body), cancellationToken);
@@ -325,11 +328,7 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal(fixture.Defaults.InitialVersion, secondStored["version"].AsInt32);
         Assert.True(firstStored["isCurrent"].AsBoolean);
         Assert.True(secondStored["isCurrent"].AsBoolean);
-        Assert.Equal(
-            "Upserted batch of 2 POM submissions (2 created, 0 amended)",
-            Assert.Single(
-                fixture.Logger.Entries,
-                entry => entry.Message == "Upserted batch of 2 POM submissions (2 created, 0 amended)").Message);
+        Assert.Equal(batchLog, AssertOneNewBatchLog(batchLog, batchLogsBefore).Message);
     }
 
     [Fact]
@@ -346,6 +345,8 @@ public partial class PomSubmissionEndpointsTests
             SamplePomSubmission.CompliancePeriodYear,
             SamplePomSubmission.CompliancePeriodQuarter,
             cancellationToken);
+        const string batchLog = "Upserted batch of 1 POM submissions (0 created, 1 amended)";
+        var batchLogsBefore = BatchLogCount(batchLog);
 
         // Act
         var response = await client.PostAsync(
@@ -379,11 +380,7 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal(HttpStatusCode.OK, currentResponse.StatusCode);
         Assert.Equal(created.Id, currentDocument.RootElement.GetProperty("supersedesSubmissionId").GetString());
         Assert.Equal(fixture.Defaults.InitialVersion + 1, currentDocument.RootElement.GetProperty("version").GetInt32());
-        Assert.Equal(
-            "Upserted batch of 1 POM submissions (0 created, 1 amended)",
-            Assert.Single(
-                fixture.Logger.Entries,
-                entry => entry.Message == "Upserted batch of 1 POM submissions (0 created, 1 amended)").Message);
+        Assert.Equal(batchLog, AssertOneNewBatchLog(batchLog, batchLogsBefore).Message);
     }
 
     [Fact]
@@ -401,6 +398,8 @@ public partial class PomSubmissionEndpointsTests
             SamplePomSubmission.CompliancePeriodYear,
             SamplePomSubmission.CompliancePeriodQuarter,
             cancellationToken);
+        const string batchLog = "Upserted batch of 2 POM submissions (1 created, 1 amended)";
+        var batchLogsBefore = BatchLogCount(batchLog);
 
         // Act
         var response = await client.PostAsync(
@@ -431,11 +430,7 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal(fixture.Defaults.InitialVersion + 1, replacement["version"].AsInt32);
         Assert.Equal("3.000", replacement["tonnageEntries"][0]["tonnes"].AsDecimal128.ToString());
         Assert.Equal(other["createdAtUtc"].ToUniversalTime(), replacement["createdAtUtc"].ToUniversalTime());
-        Assert.Equal(
-            "Upserted batch of 2 POM submissions (1 created, 1 amended)",
-            Assert.Single(
-                fixture.Logger.Entries,
-                entry => entry.Message == "Upserted batch of 2 POM submissions (1 created, 1 amended)").Message);
+        Assert.Equal(batchLog, AssertOneNewBatchLog(batchLog, batchLogsBefore).Message);
     }
 
     [Fact]
@@ -641,6 +636,18 @@ public partial class PomSubmissionEndpointsTests
             await fixture.Submissions.DeleteManyAsync(MemberFilter(memberOrgId), cancellationToken);
             await fixture.Submissions.DeleteManyAsync(MemberFilter(otherMemberOrgId), cancellationToken);
         }
+    }
+
+    // The fixture logger is shared by every test in this class. Another test can already
+    // have written the same batch summary, so count matches from this call only.
+    private int BatchLogCount(string message) =>
+        fixture.Logger.Entries.Count(entry => entry.Message == message);
+
+    private CapturingLogger<PomSubmissionService>.LogEntry AssertOneNewBatchLog(string message, int countBefore)
+    {
+        var matches = fixture.Logger.Entries.Where(entry => entry.Message == message).ToList();
+        Assert.Equal(countBefore + 1, matches.Count);
+        return matches[^1];
     }
 
     private static string BatchBody(params string[] submissions) =>
