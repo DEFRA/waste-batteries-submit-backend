@@ -20,7 +20,7 @@ public class PomSubmissionIndexesTests
         var args = RenderArgs();
 
         // Assert
-        Assert.Equal(6, indexes.Count);
+        Assert.Equal(7, indexes.Count);
 
         var current = indexes[0];
         Assert.True(current.Options.Unique);
@@ -29,32 +29,42 @@ public class PomSubmissionIndexesTests
             current.Keys.Render(args).ToString());
         Assert.Equal("{ \"isCurrent\" : true }", PartialFilter(current).Render(args).ToString());
 
+        var version = indexes[1];
+        Assert.True(version.Options.Unique);
+        Assert.Equal(
+            "{ \"schemeOrgId\" : 1, \"memberOrgId\" : 1, \"compliancePeriodYear\" : 1, \"compliancePeriodQuarter\" : 1, \"version\" : 1 }",
+            version.Keys.Render(args).ToString());
+        Assert.Null(IndexOptions(version).PartialFilterExpression);
+
         Assert.Equal(
             "{ \"schemeOrgId\" : 1, \"compliancePeriodYear\" : 1, \"compliancePeriodQuarter\" : 1 }",
-            indexes[1].Keys.Render(args).ToString());
-        Assert.NotEqual(true, indexes[1].Options?.Unique);
+            indexes[2].Keys.Render(args).ToString());
+        Assert.NotEqual(true, indexes[2].Options?.Unique);
 
         Assert.Equal(
             "{ \"memberOrgId\" : 1, \"compliancePeriodYear\" : 1 }",
-            indexes[2].Keys.Render(args).ToString());
-        Assert.Equal("{ \"isCurrent\" : true }", PartialFilter(indexes[2]).Render(args).ToString());
+            indexes[3].Keys.Render(args).ToString());
+        Assert.Equal("{ \"isCurrent\" : true }", PartialFilter(indexes[3]).Render(args).ToString());
 
-        Assert.Equal("{ \"memberBprn\" : 1 }", indexes[3].Keys.Render(args).ToString());
+        Assert.Equal("{ \"memberBprn\" : 1 }", indexes[4].Keys.Render(args).ToString());
 
         Assert.Equal(
             "{ \"tonnageEntries.classification.chemistry\" : 1, \"tonnageEntries.classification.batteryCategory\" : 1 }",
-            indexes[4].Keys.Render(args).ToString());
+            indexes[5].Keys.Render(args).ToString());
 
-        Assert.Equal("{ \"supersedesSubmissionId\" : 1 }", indexes[5].Keys.Render(args).ToString());
-        Assert.True(indexes[5].Options.Sparse);
+        Assert.Equal("{ \"supersedesSubmissionId\" : 1 }", indexes[6].Keys.Render(args).ToString());
+        Assert.True(indexes[6].Options.Sparse);
     }
 
     private static FilterDefinition<PomSubmissionModel> PartialFilter(CreateIndexModel<PomSubmissionModel> index)
     {
-        var options = Assert.IsType<CreateIndexOptions<PomSubmissionModel>>(index.Options);
+        var options = IndexOptions(index);
         Assert.NotNull(options.PartialFilterExpression);
         return options.PartialFilterExpression;
     }
+
+    private static CreateIndexOptions<PomSubmissionModel> IndexOptions(CreateIndexModel<PomSubmissionModel> index) =>
+        Assert.IsType<CreateIndexOptions<PomSubmissionModel>>(index.Options);
 
     private static RenderArgs<PomSubmissionModel> RenderArgs()
     {

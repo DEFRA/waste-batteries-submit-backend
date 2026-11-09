@@ -353,4 +353,55 @@ public partial class PomSubmissionEndpointsTests
                 cancellationToken);
         }
     }
+
+    [Fact]
+    public async Task Create_WhenTheSameVersionAlreadyExistsAndIsNotCurrent_ThrowsDuplicateKeyOnSaveException()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        const string memberOrgId = "674a1b2c3d4e5f6789012501";
+        var repository = fixture.Services.GetRequiredService<IPomSubmissionRepository>();
+        var mapper = fixture.Services.GetRequiredService<IPomSubmissionMapper>();
+        var request = SamplePomSubmission.Request() with { MemberOrgId = memberOrgId };
+        var first = mapper.ToNewSubmission(request, PomSubmissionApiFixture.CreatedAt);
+
+        try
+        {
+            await repository.CreateAsync(first, cancellationToken);
+            var nextVersion = mapper.ToNewSubmission(
+                request,
+                PomSubmissionApiFixture.CreatedAt,
+                version: fixture.Defaults.InitialVersion + 1);
+
+            // Act
+            await ClearCurrent(first.Id, cancellationToken);
+            await repository.CreateAsync(nextVersion, cancellationToken);
+            await ClearCurrent(nextVersion.Id, cancellationToken);
+            var repeatedVersion = mapper.ToNewSubmission(request, PomSubmissionApiFixture.CreatedAt);
+            Task Act() => repository.CreateAsync(repeatedVersion, cancellationToken);
+
+            // Assert
+            await Assert.ThrowsAsync<DuplicateKeyOnSaveException>(Act);
+            Assert.Equal(
+                2,
+                await fixture.Submissions.CountDocumentsAsync(
+                    Builders<BsonDocument>.Filter.Eq("memberOrgId", ObjectId.Parse(memberOrgId)),
+                    cancellationToken: cancellationToken));
+        }
+        finally
+        {
+            await fixture.Submissions.DeleteManyAsync(
+                Builders<BsonDocument>.Filter.Eq("memberOrgId", ObjectId.Parse(memberOrgId)),
+                cancellationToken);
+        }
+    }
+
+    private async Task ClearCurrent(string id, CancellationToken cancellationToken)
+    {
+        var cleared = await fixture.Submissions.UpdateOneAsync(
+            Builders<BsonDocument>.Filter.Eq("_id", ObjectId.Parse(id)),
+            Builders<BsonDocument>.Update.Set("isCurrent", false),
+            cancellationToken: cancellationToken);
+        Assert.Equal(1, cleared.ModifiedCount);
+    }
 }

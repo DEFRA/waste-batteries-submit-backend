@@ -80,9 +80,9 @@ Each tonnage entry also stores:
 - `activity` (from `PomSubmission:InitialActivity`, default Placed)
 - `batteryCategory` (from `PomSubmission:InitialBatteryCategory`, default Portable; not accepted on the request) 
 
-The unique index for a submission in the database is `schemeOrgId`, `memberOrgId`, `compliancePeriodYear` and `compliancePeriodQuarter`, partial on `isCurrent: true`. A submission with `isCurrent` false can share that key. 
+Two unique indexes cover a submission. The current-row index is `schemeOrgId`, `memberOrgId`, `compliancePeriodYear` and `compliancePeriodQuarter`, partial on `isCurrent: true`, so one current submission can use that key. The version index is those fields plus `version`, so each version of that key is stored once, including submissions that are no longer current.
 
-The other indexes are not unique: scheme plus year plus quarter, member plus year where `isCurrent` is true, `memberBprn`, chemistry plus battery category on the entries, and a sparse index on `supersedesSubmissionId`.
+The other indexes are scheme plus year plus quarter, member plus year where `isCurrent` is true, `memberBprn`, chemistry plus battery category on the entries, and a sparse index on `supersedesSubmissionId`.
 
 
 ### Docker Compose
