@@ -13,10 +13,10 @@ namespace WasteBatteriesSubmitBackend.PomSubmission.Services;
 // A batch of submissions. Each item is created or amended. The whole batch commits or rolls back together.
 public partial class PomSubmissionService
 {
-    // Saves many submissions. A key with no current row is created. A key that has one is amended.
-    // Field rules are the single-submission rules. Every item is checked, and each error names that item's position.
-    // The response is one short result per item, in request order. It carries the new id, the key,
-    // the request index, and whether that item was created or amended.
+    // Saves many submissions. A submission witn no existing matching key (scheme id, member id, year & quarter) is created, else amended.
+    // Every item is checked, and each error names that item's position.
+    // The response is one short result per item, in request order - returning the full objects would cause payload limit issues.
+    // Each response item includes the new id, the key, the request index, and whether that item was created or amended.
     // Current rows are read in one query. Ids and the timestamp are allocated before the transaction.
     // The callback can run more than once.
     public async Task<IReadOnlyList<PomSubmissionUpsertResult>> UpsertBatchAsync(
@@ -190,7 +190,7 @@ public partial class PomSubmissionService
         }
     }
 
-    // The unique index allows one current submission for a key, so every current row is cleared
+    // The unique index allows one isCurrent submission for a key, so every current row is set to false
     // before any replacement or new submission is inserted. Both writes use the caller's transaction.
     // One update covers every amendment. One insert covers the creates and the amendments.
     private async Task WriteBatchAsync(

@@ -8,6 +8,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
@@ -253,184 +254,84 @@ public partial class PomSubmissionEndpointsTests
     }
 
     [Fact]
-    public async Task UpsertBatch_WhenSubmissionIsValid_SavesItAndLogsIt()
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var memberOrgId = ObjectId.GenerateNewId().ToString();
-        using var client = fixture.CreateClient();
-        var body = BatchBody(Padded(BodyForMember(memberOrgId)));
-        const string batchLog = "Upserted batch of 1 POM submissions (1 created, 0 amended)";
-        var batchLogsBefore = BatchLogCount(batchLog);
-
-        // Act
-        var response = await client.PostAsync("/pom-submissions/upsert-batch", Json(body), cancellationToken);
-        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-        var results = ReadResults(responseJson);
-        var ids = ReadIds(results);
-        var storedDocuments = await MemberSubmissions(memberOrgId, cancellationToken);
-
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var saved = Assert.Single(results);
-        var id = Assert.Single(ids);
-        AssertCoreResult(saved, requestIndex: 0, id, memberOrgId, "Created");
-        var stored = Assert.Single(storedDocuments);
-        Assert.Equal(id, stored["_id"].AsObjectId.ToString());
-        Assert.Equal(memberOrgId, stored["memberOrgId"].AsObjectId.ToString());
-        Assert.Equal(SamplePomSubmission.MemberName, stored["memberName"].AsString);
-        Assert.Equal(SamplePomSubmission.Tonnes, stored["tonnageEntries"][0]["tonnes"].AsDecimal128.ToString());
-        Assert.Equal(SamplePomSubmission.CompliancePeriodQuarter, stored["compliancePeriodQuarter"].AsString);
-        Assert.True(stored["isCurrent"].AsBoolean);
-        Assert.Equal(fixture.Defaults.InitialVersion, stored["version"].AsInt32);
-        Assert.Equal(BsonNull.Value, stored["supersedesSubmissionId"]);
-        Assert.Equal(PomSubmissionApiFixture.CreatedAt, stored["createdAtUtc"].ToUniversalTime());
-
-        var log = AssertOneNewBatchLog(batchLog, batchLogsBefore);
-        Assert.Equal(LogLevel.Information, log.Level);
-        Assert.Equal(6, log.EventId.Id);
-        Snapshot.Match(PinCreated(stored));
-    }
-
-    [Fact]
-    public async Task UpsertBatch_WhenNoCurrentRowsExist_CreatesEachAndReturnsIdsInRequestOrder()
+    public async Task UpsertBatch_WhenNoCurrentRowsExist_CreatesEachInRequestOrder()
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
         var firstMemberOrgId = ObjectId.GenerateNewId().ToString();
         var secondMemberOrgId = ObjectId.GenerateNewId().ToString();
         using var client = fixture.CreateClient();
+        // Surrounding spaces are trimmed before save. The stored snapshot shows the trimmed fields.
         var body = BatchBody(
-            BodyForMember(firstMemberOrgId),
+            Padded(BodyForMember(firstMemberOrgId)),
             BodyForMember(secondMemberOrgId, "3.000"));
         const string batchLog = "Upserted batch of 2 POM submissions (2 created, 0 amended)";
         var batchLogsBefore = BatchLogCount(batchLog);
 
         // Act
         var response = await client.PostAsync("/pom-submissions/upsert-batch", Json(body), cancellationToken);
-        var results = ReadResults(await response.Content.ReadAsStringAsync(cancellationToken));
-        var ids = ReadIds(results);
-        var first = await MemberSubmissions(firstMemberOrgId, cancellationToken);
-        var second = await MemberSubmissions(secondMemberOrgId, cancellationToken);
+        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+        var stored = await MembersInVersionOrder(cancellationToken, firstMemberOrgId, secondMemberOrgId);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(2, results.Length);
-        AssertCoreResult(results[0], requestIndex: 0, ids[0], firstMemberOrgId, "Created");
-        AssertCoreResult(results[1], requestIndex: 1, ids[1], secondMemberOrgId, "Created");
-        var firstStored = Assert.Single(first);
-        var secondStored = Assert.Single(second);
-        Assert.Equal(ids[0], firstStored["_id"].AsObjectId.ToString());
-        Assert.Equal(ids[1], secondStored["_id"].AsObjectId.ToString());
-        Assert.Equal(SamplePomSubmission.Tonnes, firstStored["tonnageEntries"][0]["tonnes"].AsDecimal128.ToString());
-        Assert.Equal("3.000", secondStored["tonnageEntries"][0]["tonnes"].AsDecimal128.ToString());
-        Assert.Equal(fixture.Defaults.InitialVersion, firstStored["version"].AsInt32);
-        Assert.Equal(fixture.Defaults.InitialVersion, secondStored["version"].AsInt32);
-        Assert.True(firstStored["isCurrent"].AsBoolean);
-        Assert.True(secondStored["isCurrent"].AsBoolean);
-        Assert.Equal(batchLog, AssertOneNewBatchLog(batchLog, batchLogsBefore).Message);
+        AssertBatchLogged(batchLog, batchLogsBefore);
+        var pins = PinsFor(stored);
+        Snapshot.Match(PinResponse(responseJson, pins), "Response");
+        Snapshot.Match(PinStored(stored, pins), "Stored");
     }
 
     [Fact]
-    public async Task UpsertBatch_WhenCurrentSubmissionExists_ReplacesItAndKeepsThePreviousRow()
+    public async Task UpsertBatch_WhenTheBatchCreatesAndAmends_LeavesOtherHistory()
     {
         // Arrange
+        // Amended Member already has a superseded row and a current row, and this batch amends it again.
+        // Untouched History has the same kind of history and is not posted, so both of its rows stay as they were.
         var cancellationToken = TestContext.Current.CancellationToken;
-        var memberOrgId = ObjectId.GenerateNewId().ToString();
+        var createdMemberOrgId = ObjectId.GenerateNewId().ToString();
+        var amendedMemberOrgId = ObjectId.GenerateNewId().ToString();
+        var untouchedMemberOrgId = ObjectId.GenerateNewId().ToString();
         using var client = fixture.CreateClient();
-        var created = await CreateSubmission(
-            client,
-            PomSubmissionApiFixture.SchemeOrgId,
-            memberOrgId,
-            SamplePomSubmission.CompliancePeriodYear,
-            SamplePomSubmission.CompliancePeriodQuarter,
-            cancellationToken);
-        const string batchLog = "Upserted batch of 1 POM submissions (0 created, 1 amended)";
-        var batchLogsBefore = BatchLogCount(batchLog);
+        await CreateNamed(client, amendedMemberOrgId, "Amended Member Ltd", cancellationToken);
+        using (var amendedEarlier = await client.PatchAsync(
+            "/pom-submissions",
+            Json(NamedBody(amendedMemberOrgId, "Amended Member Ltd", "2.000")),
+            cancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.OK, amendedEarlier.StatusCode);
+        }
 
-        // Act
-        var response = await client.PostAsync(
-            "/pom-submissions/upsert-batch",
-            Json(BatchBody(BodyForMember(memberOrgId, "3.000"))),
-            cancellationToken);
-        var results = ReadResults(await response.Content.ReadAsStringAsync(cancellationToken));
-        var ids = ReadIds(results);
-        var stored = await MemberSubmissions(memberOrgId, cancellationToken);
-        var currentResponse = await client.GetAsync($"/pom-submissions/{ids.Single()}", cancellationToken);
-        using var currentDocument = JsonDocument.Parse(await currentResponse.Content.ReadAsStringAsync(cancellationToken));
+        await CreateNamed(client, untouchedMemberOrgId, "Untouched History Ltd", cancellationToken);
+        using (var untouchedEarlier = await client.PatchAsync(
+            "/pom-submissions",
+            Json(NamedBody(untouchedMemberOrgId, "Untouched History Ltd", "5.000")),
+            cancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.OK, untouchedEarlier.StatusCode);
+        }
 
-        // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var amendedResult = Assert.Single(results);
-        var amendedId = Assert.Single(ids);
-        AssertCoreResult(amendedResult, requestIndex: 0, amendedId, memberOrgId, "Amended");
-        Assert.NotEqual(created.Id, amendedId);
-        Assert.Equal(2, stored.Count);
-        var previous = Assert.Single(stored, document => document["_id"].AsObjectId.ToString() == created.Id);
-        var replacement = Assert.Single(stored, document => document["_id"].AsObjectId.ToString() == amendedId);
-        Assert.False(previous["isCurrent"].AsBoolean);
-        Assert.Equal(PomSubmissionApiFixture.CreatedAt, previous["updatedAtUtc"].ToUniversalTime());
-        Assert.Equal(fixture.Defaults.InitialVersion, previous["version"].AsInt32);
-        Assert.Equal(SamplePomSubmission.Tonnes, previous["tonnageEntries"][0]["tonnes"].AsDecimal128.ToString());
-        Assert.True(replacement["isCurrent"].AsBoolean);
-        Assert.Equal(BsonNull.Value, replacement["updatedAtUtc"]);
-        Assert.Equal(created.Id, replacement["supersedesSubmissionId"].AsObjectId.ToString());
-        Assert.Equal(fixture.Defaults.InitialVersion + 1, replacement["version"].AsInt32);
-        Assert.Equal("3.000", replacement["tonnageEntries"][0]["tonnes"].AsDecimal128.ToString());
-        Assert.Equal(HttpStatusCode.OK, currentResponse.StatusCode);
-        Assert.Equal(created.Id, currentDocument.RootElement.GetProperty("supersedesSubmissionId").GetString());
-        Assert.Equal(fixture.Defaults.InitialVersion + 1, currentDocument.RootElement.GetProperty("version").GetInt32());
-        Assert.Equal(batchLog, AssertOneNewBatchLog(batchLog, batchLogsBefore).Message);
-    }
-
-    [Fact]
-    public async Task UpsertBatch_WhenTheBatchMixesNewAndExisting_CreatesAndAmendsTogether()
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var memberOrgId = ObjectId.GenerateNewId().ToString();
-        var otherMemberOrgId = ObjectId.GenerateNewId().ToString();
-        using var client = fixture.CreateClient();
-        var created = await CreateSubmission(
-            client,
-            PomSubmissionApiFixture.SchemeOrgId,
-            memberOrgId,
-            SamplePomSubmission.CompliancePeriodYear,
-            SamplePomSubmission.CompliancePeriodQuarter,
-            cancellationToken);
+        var body = BatchBody(
+            NamedBody(createdMemberOrgId, "Created Member Ltd", "4.000"),
+            NamedBody(amendedMemberOrgId, "Amended Member Ltd", "3.000"));
         const string batchLog = "Upserted batch of 2 POM submissions (1 created, 1 amended)";
         var batchLogsBefore = BatchLogCount(batchLog);
 
         // Act
-        var response = await client.PostAsync(
-            "/pom-submissions/upsert-batch",
-            Json(BatchBody(BodyForMember(otherMemberOrgId, "4.000"), BodyForMember(memberOrgId, "3.000"))),
-            cancellationToken);
-        var results = ReadResults(await response.Content.ReadAsStringAsync(cancellationToken));
-        var ids = ReadIds(results);
-        var amended = await MemberSubmissions(memberOrgId, cancellationToken);
-        var createdNow = await MemberSubmissions(otherMemberOrgId, cancellationToken);
+        var response = await client.PostAsync("/pom-submissions/upsert-batch", Json(body), cancellationToken);
+        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+        // Created row, then the amended chain oldest first, then the member this batch did not post.
+        var stored = await MembersInVersionOrder(
+            cancellationToken,
+            createdMemberOrgId,
+            amendedMemberOrgId,
+            untouchedMemberOrgId);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(2, results.Length);
-        AssertCoreResult(results[0], requestIndex: 0, ids[0], otherMemberOrgId, "Created");
-        AssertCoreResult(results[1], requestIndex: 1, ids[1], memberOrgId, "Amended");
-        var other = Assert.Single(createdNow);
-        Assert.Equal(ids[0], other["_id"].AsObjectId.ToString());
-        Assert.Equal(fixture.Defaults.InitialVersion, other["version"].AsInt32);
-        Assert.Equal(BsonNull.Value, other["supersedesSubmissionId"]);
-        Assert.Equal("4.000", other["tonnageEntries"][0]["tonnes"].AsDecimal128.ToString());
-        Assert.True(other["isCurrent"].AsBoolean);
-        var replacement = Assert.Single(amended, document => document["_id"].AsObjectId.ToString() == ids[1]);
-        var previous = Assert.Single(amended, document => document["_id"].AsObjectId.ToString() == created.Id);
-        Assert.False(previous["isCurrent"].AsBoolean);
-        Assert.True(replacement["isCurrent"].AsBoolean);
-        Assert.Equal(created.Id, replacement["supersedesSubmissionId"].AsObjectId.ToString());
-        Assert.Equal(fixture.Defaults.InitialVersion + 1, replacement["version"].AsInt32);
-        Assert.Equal("3.000", replacement["tonnageEntries"][0]["tonnes"].AsDecimal128.ToString());
-        Assert.Equal(other["createdAtUtc"].ToUniversalTime(), replacement["createdAtUtc"].ToUniversalTime());
-        Assert.Equal(batchLog, AssertOneNewBatchLog(batchLog, batchLogsBefore).Message);
+        AssertBatchLogged(batchLog, batchLogsBefore);
+        var pins = PinsFor(stored);
+        Snapshot.Match(PinResponse(responseJson, pins), "Response");
+        Snapshot.Match(PinStored(stored, pins), "Stored");
     }
 
     [Fact]
@@ -650,6 +551,13 @@ public partial class PomSubmissionEndpointsTests
         return matches[^1];
     }
 
+    private void AssertBatchLogged(string message, int countBefore)
+    {
+        var log = AssertOneNewBatchLog(message, countBefore);
+        Assert.Equal(LogLevel.Information, log.Level);
+        Assert.Equal(6, log.EventId.Id);
+    }
+
     private static string BatchBody(params string[] submissions) =>
         "[" + string.Join(",", submissions) + "]";
 
@@ -708,17 +616,112 @@ public partial class PomSubmissionEndpointsTests
             SamplePomSubmission.CompliancePeriodYear,
             SamplePomSubmission.CompliancePeriodQuarter);
 
-    private static string PinCreated(BsonDocument stored)
+    private static async Task CreateNamed(
+        HttpClient client,
+        string memberOrgId,
+        string memberName,
+        CancellationToken cancellationToken)
     {
-        var snapshot = stored.DeepClone().AsBsonDocument;
-        snapshot["_id"] = ObjectId.Parse("000000000000000000000001");
-        snapshot["memberOrgId"] = ObjectId.Parse(PomSubmissionApiFixture.MemberOrgId);
-        snapshot["tonnageEntries"][0].AsBsonDocument["id"] = ObjectId.Parse("000000000000000000000002");
-        return snapshot.ToJson(new JsonWriterSettings
+        using var response = await client.PostAsync(
+            "/pom-submissions",
+            Json(NamedBody(memberOrgId, memberName)),
+            cancellationToken);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    private static string NamedBody(string memberOrgId, string memberName, string? tonnes = null) =>
+        BodyForMember(memberOrgId, tonnes).Replace(
+            $"\"memberName\": \"{SamplePomSubmission.MemberName}\"",
+            $"\"memberName\": \"{memberName}\"",
+            StringComparison.Ordinal);
+
+    private async Task<List<BsonDocument>> MembersInVersionOrder(
+        CancellationToken cancellationToken,
+        params string[] memberOrgIds)
+    {
+        var documents = new List<BsonDocument>();
+        foreach (var memberOrgId in memberOrgIds)
+        {
+            var rows = await MemberSubmissions(memberOrgId, cancellationToken);
+            documents.AddRange(rows.OrderBy(document => document["version"].AsInt32));
+        }
+
+        return documents;
+    }
+
+    // Generated ids change every run. The same pin is used in the response and the stored
+    // document, and supersedesSubmissionId is rewritten to the pinned id of the row it replaced.
+    private static BatchPins PinsFor(IReadOnlyList<BsonDocument> stored)
+    {
+        var submissionIds = new Dictionary<string, string>(StringComparer.Ordinal);
+        var memberIds = new Dictionary<string, string>(StringComparer.Ordinal);
+        var nextSubmission = 1;
+        var nextMember = 0x101;
+        foreach (var document in stored)
+        {
+            var id = document["_id"].AsObjectId.ToString();
+            if (!submissionIds.ContainsKey(id))
+            {
+                submissionIds[id] = PinHex(nextSubmission++);
+            }
+
+            var memberOrgId = document["memberOrgId"].AsObjectId.ToString();
+            if (!memberIds.ContainsKey(memberOrgId))
+            {
+                memberIds[memberOrgId] = PinHex(nextMember++);
+            }
+        }
+
+        return new BatchPins(submissionIds, memberIds);
+    }
+
+    private static string PinResponse(string json, BatchPins pins)
+    {
+        var results = JsonNode.Parse(json)!.AsArray();
+        foreach (var result in results)
+        {
+            var item = result!.AsObject();
+            item["id"] = pins.SubmissionIds[item["id"]!.GetValue<string>()];
+            item["memberOrgId"] = pins.MemberIds[item["memberOrgId"]!.GetValue<string>()];
+        }
+
+        return results.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    private static string PinStored(IReadOnlyList<BsonDocument> stored, BatchPins pins)
+    {
+        var pinned = new BsonArray();
+        var tonnageId = 0x201;
+        foreach (var document in stored)
+        {
+            var copy = document.DeepClone().AsBsonDocument;
+            copy["_id"] = ObjectId.Parse(pins.SubmissionIds[copy["_id"].AsObjectId.ToString()]);
+            copy["memberOrgId"] = ObjectId.Parse(pins.MemberIds[copy["memberOrgId"].AsObjectId.ToString()]);
+            if (copy["supersedesSubmissionId"].BsonType == BsonType.ObjectId)
+            {
+                copy["supersedesSubmissionId"] = ObjectId.Parse(
+                    pins.SubmissionIds[copy["supersedesSubmissionId"].AsObjectId.ToString()]);
+            }
+
+            foreach (var entry in copy["tonnageEntries"].AsBsonArray)
+            {
+                entry.AsBsonDocument["id"] = ObjectId.Parse(PinHex(tonnageId++));
+            }
+
+            pinned.Add(copy);
+        }
+
+        return pinned.ToJson(new JsonWriterSettings
         {
             OutputMode = JsonOutputMode.CanonicalExtendedJson,
             Indent = true,
             NewLineChars = "\n"
         });
     }
+
+    private static string PinHex(int value) => value.ToString("x24");
+
+    private sealed record BatchPins(
+        Dictionary<string, string> SubmissionIds,
+        Dictionary<string, string> MemberIds);
 }

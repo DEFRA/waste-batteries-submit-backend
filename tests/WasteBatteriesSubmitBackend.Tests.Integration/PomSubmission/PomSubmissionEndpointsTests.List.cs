@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
 
@@ -97,18 +100,46 @@ public partial class PomSubmissionEndpointsTests
         const string schemeOrgId = "674a1b2c3d4e5f6789012701";
         const string member1 = "674a1b2c3d4e5f6789012711";
         const string member2 = "674a1b2c3d4e5f6789012712";
-        var firstQuarter = await CreateSubmission(client, schemeOrgId, member1, 2024, "Quarter 1", cancellationToken);
-        var secondQuarter = await CreateSubmission(client, schemeOrgId, member1, 2025, "Quarter 2", cancellationToken);
-        var thirdQuarter = await CreateSubmission(client, schemeOrgId, member1, 2026, "Quarter 2", cancellationToken);
-        var fourthQuarter = await CreateSubmission(client, schemeOrgId, member1, 2026, "Quarter 1", cancellationToken);
-        var otherMember = await CreateSubmission(client, schemeOrgId, member2, 2026, "Quarter 2", cancellationToken);
-        var previous = await CreateSubmission(client, schemeOrgId, member2, 2025, "Quarter 2", cancellationToken);
-        await SetCurrent(previous.Id, false, cancellationToken);
+        const string memberOne = "Member One";
+        const string memberTwo = "Member Two";
+        var member1Year2024Quarter1 = await CreateSubmission(
+            client, schemeOrgId, member1, 2024, "Quarter 1", cancellationToken, memberOne);
+        var member1Year2025Quarter2 = await CreateSubmission(
+            client, schemeOrgId, member1, 2025, "Quarter 2", cancellationToken, memberOne);
+        var member1Year2026Quarter2 = await CreateSubmission(
+            client, schemeOrgId, member1, 2026, "Quarter 2", cancellationToken, memberOne);
+        var member1Year2026Quarter2Version2 = await Amend(
+            client, schemeOrgId, member1, 2026, "Quarter 2", memberOne, "2.000", cancellationToken);
+        var member1Year2026Quarter2Version3 = await Amend(
+            client, schemeOrgId, member1, 2026, "Quarter 2", memberOne, "3.000", cancellationToken);
+        var member1Year2026Quarter1 = await CreateSubmission(
+            client, schemeOrgId, member1, 2026, "Quarter 1", cancellationToken, memberOne);
+        var member2Year2026Quarter2 = await CreateSubmission(
+            client, schemeOrgId, member2, 2026, "Quarter 2", cancellationToken, memberTwo);
+        var member2Year2025Quarter2 = await CreateSubmission(
+            client, schemeOrgId, member2, 2025, "Quarter 2", cancellationToken, memberTwo);
+        await SetCurrent(member2Year2025Quarter2.Id, false, cancellationToken);
+        var submissions = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [member1Year2024Quarter1.Id] = PinHex(1),
+            [member1Year2025Quarter2.Id] = PinHex(2),
+            [member1Year2026Quarter2.Id] = PinHex(3),
+            [member1Year2026Quarter2Version2] = PinHex(4),
+            [member1Year2026Quarter2Version3] = PinHex(5),
+            [member1Year2026Quarter1.Id] = PinHex(6),
+            [member2Year2026Quarter2.Id] = PinHex(7),
+            [member2Year2025Quarter2.Id] = PinHex(8)
+        };
+        var members = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [member1] = PinHex(0x101),
+            [member2] = PinHex(0x102)
+        };
 
         // Act
-        using var current = await ReadPage(client, cancellationToken, ("schemeOrgId", schemeOrgId));
-        using var memberOnly = await ReadPage(client, cancellationToken, ("memberOrgId", member1));
-        using var memberYearAndQuarter = await ReadPage(
+        using var scheme = await ReadPage(client, cancellationToken, ("schemeOrgId", schemeOrgId));
+        using var member = await ReadPage(client, cancellationToken, ("memberOrgId", member1));
+        using var memberYearsAndQuarter = await ReadPage(
             client,
             cancellationToken,
             ("schemeOrgId", schemeOrgId),
@@ -117,45 +148,35 @@ public partial class PomSubmissionEndpointsTests
             ("compliancePeriodYears", "2025"),
             ("compliancePeriodYears", "2026"),
             ("compliancePeriodQuarters", "Quarter 2"));
-        using var eitherQuarter = await ReadPage(
+        using var quarter1Or3 = await ReadPage(
             client,
             cancellationToken,
             ("schemeOrgId", schemeOrgId),
             ("compliancePeriodQuarters", "Quarter 1"),
             ("compliancePeriodQuarters", "Quarter 3"));
-        using var history = await ReadPage(
+        using var notCurrent = await ReadPage(
             client,
             cancellationToken,
             ("schemeOrgId", schemeOrgId),
             ("isCurrent", "false"));
-        using var currentOtherMember = await ReadPage(
+        using var otherMember = await ReadPage(
             client,
             cancellationToken,
             ("schemeOrgId", schemeOrgId),
             ("memberOrgId", member2));
 
         // Assert
-        var maximum = fixture.Defaults.MaxPageSize;
-        AssertPage(
-            current.RootElement,
-            pageNumber: 1,
-            pageSize: maximum,
-            totalPages: 1,
-            totalCount: 5,
-            hasPrevious: false,
-            hasNext: false,
-            thirdQuarter.Id,
-            fourthQuarter.Id,
-            secondQuarter.Id,
-            firstQuarter.Id,
-            otherMember.Id);
-        Assert.Equal(firstQuarter.Json, Item(current.RootElement, firstQuarter.Id).GetRawText());
-        AssertPage(memberOnly.RootElement, 1, maximum, 1, 4, false, false, thirdQuarter.Id, fourthQuarter.Id, secondQuarter.Id, firstQuarter.Id);
-        AssertPage(memberYearAndQuarter.RootElement, 1, maximum, 1, 2, false, false, thirdQuarter.Id, secondQuarter.Id);
-        AssertPage(eitherQuarter.RootElement, 1, maximum, 1, 2, false, false, fourthQuarter.Id, firstQuarter.Id);
-        AssertPage(history.RootElement, 1, maximum, 1, 1, false, false, previous.Id);
-        Assert.False(Item(history.RootElement, previous.Id).GetProperty("isCurrent").GetBoolean());
-        AssertPage(currentOtherMember.RootElement, 1, maximum, 1, 1, false, false, otherMember.Id);
+        // Each list is that query's matches, already in list order: member, then latest year, quarter and version.
+        var snapshot = new JsonObject
+        {
+            ["scheme"] = PinPage(scheme.RootElement, submissions, members),
+            ["member"] = PinPage(member.RootElement, submissions, members),
+            ["memberYearsAndQuarter2"] = PinPage(memberYearsAndQuarter.RootElement, submissions, members),
+            ["quarter1Or3"] = PinPage(quarter1Or3.RootElement, submissions, members),
+            ["notCurrent"] = PinPage(notCurrent.RootElement, submissions, members),
+            ["otherMember"] = PinPage(otherMember.RootElement, submissions, members)
+        };
+        Snapshot.Match(snapshot.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
     }
 
     [Fact]
@@ -207,5 +228,52 @@ public partial class PomSubmissionEndpointsTests
         AssertPage(all.RootElement, 1, fixture.Defaults.MaxPageSize, 1, 3, false, false, first.Id, second.Id, third.Id);
         AssertPage(oversized.RootElement, 1, fixture.Defaults.MaxPageSize, 1, 3, false, false, first.Id, second.Id, third.Id);
         AssertPage(none.RootElement, 1, 2, 0, 0, false, false);
+    }
+
+    private static async Task<string> Amend(
+        HttpClient client,
+        string schemeOrgId,
+        string memberOrgId,
+        int year,
+        string quarter,
+        string memberName,
+        string tonnes,
+        CancellationToken cancellationToken)
+    {
+        using var response = await client.PatchAsync(
+            "/pom-submissions",
+            Json(SubmissionBody(schemeOrgId, memberOrgId, year, quarter, memberName, tonnes)),
+            cancellationToken);
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return ReadId(json);
+    }
+
+    // The page envelope stays out of this snapshot. totalCount and the item order are the filter and the sort.
+    private static JsonObject PinPage(
+        JsonElement page,
+        Dictionary<string, string> submissionIds,
+        Dictionary<string, string> memberIds)
+    {
+        var items = new JsonArray();
+        foreach (var item in page.GetProperty("items").EnumerateArray())
+        {
+            items.Add(new JsonObject
+            {
+                ["id"] = submissionIds[item.GetProperty("id").GetString()!],
+                ["memberOrgId"] = memberIds[item.GetProperty("memberOrgId").GetString()!],
+                ["memberName"] = item.GetProperty("memberName").GetString(),
+                ["compliancePeriodYear"] = item.GetProperty("compliancePeriodYear").GetInt32(),
+                ["compliancePeriodQuarter"] = item.GetProperty("compliancePeriodQuarter").GetString(),
+                ["version"] = item.GetProperty("version").GetInt32(),
+                ["isCurrent"] = item.GetProperty("isCurrent").GetBoolean()
+            });
+        }
+
+        return new JsonObject
+        {
+            ["totalCount"] = page.GetProperty("totalCount").GetInt32(),
+            ["items"] = items
+        };
     }
 }

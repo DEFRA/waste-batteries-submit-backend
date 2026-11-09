@@ -272,7 +272,7 @@ public class PomSubmissionRepository(IMongoDbClientFactory connectionFactory, IL
         return builder.And(filters);
     }
 
-    // One query for these current rows. Each clause is an equality on the unique current-submission index.
+    // One query for these current rows using the keys (scheme id, member id, year & quarter).
     // An empty key list is rejected so this cannot become a collection scan.
     internal static FilterDefinition<PomSubmissionModel> FilterCurrent(IReadOnlyCollection<PomSubmissionKey> keys)
     {

@@ -20,9 +20,7 @@ All requests expect a Defra ID bearer token.
 
 `PATCH /pom-submissions` amends the current submission, using the supplied scheme, member, year and quarter to find it. The amendment inserts a new version and sets the previous submission so it is no longer current. The response is `200 OK` and the new stored submission is the body. Both the new submission and updating the existing submission commit or roll back in one transaction.
 
-`POST /pom-submissions/upsert-batch` creates or amends a batch of submissions. The body is a required JSON array. Each element has the same shape as a single create or amend. A missing body or a JSON null is a bad request. A null element is invalid: it is reported against that position, for example `[1].Submission`, and the other elements are still checked. A submission is created when no current row exists for its scheme, member, year and quarter, and amended when one does. Field validation uses the same rules as a single submission and runs for every element, so one invalid element does not hide the others. The validation problem names the failing element by its position, for example `[0].MemberName` and `[1].Submission`. The array must contain at least one submission. Two elements with the same scheme, member, year and quarter are rejected. Existing current rows are read in one query. Amendments clear those current rows, then every new row is inserted, both inside one transaction, so the batch commits or rolls back together. The response is `200 OK` and the body is a JSON array in the same order as the request. Each element has `requestIndex` (the position in the posted array, the same index a validation error uses), `id` (the submission just saved), `schemeOrgId`, `memberOrgId`, `compliancePeriodYear`, `compliancePeriodQuarter`, and `action` (`Created` or `Amended`). Tonnage and the other stored fields are not returned. An amendment's id is the new version, not the row it replaced.
-
-The batch is one transaction, so it is not paged. A larger upload is several requests, and each request commits or rolls back on its own. Each response element is that short object, not the stored submission. The service does not cap the batch count: a request that reaches the API is processed. The 10 MiB CDP limit is what stops an oversized body before it arrives. Callers should keep a batch of the largest submissions under that limit. See the batch size section below.
+`POST /pom-submissions/upsert-batch` creates or amends a batch of submissions. The body is a required JSON array, with each element has the same shape as a single create or amend. A submission is created when no current row exists for its scheme, member, year and quarter, and amended when one does. The response is `200 OK` and the body is a JSON array in the same order as the request is returned with the `requestIndex`, `id` (the submission just saved), `schemeOrgId`, `memberOrgId`, `compliancePeriodYear`, `compliancePeriodQuarter`, and `action` (`Created` or `Amended`). 
 
 `GET /pom-submissions/{id}` returns the stored submission as `200 OK`. Accepting gzip does not compress this response. The read is by id, so a submission that is no longer current is still returned.
 
@@ -37,7 +35,14 @@ Both numbers were calculated for the current `PomSubmissionModel` shape, using t
 
 #### Batch size when upserting submissions
 
-This is a limit for the callers, not a check in the service. The body is plain JSON. The same measured submission is used, as a request rather than a stored document: 80 tonnage entries and the long member name. One request is 6,870 bytes. 1,526 of them fit in 10 MiB, so callers should send at most 1,500. A batch of 1,550 does not fit and the gateway rejects it before this API sees it. A batch that does arrive is smaller than that measured shape, and each response element is a short object, so the service processes it. If the posted shape changes, the unit tests in `PomSubmissionPageBudgetTests` fail when 1,500 no longer fits, or when 1,550 still fits. Update 1,500 on each frontend that calls the API.
+When consumers of this API call the `upsert-batch` they will need to ensure that they do not pass the payload limit, otherwise the request will never reach this API.
+
+As well as testing the page sizes for the get list response (see above) the unit tests in `PomSubmissionPageBudgetTests` also have the `RoundedBatchSize` - which is the number of requests the consumers can include in their `upsert-batch` request before hitting 10 MiB.  If the model shape subsequently changes, highlighting that we can allow more or less than submissions then this unit test will fail.  This will allow us to update the frontend limits for the upsert at the point the model shape changes.
+
+Because returning the fully saved submission for each item in the batch would exceed the payload even quicker, upon a successful save we are returning the following for each item in the upsert to help identify what happened to which item:
+
+The `requestIndex`, `id` (the submission just saved), `schemeOrgId`, `memberOrgId`, `compliancePeriodYear`, `compliancePeriodQuarter`, and `action` (`Created` or `Amended`). 
+
 
 #### Request JSON
 
