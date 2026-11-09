@@ -39,6 +39,7 @@ public interface IPomSubmissionRepository
         CancellationToken cancellationToken = default);
 
     // Returns every submission matching the PomSubmissionFilter and PageRequest.
+    // Ordered by scheme, member, then latest year, quarter and version, then newest created, then id.
     // A submission id matches at most one.
     // If Scheme, Members, Years and quarters are supplied it is an "AND", returning a list of submissions.
     Task<PaginatedList<PomSubmissionModel>> FindAsync(
@@ -204,10 +205,7 @@ public class PomSubmissionRepository(IMongoDbClientFactory connectionFactory, IL
         var definition = Filter(filter);
         var totalCount = (int)await Collection.CountDocumentsAsync(definition, cancellationToken: cancellationToken);
         var window = PageWindow.Resolve(page.PageNumber, page.PageSize, totalCount);
-        var find = Collection.Find(definition);
-        find = find
-            .SortByDescending(submission => submission.CreatedAtUtc)
-            .ThenByDescending(submission => submission.Id);
+        var find = Collection.Find(definition).Sort(ListOrder());
 
         if (window.IsPaged)
         {
@@ -217,6 +215,18 @@ public class PomSubmissionRepository(IMongoDbClientFactory connectionFactory, IL
         var items = await find.ToListAsync(cancellationToken);
         return new PaginatedList<PomSubmissionModel>(items, totalCount, window.PageNumber, window.PageSize);
     }
+
+    // Scheme and member ascending. Within a member, the latest year, quarter and version come first,
+    // then the most recently created row, then id.
+    internal static SortDefinition<PomSubmissionModel> ListOrder() =>
+        Builders<PomSubmissionModel>.Sort
+            .Ascending(submission => submission.SchemeOrgId)
+            .Ascending(submission => submission.MemberOrgId)
+            .Descending(submission => submission.CompliancePeriodYear)
+            .Descending(submission => submission.CompliancePeriodQuarter)
+            .Descending(submission => submission.Version)
+            .Descending(submission => submission.CreatedAtUtc)
+            .Ascending(submission => submission.Id);
 
     // IsCurrent defaults to true. A filter that clears it and sets nothing else would read the whole collection.
     internal static FilterDefinition<PomSubmissionModel> Filter(PomSubmissionFilter filter)

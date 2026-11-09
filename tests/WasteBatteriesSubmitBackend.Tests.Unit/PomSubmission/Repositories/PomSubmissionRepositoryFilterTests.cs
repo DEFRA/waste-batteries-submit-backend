@@ -18,6 +18,19 @@ public class PomSubmissionRepositoryFilterTests
     }
 
     [Fact]
+    public void ListOrder_WhenRendered_SortsSchemeThenMemberThenLatestPeriod()
+    {
+        // Act
+        var order = PomSubmissionRepository.ListOrder();
+
+        // Assert
+        Assert.Equal(
+            "{ \"schemeOrgId\" : 1, \"memberOrgId\" : 1, \"compliancePeriodYear\" : -1, "
+            + "\"compliancePeriodQuarter\" : -1, \"version\" : -1, \"createdAtUtc\" : -1, \"_id\" : 1 }",
+            Render(order));
+    }
+
+    [Fact]
     public void Filter_WhenOnlyTheIdIsSet_MatchesThatDocument()
     {
         // Arrange
@@ -266,10 +279,16 @@ public class PomSubmissionRepositoryFilterTests
     private static string ObjectIdClause(string field, string id) =>
         $$"""{ "{{field}}" : { "$oid" : "{{id}}" } }""";
 
-    private static string Render(FilterDefinition<PomSubmissionModel> filter)
+    private static string Render(FilterDefinition<PomSubmissionModel> filter) =>
+        filter.Render(RenderArgs()).ToString();
+
+    private static string Render(SortDefinition<PomSubmissionModel> sort) =>
+        sort.Render(RenderArgs()).ToString();
+
+    private static RenderArgs<PomSubmissionModel> RenderArgs()
     {
         var registry = BsonSerializer.SerializerRegistry;
-        var args = new RenderArgs<PomSubmissionModel>(
+        return new RenderArgs<PomSubmissionModel>(
             registry.GetSerializer<PomSubmissionModel>(),
             registry,
             default,
@@ -277,6 +296,5 @@ public class PomSubmissionRepositoryFilterTests
             false,
             false,
             null);
-        return filter.Render(args).ToString();
     }
 }

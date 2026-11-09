@@ -10,7 +10,8 @@ namespace WasteBatteriesSubmitBackend.Tests.Common;
 
 // The long submission the page-size limits were measured against. Distinct rows differ, because identical
 // copies compress far more than a real list. Full is the index-0 row and is repeated for the uncompressed limit.
-// The list endpoint returns this JSON, newest first.
+// The list endpoint returns this JSON in list order: scheme, member, latest year, quarter and version,
+// then newest created, then id.
 public static class MeasuredPomSubmission
 {
     public const int TonnageEntryCount = 80;
@@ -36,7 +37,7 @@ public static class MeasuredPomSubmission
             items[index] = Distinct(schemeOrgId, index, activity, status, version, batteryCategory);
         }
 
-        Array.Sort(items, CompareNewestFirst);
+        Array.Sort(items, CompareListOrder);
         return items;
     }
 
@@ -146,10 +147,46 @@ public static class MeasuredPomSubmission
             new PaginatedList<PomSubmissionModel>(items, totalCount, pageNumber, pageSize),
             s_jsonOptions);
 
-    private static int CompareNewestFirst(PomSubmissionModel left, PomSubmissionModel right)
+    // Same order as PomSubmissionRepository.ListOrder.
+    private static int CompareListOrder(PomSubmissionModel left, PomSubmissionModel right)
     {
+        var byScheme = string.CompareOrdinal(left.SchemeOrgId, right.SchemeOrgId);
+        if (byScheme != 0)
+        {
+            return byScheme;
+        }
+
+        var byMember = string.CompareOrdinal(left.MemberOrgId, right.MemberOrgId);
+        if (byMember != 0)
+        {
+            return byMember;
+        }
+
+        var byYear = right.CompliancePeriodYear.CompareTo(left.CompliancePeriodYear);
+        if (byYear != 0)
+        {
+            return byYear;
+        }
+
+        var byQuarter = string.CompareOrdinal(right.CompliancePeriodQuarter, left.CompliancePeriodQuarter);
+        if (byQuarter != 0)
+        {
+            return byQuarter;
+        }
+
+        var byVersion = right.Version.CompareTo(left.Version);
+        if (byVersion != 0)
+        {
+            return byVersion;
+        }
+
         var byTime = right.CreatedAtUtc.CompareTo(left.CreatedAtUtc);
-        return byTime != 0 ? byTime : string.CompareOrdinal(right.Id, left.Id);
+        if (byTime != 0)
+        {
+            return byTime;
+        }
+
+        return string.CompareOrdinal(left.Id, right.Id);
     }
 
     // The API writes tonnes back with Decimal128.ToString() after they have been stored.

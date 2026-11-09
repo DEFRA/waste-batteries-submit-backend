@@ -144,13 +144,13 @@ public partial class PomSubmissionEndpointsTests
             totalCount: 5,
             hasPrevious: false,
             hasNext: false,
-            otherMember.Id,
-            fourthQuarter.Id,
             thirdQuarter.Id,
+            fourthQuarter.Id,
             secondQuarter.Id,
-            firstQuarter.Id);
+            firstQuarter.Id,
+            otherMember.Id);
         Assert.Equal(firstQuarter.Json, Item(current.RootElement, firstQuarter.Id).GetRawText());
-        AssertPage(memberOnly.RootElement, 1, maximum, 1, 4, false, false, fourthQuarter.Id, thirdQuarter.Id, secondQuarter.Id, firstQuarter.Id);
+        AssertPage(memberOnly.RootElement, 1, maximum, 1, 4, false, false, thirdQuarter.Id, fourthQuarter.Id, secondQuarter.Id, firstQuarter.Id);
         AssertPage(memberYearAndQuarter.RootElement, 1, maximum, 1, 2, false, false, thirdQuarter.Id, secondQuarter.Id);
         AssertPage(eitherQuarter.RootElement, 1, maximum, 1, 2, false, false, fourthQuarter.Id, firstQuarter.Id);
         AssertPage(history.RootElement, 1, maximum, 1, 1, false, false, previous.Id);
@@ -201,11 +201,11 @@ public partial class PomSubmissionEndpointsTests
             ("pageSize", "2"));
 
         // Assert
-        AssertPage(firstPage.RootElement, 1, 2, 2, 3, false, true, third.Id, second.Id);
-        AssertPage(secondPage.RootElement, 2, 2, 2, 3, true, false, first.Id);
-        AssertPage(pastTheEnd.RootElement, 2, 2, 2, 3, true, false, first.Id);
-        AssertPage(all.RootElement, 1, fixture.Defaults.MaxPageSize, 1, 3, false, false, third.Id, second.Id, first.Id);
-        AssertPage(oversized.RootElement, 1, fixture.Defaults.MaxPageSize, 1, 3, false, false, third.Id, second.Id, first.Id);
+        AssertPage(firstPage.RootElement, 1, 2, 2, 3, false, true, first.Id, second.Id);
+        AssertPage(secondPage.RootElement, 2, 2, 2, 3, true, false, third.Id);
+        AssertPage(pastTheEnd.RootElement, 2, 2, 2, 3, true, false, third.Id);
+        AssertPage(all.RootElement, 1, fixture.Defaults.MaxPageSize, 1, 3, false, false, first.Id, second.Id, third.Id);
+        AssertPage(oversized.RootElement, 1, fixture.Defaults.MaxPageSize, 1, 3, false, false, first.Id, second.Id, third.Id);
         AssertPage(none.RootElement, 1, 2, 0, 0, false, false);
     }
 }
