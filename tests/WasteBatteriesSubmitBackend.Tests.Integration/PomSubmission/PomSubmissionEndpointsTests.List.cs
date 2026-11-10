@@ -25,7 +25,7 @@ public partial class PomSubmissionEndpointsTests
 
     [Theory]
     [InlineData("/pom-submissions")]
-    [InlineData("/pom-submissions?isCurrent=false")]
+    [InlineData("/pom-submissions?returnCurrentOnly=false")]
     public async Task List_WhenNoBusinessFilterIsSet_ReturnsValidationError(string url)
     {
         // Arrange
@@ -154,11 +154,11 @@ public partial class PomSubmissionEndpointsTests
             ("schemeOrgId", schemeOrgId),
             ("compliancePeriodQuarters", "Quarter 1"),
             ("compliancePeriodQuarters", "Quarter 3"));
-        using var notCurrent = await ReadPage(
+        using var currentAndHistorical = await ReadPage(
             client,
             cancellationToken,
             ("schemeOrgId", schemeOrgId),
-            ("isCurrent", "false"));
+            ("returnCurrentOnly", "false"));
         using var otherMember = await ReadPage(
             client,
             cancellationToken,
@@ -173,7 +173,7 @@ public partial class PomSubmissionEndpointsTests
             ["member"] = PinPage(member.RootElement, submissions, members),
             ["memberYearsAndQuarter2"] = PinPage(memberYearsAndQuarter.RootElement, submissions, members),
             ["quarter1Or3"] = PinPage(quarter1Or3.RootElement, submissions, members),
-            ["notCurrent"] = PinPage(notCurrent.RootElement, submissions, members),
+            ["currentAndHistorical"] = PinPage(currentAndHistorical.RootElement, submissions, members),
             ["otherMember"] = PinPage(otherMember.RootElement, submissions, members)
         };
         Snapshot.Match(snapshot.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));

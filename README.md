@@ -24,7 +24,7 @@ All requests expect a Defra ID bearer token.
 
 `GET /pom-submissions/{id}` returns the stored submission as `200 OK`. Accepting gzip does not compress this response. The read is by id, so a submission that is no longer current is still returned.
 
-`GET /pom-submissions` returns a page of submission objects. The filters are combined with AND: `schemeOrgId`, `memberOrgId`, `compliancePeriodYears` (array), `compliancePeriodQuarters` (array), and `isCurrent` (optional, defaults to true). At least one of `schemeOrgId`, `memberOrgId`, `compliancePeriodYears` or `compliancePeriodQuarters` is required. `isCurrent` alone does not satisfy that rule.
+`GET /pom-submissions` returns a page of submission objects. The filters are combined with AND: `schemeOrgId`, `memberOrgId`, `compliancePeriodYears` (array), `compliancePeriodQuarters` (array), and `returnCurrentOnly` (optional, defaults to true if omitted). When it is false, the list includes current submissions and submissions that are no longer current. At least one of `schemeOrgId`, `memberOrgId`, `compliancePeriodYears` or `compliancePeriodQuarters` is required. `returnCurrentOnly` alone does not satisfy that rule.
 A missing `pageSize`, or one above the limit for that request, is replaced by `MaxPageSize` or `MaxGzipPageSize` (see below). A smaller `pageSize` is kept. `pageNumber` defaults to 1. A page past the end returns the last page. The JSON body has `items`, `pageNumber`, `pageSize`, `totalPages`, `totalCount`, `hasPreviousPage` and `hasNextPage`. No match is `200` with an empty `items` array. The list is gzip-compressed when the caller accepts gzip. A single submission is not. 
 
 #### Page sizes when getting list of submissions

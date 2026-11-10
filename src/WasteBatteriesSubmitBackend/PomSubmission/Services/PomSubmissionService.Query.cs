@@ -34,7 +34,8 @@ public partial class PomSubmissionService
     }
 
     // Returns the submissions that match every supplied filter.
-    // IsCurrent on the filter defaults to true. A caller who sets it replaces that default.
+    // returnCurrentOnly defaults to true, so the read stays on current submissions.
+    // False does not set IsCurrent to false. It clears that criterion, so the query returns current and historical submissions.
     // If Scheme, Members, Years and quarters are supplied it is an "AND", returning a list of submissions.
     // A missing page size, or one above the maximum for this response, is limited to that maximum.
     // The maximum is the gzip page size when the response will be gzipped, and the plain page size otherwise.
@@ -54,9 +55,9 @@ public partial class PomSubmissionService
             CompliancePeriodQuarters = Present(request.CompliancePeriodQuarters)
         };
 
-        if (request.IsCurrent is bool isCurrent)
+        if (request.ReturnCurrentOnly == false)
         {
-            filter = filter with { IsCurrent = isCurrent };
+            filter = filter with { IsCurrent = null };
         }
 
         return await pomSubmissionRepository.FindAsync(

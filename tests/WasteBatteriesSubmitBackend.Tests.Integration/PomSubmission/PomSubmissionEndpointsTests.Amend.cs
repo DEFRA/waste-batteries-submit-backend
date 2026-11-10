@@ -253,11 +253,11 @@ public partial class PomSubmissionEndpointsTests
         var stored = await MemberSubmissions(memberOrgId, cancellationToken);
         var previousResponse = await client.GetAsync($"/pom-submissions/{created.Id}", cancellationToken);
         using var currentPage = await ReadPage(client, cancellationToken, ("memberOrgId", memberOrgId));
-        using var previousPage = await ReadPage(
+        using var historyPage = await ReadPage(
             client,
             cancellationToken,
             ("memberOrgId", memberOrgId),
-            ("isCurrent", "false"));
+            ("returnCurrentOnly", "false"));
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -297,13 +297,14 @@ public partial class PomSubmissionEndpointsTests
             false,
             amendedId!);
         AssertPage(
-            previousPage.RootElement,
+            historyPage.RootElement,
             1,
             fixture.Defaults.MaxPageSize,
             1,
-            1,
+            2,
             false,
             false,
+            amendedId!,
             created.Id);
 
         var log = Assert.Single(fixture.Logger.Entries, entry => entry.Message.Contains(amendedId!, StringComparison.Ordinal));

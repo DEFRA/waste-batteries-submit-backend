@@ -136,9 +136,18 @@
       }
     ]
   },
-  "notCurrent": {
-    "totalCount": 3,
+  "currentAndHistorical": {
+    "totalCount": 8,
     "items": [
+      {
+        "id": "000000000000000000000005",
+        "memberOrgId": "000000000000000000000101",
+        "memberName": "Member One",
+        "compliancePeriodYear": 2026,
+        "compliancePeriodQuarter": "Quarter 2",
+        "version": 3,
+        "isCurrent": true
+      },
       {
         "id": "000000000000000000000004",
         "memberOrgId": "000000000000000000000101",
@@ -156,6 +165,42 @@
         "compliancePeriodQuarter": "Quarter 2",
         "version": 1,
         "isCurrent": false
+      },
+      {
+        "id": "000000000000000000000006",
+        "memberOrgId": "000000000000000000000101",
+        "memberName": "Member One",
+        "compliancePeriodYear": 2026,
+        "compliancePeriodQuarter": "Quarter 1",
+        "version": 1,
+        "isCurrent": true
+      },
+      {
+        "id": "000000000000000000000002",
+        "memberOrgId": "000000000000000000000101",
+        "memberName": "Member One",
+        "compliancePeriodYear": 2025,
+        "compliancePeriodQuarter": "Quarter 2",
+        "version": 1,
+        "isCurrent": true
+      },
+      {
+        "id": "000000000000000000000001",
+        "memberOrgId": "000000000000000000000101",
+        "memberName": "Member One",
+        "compliancePeriodYear": 2024,
+        "compliancePeriodQuarter": "Quarter 1",
+        "version": 1,
+        "isCurrent": true
+      },
+      {
+        "id": "000000000000000000000007",
+        "memberOrgId": "000000000000000000000102",
+        "memberName": "Member Two",
+        "compliancePeriodYear": 2026,
+        "compliancePeriodQuarter": "Quarter 2",
+        "version": 1,
+        "isCurrent": true
       },
       {
         "id": "000000000000000000000008",
