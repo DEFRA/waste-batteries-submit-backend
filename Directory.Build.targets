@@ -15,6 +15,34 @@
         Condition="'%(Identity)' == 'Microsoft.OpenApi' and '%(Version)' != '$(PinnedMicrosoftOpenApiVersion)'">
         <PinnedVersion>$(PinnedMicrosoftOpenApiVersion)</PinnedVersion>
       </_PinnedPackageOverride>
+      <_ExactVersionOverride Include="@(PackageReference)"
+        Condition="'%(Identity)' == 'Microsoft.AspNetCore.Authentication.JwtBearer' and '%(Version)' != '$(PinnedAspNetCore10Version)'">
+        <PinnedVersion>$(PinnedAspNetCore10Version)</PinnedVersion>
+      </_ExactVersionOverride>
+      <_ExactVersionOverride Include="@(PackageReference)"
+        Condition="'%(Identity)' == 'Microsoft.AspNetCore.HeaderPropagation' and '%(Version)' != '$(PinnedAspNetCore10Version)'">
+        <PinnedVersion>$(PinnedAspNetCore10Version)</PinnedVersion>
+      </_ExactVersionOverride>
+      <_ExactVersionOverride Include="@(PackageReference)"
+        Condition="'%(Identity)' == 'Microsoft.AspNetCore.Mvc.Testing' and '%(Version)' != '$(PinnedAspNetCore10Version)'">
+        <PinnedVersion>$(PinnedAspNetCore10Version)</PinnedVersion>
+      </_ExactVersionOverride>
+      <_ExactVersionOverride Include="@(PackageReference)"
+        Condition="'%(Identity)' == 'Microsoft.AspNetCore.OpenApi' and '%(Version)' != '$(PinnedAspNetCore10Version)'">
+        <PinnedVersion>$(PinnedAspNetCore10Version)</PinnedVersion>
+      </_ExactVersionOverride>
+      <_ExactVersionOverride Include="@(PackageReference)"
+        Condition="'%(Identity)' == 'Swashbuckle.AspNetCore.SwaggerUI' and '%(Version)' != '$(PinnedSwashbuckleSwaggerUiVersion)'">
+        <PinnedVersion>$(PinnedSwashbuckleSwaggerUiVersion)</PinnedVersion>
+      </_ExactVersionOverride>
+      <_ExactVersionOverride Include="@(PackageReference)"
+        Condition="'%(Identity)' == 'Microsoft.NET.Test.Sdk' and '%(Version)' != '$(PinnedMicrosoftNetTestSdkVersion)'">
+        <PinnedVersion>$(PinnedMicrosoftNetTestSdkVersion)</PinnedVersion>
+      </_ExactVersionOverride>
+      <_ExactVersionOverride Include="@(PackageReference)"
+        Condition="'%(Identity)' == 'xunit.v3' and '%(Version)' != '$(PinnedXunitV3Version)'">
+        <PinnedVersion>$(PinnedXunitV3Version)</PinnedVersion>
+      </_ExactVersionOverride>
     </ItemGroup>
     <Error
       Condition="'@(_SnappierBelowMinimum)' != ''"
@@ -25,5 +53,8 @@
     <Error
       Condition="'@(_PinnedPackageOverride)' != ''"
       Text="Package %(_PinnedPackageOverride.Identity) is pinned to %(_PinnedPackageOverride.PinnedVersion) in Directory.Build.props, but a project sets %(_PinnedPackageOverride.Version). The NuGet Package Manager writes that override into the csproj and restore ignores the pin. Delete the PackageReference version from the csproj. Change the pin in Directory.Build.props only when the update is intended." />
+    <Error
+      Condition="'@(_ExactVersionOverride)' != ''"
+      Text="Package %(_ExactVersionOverride.Identity) is locked to %(_ExactVersionOverride.PinnedVersion). The NuGet Updates tab lists a newer release unless the csproj Version is that exact lock, brackets included. Put that literal back in the csproj. Change the pin in Directory.Build.props and the csproj together when the update is intended." />
   </Target>
 </Project>

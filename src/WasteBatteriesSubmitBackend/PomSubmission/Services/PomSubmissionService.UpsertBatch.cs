@@ -10,7 +10,8 @@ using WasteBatteriesSubmitBackend.Utils.Mongo;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Services;
 
-// A batch of submissions. Each item is created or amended. The whole batch commits or rolls back together.
+// A batch of submissions. Each item is created or amended. The submissions and one outbox
+// event per scheme and compliance year commit or roll back together.
 public partial class PomSubmissionService
 {
     // Saves many submissions. A submission witn no existing matching key (scheme id, member id, year & quarter) is created, else amended.
@@ -35,12 +36,13 @@ public partial class PomSubmissionService
             pending.Add((request, PomSubmissionKey.From(request)));
         }
 
-        var currents = await pomSubmissionRepository.FindCurrentAsync(
+        var currents = await dependencies.Repository.FindCurrentAsync(
             [.. pending.Select(item => item.Key)],
             cancellationToken);
         var currentByKey = IndexCurrents(currents);
         var savedAtUtc = timeProvider.UtcNow;
         var submissions = new List<PomSubmissionModel>(pending.Count);
+        var amended = new List<bool>(pending.Count);
         var results = new List<PomSubmissionUpsertResult>(pending.Count);
         var currentIds = new List<string>();
 
@@ -52,7 +54,7 @@ public partial class PomSubmissionService
             {
                 currentIds.Add(current.Id);
                 action = PomSubmissionUpsertAction.Amended;
-                submission = pomSubmissionMapper.ToNewSubmission(
+                submission = dependencies.Mapper.ToNewSubmission(
                     request,
                     savedAtUtc,
                     version: current.Version + 1,
@@ -61,10 +63,11 @@ public partial class PomSubmissionService
             else
             {
                 action = PomSubmissionUpsertAction.Created;
-                submission = pomSubmissionMapper.ToNewSubmission(request, savedAtUtc);
+                submission = dependencies.Mapper.ToNewSubmission(request, savedAtUtc);
             }
 
             submissions.Add(submission);
+            amended.Add(action == PomSubmissionUpsertAction.Amended);
             results.Add(new PomSubmissionUpsertResult
             {
                 RequestIndex = results.Count,
@@ -77,9 +80,13 @@ public partial class PomSubmissionService
             });
         }
 
+        var outboxEvents = GetOutboxEvents(
+            submissions.Select((submission, index) => (submission, amended[index])),
+            savedAtUtc);
+
         try
         {
-            await unitOfWork.ExecuteAsync(
+            await ExecuteSaveAsync(
                 async (transaction, transactionCancellationToken) =>
                 {
                     await WriteBatchAsync(
@@ -87,6 +94,11 @@ public partial class PomSubmissionService
                         currentIds,
                         submissions,
                         savedAtUtc,
+                        transactionCancellationToken);
+
+                    await dependencies.Outbox.AddAsync(
+                        transaction.Session,
+                        outboxEvents,
                         transactionCancellationToken);
                     return submissions;
                 },
@@ -141,7 +153,7 @@ public partial class PomSubmissionService
 
             var prepared = request.Trimmed();
             trimmed.Add(prepared);
-            var result = await validators.Request.ValidateAsync(prepared, cancellationToken);
+            var result = await dependencies.Validators.Request.ValidateAsync(prepared, cancellationToken);
             foreach (var error in result.Errors)
             {
                 failures.Add(new ValidationFailure($"[{index}].{error.PropertyName}", error.ErrorMessage));
@@ -193,6 +205,7 @@ public partial class PomSubmissionService
     // The unique index allows one isCurrent submission for a key, so every current row is set to false
     // before any replacement or new submission is inserted. Both writes use the caller's transaction.
     // One update covers every amendment. One insert covers the creates and the amendments.
+    // The caller then writes the outbox events on that same session.
     private async Task WriteBatchAsync(
         IMongoTransaction transaction,
         List<string> currentSubmissionIds,
@@ -202,7 +215,7 @@ public partial class PomSubmissionService
     {
         if (currentSubmissionIds.Count > 0)
         {
-            var superseded = await pomSubmissionRepository.SupersedeCurrentsAsync(
+            var superseded = await dependencies.Repository.SupersedeCurrentsAsync(
                 transaction.Session,
                 currentSubmissionIds,
                 updatedAtUtc,
@@ -217,7 +230,7 @@ public partial class PomSubmissionService
             }
         }
 
-        await pomSubmissionRepository.CreateManyAsync(transaction.Session, submissions, cancellationToken);
+        await dependencies.Repository.CreateManyAsync(transaction.Session, submissions, cancellationToken);
     }
 
     private static Dictionary<PomSubmissionKey, PomSubmissionModel> IndexCurrents(

@@ -3,7 +3,7 @@ using MongoDB.Driver;
 namespace WasteBatteriesSubmitBackend.Utils.Mongo;
 
 // The session for one transaction. It is valid only until ExecuteAsync returns.
-// Repository writes take Session so they commit or roll back together.
+// Submission and outbox writes take Session so they commit or roll back together.
 public interface IMongoTransaction
 {
     IClientSessionHandle Session { get; }

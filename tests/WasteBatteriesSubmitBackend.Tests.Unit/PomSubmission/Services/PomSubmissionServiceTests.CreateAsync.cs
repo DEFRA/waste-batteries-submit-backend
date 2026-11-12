@@ -1,9 +1,13 @@
 using FluentValidation;
 using Microsoft.Extensions.Logging;
+using MongoDB.Driver;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using WasteBatteriesSubmitBackend.Models;
+using WasteBatteriesSubmitBackend.Outbox;
+using WasteBatteriesSubmitBackend.Outbox.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
+using WasteBatteriesSubmitBackend.PomSubmission.Outbox;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
@@ -24,8 +28,10 @@ public partial class PomSubmissionServiceTests
         // Arrange
         var repository = Substitute.For<IPomSubmissionRepository>();
         ReturnNoSubmissions(repository);
+        var session = Substitute.For<IClientSessionHandle>();
+        var outbox = Substitute.For<IOutboxRepository>();
         var logger = new CapturingLogger<PomSubmissionService>();
-        var service = Service(repository, logger);
+        var service = Service(repository, logger, TransactionFor<PomSubmissionModel>(session), outbox);
         var request = ValidRequest();
 
         // Act
@@ -44,6 +50,7 @@ public partial class PomSubmissionServiceTests
             new PageRequest { PageSize = MaxPageSize },
             Arg.Any<CancellationToken>());
         await repository.Received(1).CreateAsync(
+            session,
             Arg.Is<PomSubmissionModel>(saved =>
                 saved.Id == submission.Id
                 && saved.Status == "Submitted"
@@ -55,6 +62,13 @@ public partial class PomSubmissionServiceTests
                 && saved.IsCurrent
                 && saved.CreatedAtUtc == s_createdAt),
             Arg.Any<CancellationToken>());
+        await AssertSingleOutboxEvent(
+            outbox,
+            session,
+            submission.SchemeOrgId,
+            submission.CompliancePeriodYear,
+            PomSubmissionOutboxEvent.PomSubmissionCreatedType);
+        await repository.DidNotReceive().CreateAsync(Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>());
         var entry = Assert.Single(logger.Entries);
         Assert.Equal(LogLevel.Information, entry.Level);
         Assert.Equal(
@@ -63,23 +77,27 @@ public partial class PomSubmissionServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_WhenSaveFails_DoesNotLog()
+    public async Task CreateAsync_WhenSaveFails_LogsTheError()
     {
         // Arrange
         var repository = Substitute.For<IPomSubmissionRepository>();
         ReturnNoSubmissions(repository);
-        repository
-            .CreateAsync(Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>())
-            .ThrowsAsync(new InvalidOperationException("database unavailable"));
+        var failure = new InvalidOperationException("database unavailable");
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork
+            .ExecuteAsync(
+                Arg.Any<Func<IMongoTransaction, CancellationToken, Task<PomSubmissionModel>>>(),
+                Arg.Any<CancellationToken>())
+            .ThrowsAsync(failure);
         var logger = new CapturingLogger<PomSubmissionService>();
-        var service = Service(repository, logger);
+        var service = Service(repository, logger, unitOfWork);
 
         // Act
         Task<PomSubmissionModel> Act() => service.CreateAsync(ValidRequest(), TestContext.Current.CancellationToken);
 
         // Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(Act);
-        Assert.Empty(logger.Entries);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(Act);
+        AssertSaveError(logger, exception);
     }
 
     [Fact]
@@ -111,8 +129,9 @@ public partial class PomSubmissionServiceTests
         // Arrange
         var repository = Substitute.For<IPomSubmissionRepository>();
         ReturnNoSubmissions(repository);
+        var session = Substitute.For<IClientSessionHandle>();
         var logger = new CapturingLogger<PomSubmissionService>();
-        var service = Service(repository, logger);
+        var service = Service(repository, logger, TransactionFor<PomSubmissionModel>(session));
         var request = ValidRequest() with
         {
             SchemeOrgId = $"  {SamplePomSubmission.SchemeOrgId}  ",
@@ -151,6 +170,7 @@ public partial class PomSubmissionServiceTests
             new PageRequest { PageSize = MaxPageSize },
             Arg.Any<CancellationToken>());
         await repository.Received(1).CreateAsync(
+            session,
             Arg.Is<PomSubmissionModel>(saved =>
                 saved.MemberName == SamplePomSubmission.MemberName
                 && saved.MemberBprn == SamplePomSubmission.MemberBprn
@@ -248,11 +268,13 @@ public partial class PomSubmissionServiceTests
         // Arrange
         var repository = Substitute.For<IPomSubmissionRepository>();
         ReturnNoSubmissions(repository);
+        var session = Substitute.For<IClientSessionHandle>();
+        var outbox = Substitute.For<IOutboxRepository>();
         repository
-            .CreateAsync(Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>())
+            .CreateAsync(session, Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new DuplicateKeyOnSaveException(new InvalidOperationException("duplicate key")));
         var logger = new CapturingLogger<PomSubmissionService>();
-        var service = Service(repository, logger);
+        var service = Service(repository, logger, TransactionFor<PomSubmissionModel>(session), outbox);
 
         // Act
         Task<PomSubmissionModel> Act() => service.CreateAsync(ValidRequest(), TestContext.Current.CancellationToken);
@@ -264,6 +286,10 @@ public partial class PomSubmissionServiceTests
         Assert.Equal(
             "A current submission already exists for this scheme, member, year and quarter.",
             error.ErrorMessage);
+        await outbox.DidNotReceive().AddAsync(
+            Arg.Any<IClientSessionHandle>(),
+            Arg.Any<IReadOnlyList<OutboxEvent>>(),
+            Arg.Any<CancellationToken>());
         Assert.Empty(logger.Entries);
     }
 
@@ -323,5 +349,32 @@ public partial class PomSubmissionServiceTests
                 && error.ErrorMessage == "A current submission already exists for this scheme, member, year and quarter.");
         await repository.DidNotReceive().CreateAsync(Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>());
         Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenTheOutboxWriteFails_LogsTheErrorAndDoesNotReportSuccess()
+    {
+        // Arrange
+        var repository = Substitute.For<IPomSubmissionRepository>();
+        ReturnNoSubmissions(repository);
+        var session = Substitute.For<IClientSessionHandle>();
+        var outbox = Substitute.For<IOutboxRepository>();
+        var failure = new InvalidOperationException("outbox unavailable");
+        outbox
+            .AddAsync(session, Arg.Any<IReadOnlyList<OutboxEvent>>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(failure);
+        var logger = new CapturingLogger<PomSubmissionService>();
+        var service = Service(repository, logger, TransactionFor<PomSubmissionModel>(session), outbox);
+
+        // Act
+        Task<PomSubmissionModel> Act() => service.CreateAsync(ValidRequest(), TestContext.Current.CancellationToken);
+
+        // Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(Act);
+        AssertSaveError(logger, exception);
+        await repository.Received(1).CreateAsync(
+            session,
+            Arg.Any<PomSubmissionModel>(),
+            Arg.Any<CancellationToken>());
     }
 }
