@@ -52,7 +52,7 @@ public partial class PomSubmissionService(
     private IReadOnlyList<OutboxEvent> GetOutboxEvents(
         IEnumerable<(PomSubmissionModel Submission, bool Amended)> saved,
         DateTime occurredAtUtc) =>
-        PomSubmissionOutboxEvents.ForSchemeYears(
+        PomSubmissionOutboxEvents.GetOutboxEventsBySchemeYears(
             saved.Select(item => (item.Submission.SchemeOrgId, item.Submission.CompliancePeriodYear, item.Amended)),
             occurredAtUtc,
             correlationContext.CorrelationId,

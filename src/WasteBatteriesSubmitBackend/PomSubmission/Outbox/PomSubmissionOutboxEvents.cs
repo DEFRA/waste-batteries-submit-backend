@@ -6,7 +6,7 @@ namespace WasteBatteriesSubmitBackend.PomSubmission.Outbox;
 // One event per scheme and compliance year. Ids and the timestamp are fixed by the caller, before the transaction.
 public static class PomSubmissionOutboxEvents
 {
-    public static IReadOnlyList<OutboxEvent> ForSchemeYears(
+    public static IReadOnlyList<OutboxEvent> GetOutboxEventsBySchemeYears(
         IEnumerable<(string SchemeOrgId, int CompliancePeriodYear, bool Amended)> saved,
         DateTime occurredAtUtc,
         string correlationId,
@@ -36,13 +36,12 @@ public static class PomSubmissionOutboxEvents
         var events = new List<OutboxEvent>(order.Count);
         foreach (var key in order)
         {
-            var (Created, Amended) = groups[key];
             events.Add(new PomSubmissionOutboxEvent
             {
                 Id = OutboxEvents.NewId(),
-                EventType = EventType(Created, Amended),
+                EventType = GetEventType(groups[key].Created, groups[key].Amended),
                 SchemaVersion = OutboxEvent.CurrentSchemaVersion,
-                SubjectId = SubjectId(key.SchemeId, key.Year),
+                SubjectId = GetSubjectIdForSchemeYear(key.SchemeId, key.Year),
                 Version = version,
                 PartitionKey = key.SchemeId,
                 OccurredAtUtc = occurredAtUtc,
@@ -58,13 +57,21 @@ public static class PomSubmissionOutboxEvents
     }
 
     // What changed. One event covers every submission in that scheme and year.
-    public static string SubjectId(string schemeOrgId, int compliancePeriodYear) =>
+    private static string GetSubjectIdForSchemeYear(string schemeOrgId, int compliancePeriodYear) =>
         $"{schemeOrgId}:{compliancePeriodYear}";
 
-    private static string EventType(bool created, bool amended) =>
-        created && amended
-            ? PomSubmissionOutboxEvent.PomSubmissionSavedType
-            : amended
-                ? PomSubmissionOutboxEvent.PomSubmissionAmendedType
-                : PomSubmissionOutboxEvent.PomSubmissionCreatedType;
+    private static string GetEventType(bool created, bool amended)
+    {
+        if (created && amended)
+        {
+            return PomSubmissionOutboxEvent.PomSubmissionSavedType;
+        }
+
+        if (amended)
+        {
+            return PomSubmissionOutboxEvent.PomSubmissionAmendedType;
+        }
+
+        return PomSubmissionOutboxEvent.PomSubmissionCreatedType;
+    }
 }

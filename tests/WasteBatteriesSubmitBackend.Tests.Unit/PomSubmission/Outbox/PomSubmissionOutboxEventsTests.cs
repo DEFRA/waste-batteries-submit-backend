@@ -24,7 +24,7 @@ public class PomSubmissionOutboxEventsTests
             (otherSchemeOrgId.ToUpperInvariant(), SamplePomSubmission.CompliancePeriodYear, false)
         };
 
-        var events = PomSubmissionOutboxEvents.ForSchemeYears(saved, s_occurredAt, "correlation-1", ActorId);
+        var events = PomSubmissionOutboxEvents.GetOutboxEventsBySchemeYears(saved, s_occurredAt, "correlation-1", ActorId);
 
         Assert.Equal(3, events.Count);
         AssertEvent(events[0], SamplePomSubmission.SchemeOrgId, SamplePomSubmission.CompliancePeriodYear, PomSubmissionOutboxEvent.PomSubmissionCreatedType);
@@ -41,7 +41,7 @@ public class PomSubmissionOutboxEventsTests
             (SamplePomSubmission.SchemeOrgId, SamplePomSubmission.CompliancePeriodYear, true)
         };
 
-        var events = PomSubmissionOutboxEvents.ForSchemeYears(saved, s_occurredAt, "correlation-1", ActorId);
+        var events = PomSubmissionOutboxEvents.GetOutboxEventsBySchemeYears(saved, s_occurredAt, "correlation-1", ActorId);
 
         var outboxEvent = Assert.IsType<PomSubmissionOutboxEvent>(Assert.Single(events));
         Assert.Equal(PomSubmissionOutboxEvent.PomSubmissionAmendedType, outboxEvent.EventType);
@@ -57,20 +57,21 @@ public class PomSubmissionOutboxEventsTests
             (SamplePomSubmission.SchemeOrgId, 2025, true)
         };
 
-        var events = PomSubmissionOutboxEvents.ForSchemeYears(saved, s_occurredAt, "correlation-1", ActorId);
+        var events = PomSubmissionOutboxEvents.GetOutboxEventsBySchemeYears(saved, s_occurredAt, "correlation-1", ActorId);
 
         Assert.Equal(2, events.Count);
         Assert.Equal(PomSubmissionOutboxEvent.PomSubmissionSavedType, events[0].EventType);
         Assert.Equal(PomSubmissionOutboxEvent.PomSubmissionAmendedType, events[1].EventType);
         Assert.Equal(
-            PomSubmissionOutboxEvents.SubjectId(SamplePomSubmission.SchemeOrgId, SamplePomSubmission.CompliancePeriodYear),
+            SubjectId(SamplePomSubmission.SchemeOrgId, SamplePomSubmission.CompliancePeriodYear),
             events[0].SubjectId);
+        Assert.Equal(SubjectId(SamplePomSubmission.SchemeOrgId, 2025), events[1].SubjectId);
     }
 
     [Fact]
     public void ForSchemeYears_WhenNothingWasSaved_ReturnsNoEvents()
     {
-        var events = PomSubmissionOutboxEvents.ForSchemeYears([], s_occurredAt, "correlation-1", ActorId);
+        var events = PomSubmissionOutboxEvents.GetOutboxEventsBySchemeYears([], s_occurredAt, "correlation-1", ActorId);
 
         Assert.Empty(events);
     }
@@ -84,7 +85,7 @@ public class PomSubmissionOutboxEventsTests
         var saved = new (string, int, bool)[] { (SamplePomSubmission.SchemeOrgId, SamplePomSubmission.CompliancePeriodYear, false) };
 
         var exception = Assert.ThrowsAny<ArgumentException>(() =>
-            PomSubmissionOutboxEvents.ForSchemeYears(saved, s_occurredAt, correlationId!, ActorId));
+            PomSubmissionOutboxEvents.GetOutboxEventsBySchemeYears(saved, s_occurredAt, correlationId!, ActorId));
 
         Assert.Equal("correlationId", exception.ParamName);
     }
@@ -98,10 +99,13 @@ public class PomSubmissionOutboxEventsTests
         var saved = new (string, int, bool)[] { (SamplePomSubmission.SchemeOrgId, SamplePomSubmission.CompliancePeriodYear, false) };
 
         var exception = Assert.ThrowsAny<ArgumentException>(() =>
-            PomSubmissionOutboxEvents.ForSchemeYears(saved, s_occurredAt, "correlation-1", actorId!));
+            PomSubmissionOutboxEvents.GetOutboxEventsBySchemeYears(saved, s_occurredAt, "correlation-1", actorId!));
 
         Assert.Equal("actorId", exception.ParamName);
     }
+
+    // The scheme id and year, joined. Hex case is already canonical on the event.
+    private static string SubjectId(string schemeOrgId, int year) => $"{schemeOrgId}:{year}";
 
     private static void AssertEvent(OutboxEvent outboxEvent, string schemeOrgId, int year, string eventType)
     {
@@ -110,7 +114,7 @@ public class PomSubmissionOutboxEventsTests
         Assert.False(ObjectId.TryParse(submissionEvent.Id, out _));
         Assert.Equal(eventType, submissionEvent.EventType);
         Assert.Equal(OutboxEvent.CurrentSchemaVersion, submissionEvent.SchemaVersion);
-        Assert.Equal(PomSubmissionOutboxEvents.SubjectId(schemeOrgId, year), submissionEvent.SubjectId);
+        Assert.Equal(SubjectId(schemeOrgId, year), submissionEvent.SubjectId);
         Assert.Equal(OutboxEvents.CommitVersion(s_occurredAt), submissionEvent.Version);
         Assert.Equal(schemeOrgId, submissionEvent.PartitionKey);
         Assert.Equal(schemeOrgId, submissionEvent.SchemeOrgId);

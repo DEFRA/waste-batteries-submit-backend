@@ -21,7 +21,11 @@ public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture
         await fixture.Outbox.DeleteManyAsync(FilterDefinition<BsonDocument>.Empty);
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
+        return ValueTask.CompletedTask;
+    }
 
     private static string CreateBody => SamplePomSubmission.Json;
 
