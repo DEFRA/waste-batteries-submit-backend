@@ -99,7 +99,7 @@ public partial class PomSubmissionServiceTests
             Arg.Is<IReadOnlyList<OutboxEvent>>(events =>
                 events.Count == 1
                 && events[0].EventType == eventType
-                && events[0].SchemaVersion == OutboxEvent.CurrentSchemaVersion
+                && events[0].SchemaVersion == PomSubmissionOutboxEvents.CurrentSchemaVersion
                 && events[0].SubjectId == schemeOrgId + ":" + year
                 && events[0].Version == OutboxEvents.CommitVersion(s_createdAt)
                 && events[0].PartitionKey == schemeOrgId

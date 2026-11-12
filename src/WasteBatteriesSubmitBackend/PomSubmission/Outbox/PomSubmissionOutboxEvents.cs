@@ -6,6 +6,9 @@ namespace WasteBatteriesSubmitBackend.PomSubmission.Outbox;
 // One event per scheme and compliance year. Ids and the timestamp are fixed by the caller, before the transaction.
 public static class PomSubmissionOutboxEvents
 {
+    // The shape of this event, for this feature. A new field or meaning is a code change, so this is not configuration.
+    public const int CurrentSchemaVersion = 1;
+
     public static IReadOnlyList<OutboxEvent> GetOutboxEventsBySchemeYears(
         IEnumerable<(string SchemeOrgId, int CompliancePeriodYear, bool Amended)> saved,
         DateTime occurredAtUtc,
@@ -40,7 +43,7 @@ public static class PomSubmissionOutboxEvents
             {
                 Id = OutboxEvents.NewId(),
                 EventType = GetEventType(groups[key].Created, groups[key].Amended),
-                SchemaVersion = OutboxEvent.CurrentSchemaVersion,
+                SchemaVersion = CurrentSchemaVersion,
                 SubjectId = GetSubjectIdForSchemeYear(key.SchemeId, key.Year),
                 Version = version,
                 PartitionKey = key.SchemeId,

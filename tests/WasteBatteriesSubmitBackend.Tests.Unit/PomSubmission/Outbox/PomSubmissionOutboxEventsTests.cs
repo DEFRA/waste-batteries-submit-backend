@@ -113,7 +113,7 @@ public class PomSubmissionOutboxEventsTests
         Assert.True(Guid.TryParse(submissionEvent.Id, out _));
         Assert.False(ObjectId.TryParse(submissionEvent.Id, out _));
         Assert.Equal(eventType, submissionEvent.EventType);
-        Assert.Equal(OutboxEvent.CurrentSchemaVersion, submissionEvent.SchemaVersion);
+        Assert.Equal(PomSubmissionOutboxEvents.CurrentSchemaVersion, submissionEvent.SchemaVersion);
         Assert.Equal(SubjectId(schemeOrgId, year), submissionEvent.SubjectId);
         Assert.Equal(OutboxEvents.CommitVersion(s_occurredAt), submissionEvent.Version);
         Assert.Equal(schemeOrgId, submissionEvent.PartitionKey);

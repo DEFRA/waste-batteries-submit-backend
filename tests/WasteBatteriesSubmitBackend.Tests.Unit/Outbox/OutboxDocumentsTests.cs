@@ -17,7 +17,7 @@ public class OutboxDocumentsTests
         {
             Id = "3f1a6c0e-4b2d-4e7a-9c11-8d5e2a7b6c40",
             EventType = PomSubmissionOutboxEvent.PomSubmissionCreatedType,
-            SchemaVersion = OutboxEvent.CurrentSchemaVersion,
+            SchemaVersion = PomSubmissionOutboxEvents.CurrentSchemaVersion,
             SubjectId = $"{SamplePomSubmission.SchemeOrgId}:{SamplePomSubmission.CompliancePeriodYear}",
             Version = OutboxEvents.CommitVersion(occurredAt),
             PartitionKey = SamplePomSubmission.SchemeOrgId,

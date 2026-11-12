@@ -6,20 +6,18 @@ namespace WasteBatteriesSubmitBackend.Outbox;
 // The fields every outbox event has. A feature adds its own properties on a subclass.
 // AdditionalFields is for values that do not have a property yet. They are stored as their own
 // elements, beside the properties, not nested under this name.
-// Sent, SentAtUtc and ExpiresAtUtc stay unset until a relay publishes the event.
-// That relay is not part of this service. An unsent event has no ExpiresAtUtc, so the TTL index leaves it.
+// SentAtUtc and ExpiresAtUtc stay unset until a relay publishes the event.
+// An unsent event has no ExpiresAtUtc, so the TTL index leaves it.
 [BsonIgnoreExtraElements]
 public abstract class OutboxEvent
 {
-    // The shape of the shared fields. A new shared field or meaning is a code change, so this is not configuration.
-    public const int CurrentSchemaVersion = 1;
-
     // A GUID. The id is stable across a retry; it is not the ordering token.
     [BsonId]
     public required string Id { get; init; }
 
     public required string EventType { get; init; }
 
+    // Set by the feature that builds the event. The number is the shape of that event type.
     public int SchemaVersion { get; init; }
 
     // What changed. The feature that builds the event chooses the text.

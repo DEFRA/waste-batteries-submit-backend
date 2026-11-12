@@ -4,7 +4,7 @@ using WasteBatteriesSubmitBackend.Outbox;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Outbox;
 
-// One unpublished fact that submissions for a scheme and compliance year were saved.
+// An event per schemeid and compliance year were saved.
 [BsonIgnoreExtraElements]
 public sealed class PomSubmissionOutboxEvent : OutboxEvent
 {

@@ -415,7 +415,7 @@ public partial class PomSubmissionEndpointsTests
         {
             Id = OutboxEvents.NewId(),
             EventType = PomSubmissionOutboxEvent.PomSubmissionCreatedType,
-            SchemaVersion = OutboxEvent.CurrentSchemaVersion,
+            SchemaVersion = PomSubmissionOutboxEvents.CurrentSchemaVersion,
             SubjectId = SubjectId(schemeOrgId, year),
             Version = version,
             PartitionKey = schemeOrgId,
@@ -439,7 +439,7 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal(BsonType.String, stored["_id"].BsonType);
         Assert.True(Guid.TryParse(stored["_id"].AsString, out _));
         Assert.Equal(eventType, stored["eventType"].AsString);
-        Assert.Equal(OutboxEvent.CurrentSchemaVersion, stored["schemaVersion"].AsInt32);
+        Assert.Equal(PomSubmissionOutboxEvents.CurrentSchemaVersion, stored["schemaVersion"].AsInt32);
         Assert.Equal(SubjectId(schemeOrgId, year), stored["subjectId"].AsString);
         Assert.Equal(OutboxEvents.CommitVersion(occurredAt), stored["version"].AsInt64);
         Assert.Equal(schemeOrgId, stored["partitionKey"].AsString);

@@ -25,7 +25,7 @@ public static class CorrelationIds
         return correlationId;
     }
 
-    public static string? ReadHeader(HttpContext httpContext, string? headerName)
+    private static string? ReadHeader(HttpContext httpContext, string? headerName)
     {
         if (string.IsNullOrWhiteSpace(headerName)
             || !httpContext.Request.Headers.TryGetValue(headerName, out var values))

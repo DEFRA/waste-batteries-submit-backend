@@ -58,8 +58,8 @@ public partial class PomSubmissionService(
             correlationContext.CorrelationId,
             actorContext.ActorId);
 
-    // Submission writes and outbox inserts share this transaction. The driver aborts it when work throws.
-    // Validation and a duplicate key are the caller's response. Any other failure is logged and rethrown.
+    // Pom Submission writes and the outbox inserts are done in the same transaction.
+    // Validation and a duplicate key are the caller's response. Any other failure is rethrown and logged.
     private async Task<T> ExecuteSaveAsync<T>(
         Func<IMongoTransaction, CancellationToken, Task<T>> work,
         CancellationToken cancellationToken)

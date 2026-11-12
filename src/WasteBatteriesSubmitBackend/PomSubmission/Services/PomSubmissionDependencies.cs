@@ -8,8 +8,7 @@ using WasteBatteriesSubmitBackend.Utils.Mongo;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Services;
 
-// The submission feature's own collaborators. Time, correlation, the caller and the logger stay on the service:
-// those belong to the request, not to placed-on-market submissions.
+// A grouping of all the Pom Submission dependencies
 public sealed class PomSubmissionDependencies(
     IPomSubmissionRepository repository,
     IOutboxRepository outbox,
