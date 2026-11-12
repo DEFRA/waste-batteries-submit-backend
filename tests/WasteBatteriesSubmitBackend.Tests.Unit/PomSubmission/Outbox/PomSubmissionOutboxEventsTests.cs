@@ -12,7 +12,7 @@ public class PomSubmissionOutboxEventsTests
     private static readonly DateTime s_occurredAt = SamplePomSubmission.CreatedAt;
 
     [Fact]
-    public void ForSchemeYears_WhenTheSameSchemeAndYearRepeat_WritesOneEventInFirstSeenOrder()
+    public void GetOutboxEventsBySchemeYears_WhenTheSameSchemeAndYearRepeat_WritesOneEventInFirstSeenOrder()
     {
         const string otherSchemeOrgId = "674a1b2c3d4e5f6789012349";
         var saved = new (string SchemeOrgId, int CompliancePeriodYear, bool Amended)[]
@@ -34,7 +34,7 @@ public class PomSubmissionOutboxEventsTests
     }
 
     [Fact]
-    public void ForSchemeYears_WhenASchemeYearIsOnlyAmended_UsesTheAmendedType()
+    public void GetOutboxEventsBySchemeYears_WhenASchemeYearIsOnlyAmended_UsesTheAmendedType()
     {
         var saved = new (string, int, bool)[]
         {
@@ -48,7 +48,7 @@ public class PomSubmissionOutboxEventsTests
     }
 
     [Fact]
-    public void ForSchemeYears_WhenASchemeYearIsCreatedAndAmended_UsesTheSavedType()
+    public void GetOutboxEventsBySchemeYears_WhenASchemeYearIsCreatedAndAmended_UsesTheSavedType()
     {
         var saved = new (string, int, bool)[]
         {
@@ -69,7 +69,7 @@ public class PomSubmissionOutboxEventsTests
     }
 
     [Fact]
-    public void ForSchemeYears_WhenNothingWasSaved_ReturnsNoEvents()
+    public void GetOutboxEventsBySchemeYears_WhenNothingWasSaved_ReturnsNoEvents()
     {
         var events = PomSubmissionOutboxEvents.GetOutboxEventsBySchemeYears([], s_occurredAt, "correlation-1", ActorId);
 
@@ -80,7 +80,7 @@ public class PomSubmissionOutboxEventsTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void ForSchemeYears_WhenTheCorrelationIdIsMissing_Throws(string? correlationId)
+    public void GetOutboxEventsBySchemeYears_WhenTheCorrelationIdIsMissing_Throws(string? correlationId)
     {
         var saved = new (string, int, bool)[] { (SamplePomSubmission.SchemeOrgId, SamplePomSubmission.CompliancePeriodYear, false) };
 
@@ -94,7 +94,7 @@ public class PomSubmissionOutboxEventsTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void ForSchemeYears_WhenTheActorIdIsMissing_Throws(string? actorId)
+    public void GetOutboxEventsBySchemeYears_WhenTheActorIdIsMissing_Throws(string? actorId)
     {
         var saved = new (string, int, bool)[] { (SamplePomSubmission.SchemeOrgId, SamplePomSubmission.CompliancePeriodYear, false) };
 

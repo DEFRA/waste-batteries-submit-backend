@@ -22,12 +22,6 @@ All requests expect a Defra ID bearer token.
 
 `POST /pom-submissions/upsert-batch` creates or amends a batch of submissions. The body is a required JSON array, with each element has the same shape as a single create or amend. A submission is created when no current row exists for its scheme, member, year and quarter, and amended when one does. The response is `200 OK` and the body is a JSON array in the same order as the request is returned with the `requestIndex`, `id` (the submission just saved), `schemeOrgId`, `memberOrgId`, `compliancePeriodYear`, `compliancePeriodQuarter`, and `action` (`Created` or `Amended`). The submissions and the outbox events commit or roll back in one transaction.
 
-Each of those saves writes one outbox document per distinct scheme and compliance year. Several members or quarters for the same scheme and year share one event. 
-The document is stored in the `outbox` collection with `id` (a GUID, the same value if the transaction is retried), `eventType` (`PomSubmissionCreated`, `PomSubmissionAmended`, 
-or `PomSubmissionSaved` when one scheme and year both creates and amends), `schemaVersion` (set by the submission event, constant 1), `subjectId` (the scheme id and year), `version` (the commit time in unix milliseconds, 
-so a later save orders after an earlier one), `partitionKey` (the scheme id), `occurredAtUtc`, `actorId` (the caller's opaque id from the configured JWT user-id claim, 
-otherwise the name claim), `correlationId`, `sent`, `schemeOrgId` and `compliancePeriodYear`. `sent` is false. `sentAtUtc` and `expiresAtUtc` are omitted until a relay publishes the event and sets the retention time. That relay is not part of this service. `correlationId` is the `x-cdp-request-id` header when the caller sent one. When the header is missing, the request's activity trace id is used, or a new id when there is no activity, and that id is stored on the request for logs and outgoing calls. An index named `sent_occurred_at` is on `sent` then `occurredAtUtc`. A unique index named `subject_version` is on `subjectId` then `version`, so one subject cannot store the same version twice. Events for different subjects can share a version, because one save writes them at one commit time. A TTL index named `expires_at` deletes a document at `expiresAtUtc` (`expireAfterSeconds` 0). An unsent document has no `expiresAtUtc`, so it is not deleted. 
-
 `GET /pom-submissions/{id}` returns the stored submission as `200 OK`. Accepting gzip does not compress this response. The read is by id, so a submission that is no longer current is still returned.
 
 `GET /pom-submissions` returns a page of submission objects. The filters are combined with AND: `schemeOrgId`, `memberOrgId`, `compliancePeriodYears` (array), `compliancePeriodQuarters` (array), and `returnCurrentOnly` (optional, defaults to true if omitted). When it is false, the list includes current submissions and submissions that are no longer current. At least one of `schemeOrgId`, `memberOrgId`, `compliancePeriodYears` or `compliancePeriodQuarters` is required. `returnCurrentOnly` alone does not satisfy that rule.
@@ -48,6 +42,32 @@ As well as testing the page sizes for the get list response (see above) the unit
 Because returning the fully saved submission for each item in the batch would exceed the payload even quicker, upon a successful save we are returning the following for each item in the upsert to help identify what happened to which item:
 
 The `requestIndex`, `id` (the submission just saved), `schemeOrgId`, `memberOrgId`, `compliancePeriodYear`, `compliancePeriodQuarter`, and `action` (`Created` or `Amended`). 
+
+#### Outbox pattern when saving a submission
+
+Each of the saves writes one outbox document per distinct scheme and compliance year, meaning several members or quarters for the same scheme and year share one event for a batch upsert.
+
+This is done within the same trabsaction, which ensures that the save and the outbox are an atomic operation. The outbox document is then used as an event and a relay publishes this to an SNS topic for consumers to subscribe to via an SQS queue.
+
+The outbox event document is stored in the `outbox` collection with 
+- `id` (a GUID, the same value if the transaction is retried), 
+- `eventType` (`PomSubmissionCreated`, `PomSubmissionAmended`, or `PomSubmissionSaved` when one scheme and year both creates and amends),
+- `schemaVersion` (set by the submission event, constant 1), 
+- `subjectId` (the scheme id and year), 
+- `version` (the commit time in unix milliseconds, so a later save orders after an earlier one), 
+- `partitionKey` (the scheme id), 
+- `occurredAtUtc`, 
+- `actorId` (the users id from the configured JWT user-id claim, otherwise the name claim), 
+- `correlationId` (from the `x-cdp-request-id` header, if passed in, else the activity trace id if this exists, else a new id), 
+- `sent`, 
+- `schemeOrgId`,
+- `compliancePeriodYear`. 
+ 
+`sent` is false. `sentAtUtc` and `expiresAtUtc` are omitted until a relay publishes the event and sets the retention time.  
+
+An index named `sent_occurred_at` is on `sent` then `occurredAtUtc`. A unique index named `subject_version` is on `subjectId` then `version`, so one subject cannot store the same version twice. 
+
+A TTL index named `expires_at` deletes a document at `expiresAtUtc` (`expireAfterSeconds` 0). An unsent document has no `expiresAtUtc`, so it is not deleted. 
 
 
 #### Request JSON

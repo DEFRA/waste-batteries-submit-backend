@@ -1,0 +1,14 @@
+{
+  "_id" : "00000000-0000-0000-0000-000000000001",
+  "eventType" : "PomSubmissionCreated",
+  "schemaVersion" : { "$numberInt" : "1" },
+  "subjectId" : "674a1b2c3d4e5f6789012345:2026",
+  "version" : { "$numberLong" : "1792573200000" },
+  "partitionKey" : "674a1b2c3d4e5f6789012345",
+  "occurredAtUtc" : { "$date" : { "$numberLong" : "1792573200000" } },
+  "actorId" : "user-123",
+  "correlationId" : "create-outbox",
+  "sent" : false,
+  "schemeOrgId" : { "$oid" : "674a1b2c3d4e5f6789012345" },
+  "compliancePeriodYear" : { "$numberInt" : "2026" }
+}

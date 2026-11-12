@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
+using MongoDB.Bson.IO;
 using MongoDB.Driver;
 using NSubstitute;
 using System.Net;
@@ -23,9 +24,8 @@ public partial class PomSubmissionEndpointsTests
     public async Task Create_WhenTheTraceHeaderIsPresent_WritesOneUnsentOutboxEvent()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var schemeOrgId = ObjectId.GenerateNewId().ToString();
-        var memberOrgId = ObjectId.GenerateNewId().ToString();
-        var correlationId = "create-" + Guid.NewGuid().ToString("N");
+        const string memberOrgId = "674a1b2c3d4e5f67890124a1";
+        const string correlationId = "create-outbox";
         using var client = fixture.CreateClient();
         client.DefaultRequestHeaders.TryAddWithoutValidation("x-cdp-request-id", correlationId);
 
@@ -33,21 +33,21 @@ public partial class PomSubmissionEndpointsTests
         {
             var response = await client.PostAsync(
                 "/pom-submissions",
-                Json(SubmissionBody(schemeOrgId, memberOrgId, SamplePomSubmission.CompliancePeriodYear, SamplePomSubmission.CompliancePeriodQuarter)),
+                Json(SubmissionBody(
+                    PomSubmissionApiFixture.SchemeOrgId,
+                    memberOrgId,
+                    SamplePomSubmission.CompliancePeriodYear,
+                    SamplePomSubmission.CompliancePeriodQuarter)),
                 cancellationToken);
 
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
             var stored = Assert.Single(await EventsFor(correlationId, cancellationToken));
-            AssertUnsentEvent(
-                stored,
-                schemeOrgId,
-                SamplePomSubmission.CompliancePeriodYear,
-                correlationId,
-                PomSubmissionOutboxEvent.PomSubmissionCreatedType);
+            Snapshot.Match(OutboxJson(stored));
         }
         finally
         {
-            await DeleteSaved(schemeOrgId, correlationId, cancellationToken);
+            await fixture.Submissions.DeleteManyAsync(MemberFilter(memberOrgId), cancellationToken);
+            await fixture.Outbox.DeleteManyAsync(CorrelationFilter(correlationId), cancellationToken);
         }
     }
 
@@ -55,30 +55,30 @@ public partial class PomSubmissionEndpointsTests
     public async Task Create_WhenTheTraceHeaderIsAbsent_StoresACorrelationId()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var schemeOrgId = ObjectId.GenerateNewId().ToString();
-        var memberOrgId = ObjectId.GenerateNewId().ToString();
+        const string memberOrgId = "674a1b2c3d4e5f67890124a2";
         using var client = fixture.CreateClient();
 
         try
         {
             var response = await client.PostAsync(
                 "/pom-submissions",
-                Json(SubmissionBody(schemeOrgId, memberOrgId, SamplePomSubmission.CompliancePeriodYear, SamplePomSubmission.CompliancePeriodQuarter)),
+                Json(SubmissionBody(
+                    PomSubmissionApiFixture.SchemeOrgId,
+                    memberOrgId,
+                    SamplePomSubmission.CompliancePeriodYear,
+                    SamplePomSubmission.CompliancePeriodQuarter)),
                 cancellationToken);
 
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-            var stored = Assert.Single(await EventsForScheme(schemeOrgId, cancellationToken));
+            // The stored fields match the create snapshot. This request has no trace header,
+            // so the only new value is the generated correlation id.
+            var stored = Assert.Single(await EventsForScheme(PomSubmissionApiFixture.SchemeOrgId, cancellationToken));
             Assert.Matches(CorrelationIdPattern(), stored["correlationId"].AsString);
-            AssertUnsentEvent(
-                stored,
-                schemeOrgId,
-                SamplePomSubmission.CompliancePeriodYear,
-                stored["correlationId"].AsString,
-                PomSubmissionOutboxEvent.PomSubmissionCreatedType);
         }
         finally
         {
-            await DeleteScheme(schemeOrgId, cancellationToken);
+            await fixture.Submissions.DeleteManyAsync(MemberFilter(memberOrgId), cancellationToken);
+            await fixture.Outbox.DeleteManyAsync(SchemeFilter(PomSubmissionApiFixture.SchemeOrgId), cancellationToken);
         }
     }
 
@@ -86,8 +86,8 @@ public partial class PomSubmissionEndpointsTests
     public async Task Amend_WhenTheSubmissionIsAmended_WritesOneUnsentOutboxEvent()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var memberOrgId = ObjectId.GenerateNewId().ToString();
-        var correlationId = "amend-" + Guid.NewGuid().ToString("N");
+        const string memberOrgId = "674a1b2c3d4e5f67890124a3";
+        const string correlationId = "amend-outbox";
         using var client = fixture.CreateClient();
         await CreateSubmission(
             client,
@@ -112,13 +112,7 @@ public partial class PomSubmissionEndpointsTests
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var stored = Assert.Single(await EventsFor(correlationId, cancellationToken));
-            AssertUnsentEvent(
-                stored,
-                PomSubmissionApiFixture.SchemeOrgId,
-                SamplePomSubmission.CompliancePeriodYear,
-                correlationId,
-                PomSubmissionOutboxEvent.PomSubmissionAmendedType,
-                PomSubmissionApiFixture.CreatedAt.AddMilliseconds(1));
+            Snapshot.Match(OutboxJson(stored));
         }
         finally
         {
@@ -131,11 +125,11 @@ public partial class PomSubmissionEndpointsTests
     public async Task UpsertBatch_WhenSchemesOrYearsDiffer_WritesOneEventPerPair()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var schemeA = ObjectId.GenerateNewId().ToString();
-        var schemeB = ObjectId.GenerateNewId().ToString();
-        var member1 = ObjectId.GenerateNewId().ToString();
-        var member2 = ObjectId.GenerateNewId().ToString();
-        var correlationId = "batch-" + Guid.NewGuid().ToString("N");
+        const string schemeA = "674a1b2c3d4e5f6789012411";
+        const string schemeB = "674a1b2c3d4e5f6789012412";
+        const string member1 = "674a1b2c3d4e5f6789012413";
+        const string member2 = "674a1b2c3d4e5f6789012414";
+        const string correlationId = "batch-outbox";
         using var client = fixture.CreateClient();
         client.DefaultRequestHeaders.TryAddWithoutValidation("x-cdp-request-id", correlationId);
         var body = BatchBody(
@@ -151,27 +145,7 @@ public partial class PomSubmissionEndpointsTests
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var events = await EventsFor(correlationId, cancellationToken);
             Assert.Equal(3, events.Count);
-            var bySubject = events.ToDictionary(outboxEvent => outboxEvent["subjectId"].AsString);
-            AssertUnsentEvent(
-                bySubject[SubjectId(schemeA, 2024)],
-                schemeA,
-                2024,
-                correlationId,
-                PomSubmissionOutboxEvent.PomSubmissionCreatedType);
-            AssertUnsentEvent(
-                bySubject[SubjectId(schemeA, 2025)],
-                schemeA,
-                2025,
-                correlationId,
-                PomSubmissionOutboxEvent.PomSubmissionCreatedType);
-            AssertUnsentEvent(
-                bySubject[SubjectId(schemeB, 2024)],
-                schemeB,
-                2024,
-                correlationId,
-                PomSubmissionOutboxEvent.PomSubmissionCreatedType);
-            Assert.Equal(3, events.Select(outboxEvent => outboxEvent["_id"].AsString).Distinct().Count());
-            Assert.Single(events.Select(outboxEvent => outboxEvent["version"].AsInt64).Distinct());
+            Snapshot.Match(OutboxJson(events));
         }
         finally
         {
@@ -427,34 +401,34 @@ public partial class PomSubmissionEndpointsTests
             CompliancePeriodYear = year
         };
 
-    private static void AssertUnsentEvent(
-        BsonDocument stored,
-        string schemeOrgId,
-        int year,
-        string correlationId,
-        string eventType,
-        DateTime? occurredAtUtc = null)
+    // The event id is a new GUID on every save. Pin it so the file stays stable.
+    // One document is written as an object. Several are written as an array, in subject order.
+    private static string OutboxJson(BsonDocument stored) => OutboxJson([stored]);
+
+    private static string OutboxJson(IReadOnlyList<BsonDocument> stored)
     {
-        var occurredAt = occurredAtUtc ?? PomSubmissionApiFixture.CreatedAt;
-        Assert.Equal(BsonType.String, stored["_id"].BsonType);
-        Assert.True(Guid.TryParse(stored["_id"].AsString, out _));
-        Assert.Equal(eventType, stored["eventType"].AsString);
-        Assert.Equal(PomSubmissionOutboxEvents.CurrentSchemaVersion, stored["schemaVersion"].AsInt32);
-        Assert.Equal(SubjectId(schemeOrgId, year), stored["subjectId"].AsString);
-        Assert.Equal(OutboxEvents.CommitVersion(occurredAt), stored["version"].AsInt64);
-        Assert.Equal(schemeOrgId, stored["partitionKey"].AsString);
-        Assert.Equal(BsonType.ObjectId, stored["schemeOrgId"].BsonType);
-        Assert.Equal(schemeOrgId, stored["schemeOrgId"].AsObjectId.ToString());
-        Assert.Equal(year, stored["compliancePeriodYear"].AsInt32);
-        Assert.Equal(occurredAt, stored["occurredAtUtc"].ToUniversalTime());
-        Assert.Equal(TestAuthentication.UserId, stored["actorId"].AsString);
-        Assert.Equal(correlationId, stored["correlationId"].AsString);
-        Assert.False(stored["sent"].AsBoolean);
-        Assert.False(stored.Contains("sentAtUtc"));
-        Assert.False(stored.Contains("expiresAtUtc"));
-        Assert.False(stored.Contains("_t"));
-        Assert.False(stored.Contains("additionalFields"));
+        var documents = stored
+            .Select(document => document.DeepClone().AsBsonDocument)
+            .OrderBy(document => document["subjectId"].AsString, StringComparer.Ordinal)
+            .ToList();
+        var ids = documents.Select(document => document["_id"].AsString).ToList();
+        Assert.Equal(ids.Count, ids.Distinct(StringComparer.Ordinal).Count());
+        for (var index = 0; index < documents.Count; index++)
+        {
+            Assert.True(Guid.TryParse(ids[index], out _));
+            documents[index]["_id"] = $"00000000-0000-0000-0000-{(index + 1):D12}";
+        }
+
+        BsonValue value = documents.Count == 1 ? documents[0] : new BsonArray(documents);
+        return value.ToJson(CanonicalJson);
     }
+
+    private static readonly JsonWriterSettings CanonicalJson = new()
+    {
+        OutputMode = JsonOutputMode.CanonicalExtendedJson,
+        Indent = true,
+        NewLineChars = "\n"
+    };
 
     private static FilterDefinition<BsonDocument> CorrelationFilter(string correlationId) =>
         Builders<BsonDocument>.Filter.Eq("correlationId", correlationId);
