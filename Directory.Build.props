@@ -12,6 +12,13 @@
     override for an exact pin. Snappier and SharpCompress accept any version at or above their minimum.
   -->
   <PropertyGroup>
+    <!--
+      artifacts/ is build output (see .gitignore). The SDK includes every other file under a
+      project as content and copies it into bin, so a build written there is copied again on
+      the next build and the path grows until the copy fails.
+    -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);artifacts/**</DefaultItemExcludes>
+
     <MinimumSnappierVersion>1.1.0</MinimumSnappierVersion>
     <PinnedSnappierVersion>1.3.1</PinnedSnappierVersion>
     <MinimumSharpCompressVersion>0.48.0</MinimumSharpCompressVersion>

@@ -63,9 +63,22 @@ public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture
             Builders<BsonDocument>.Filter.Empty,
             cancellationToken: cancellationToken);
 
-    // Other tests leave submissions in the shared collection. Compare this request with the count it started from.
-    private async Task AssertNothingStored(long countBefore, CancellationToken cancellationToken) =>
-        Assert.Equal(countBefore, await SubmissionCount(cancellationToken));
+    private Task<long> OutboxCount(CancellationToken cancellationToken) =>
+        fixture.Outbox.CountDocumentsAsync(
+            Builders<BsonDocument>.Filter.Empty,
+            cancellationToken: cancellationToken);
+
+    private async Task<StoredCounts> CountStored(CancellationToken cancellationToken) =>
+        new(await SubmissionCount(cancellationToken), await OutboxCount(cancellationToken));
+
+    // Other tests leave documents in the shared collections. Compare this request with the counts it started from.
+    private async Task AssertNothingStored(StoredCounts countBefore, CancellationToken cancellationToken)
+    {
+        Assert.Equal(countBefore.Submissions, await SubmissionCount(cancellationToken));
+        Assert.Equal(countBefore.OutboxEvents, await OutboxCount(cancellationToken));
+    }
+
+    private readonly record struct StoredCounts(long Submissions, long OutboxEvents);
 
     private async static Task<CreatedSubmission> CreateSubmission(
         HttpClient client,

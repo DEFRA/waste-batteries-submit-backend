@@ -9,11 +9,14 @@ using WasteBatteriesSubmitBackend.Utils.Mongo;
 namespace WasteBatteriesSubmitBackend.PomSubmission.Services;
 
 // One submission. Create rejects a current row. Amend requires one and replaces it.
+// Each save also writes one outbox event for that scheme and compliance year, in the same transaction.
 public partial class PomSubmissionService
 {
     // Saves a first submission.
     // The request validator checks the posted shape only. A current submission for the same
     // scheme, member, year and quarter is read once: a first submission is rejected when one exists.
+    // The submission and its outbox event commit together. Ids and the timestamp are chosen first
+    // because the driver can run the transaction callback more than once.
     // TEMPORARY: Check vocabulary texts against the reference lists, and resolve scheme and member references.
     // TEMPORARY: Infer compliancePeriodYear from the submission window.
     public async Task<PomSubmissionModel> CreateAsync(PomSubmissionRequest request, CancellationToken cancellationToken = default)
@@ -29,11 +32,26 @@ public partial class PomSubmissionService
             throw new ValidationException(prepared.Failures);
         }
 
-        var submission = pomSubmissionMapper.ToNewSubmission(prepared.Request, timeProvider.UtcNow);
+        var createdAtUtc = timeProvider.UtcNow;
+        var submission = pomSubmissionMapper.ToNewSubmission(prepared.Request, createdAtUtc);
+        var outboxEvents = OutboxFor([(submission, false)], createdAtUtc);
 
         try
         {
-            await pomSubmissionRepository.CreateAsync(submission, cancellationToken);
+            await ExecuteSaveAsync(
+                async (transaction, transactionCancellationToken) =>
+                {
+                    await pomSubmissionRepository.CreateAsync(
+                        transaction.Session,
+                        submission,
+                        transactionCancellationToken);
+                    await outboxRepository.AddAsync(
+                        transaction.Session,
+                        outboxEvents,
+                        transactionCancellationToken);
+                    return submission;
+                },
+                cancellationToken);
         }
         catch (DuplicateKeyOnSaveException)
         {
@@ -75,11 +93,12 @@ public partial class PomSubmissionService
             amendedAtUtc,
             version: current.Version + 1,
             supersedesSubmissionId: current.Id);
+        var outboxEvents = OutboxFor([(submission, true)], amendedAtUtc);
 
         try
         {
             // Ids and the timestamp are allocated above. The transaction callback can run more than once.
-            await unitOfWork.ExecuteAsync(
+            await ExecuteSaveAsync(
                 async (transaction, transactionCancellationToken) =>
                 {
                     await WriteAmendmentAsync(
@@ -87,6 +106,10 @@ public partial class PomSubmissionService
                         current.Id,
                         submission,
                         amendedAtUtc,
+                        transactionCancellationToken);
+                    await outboxRepository.AddAsync(
+                        transaction.Session,
+                        outboxEvents,
                         transactionCancellationToken);
                     return submission;
                 },
@@ -142,7 +165,7 @@ public partial class PomSubmissionService
 
     // The unique index allows one current submission for the key, so the current row is cleared
     // before the replacement is inserted. Both writes use the caller's transaction.
-    // An outbox write can take the same session.
+    // The caller then writes the outbox event on that same session.
     private async Task WriteAmendmentAsync(
         IMongoTransaction transaction,
         string currentSubmissionId,

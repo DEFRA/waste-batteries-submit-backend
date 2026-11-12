@@ -59,6 +59,14 @@ internal static partial class LoggerExtensions
         int amendedCount);
 
     [LoggerMessage(
+        EventId = 7,
+        Level = LogLevel.Error,
+        Message = "Failed to save POM submissions and outbox events")]
+    public static partial void FailedToSavePomSubmissions(
+        this ILogger logger,
+        Exception exception);
+
+    [LoggerMessage(
         EventId = 1000,
         Level = LogLevel.Information,
         Message = "Searching for {Name}, found {Result}")]

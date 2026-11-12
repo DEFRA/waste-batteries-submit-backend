@@ -5,6 +5,8 @@ using MongoDB.Driver;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using WasteBatteriesSubmitBackend.Models;
+using WasteBatteriesSubmitBackend.Outbox;
+using WasteBatteriesSubmitBackend.Outbox.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
@@ -27,8 +29,9 @@ public partial class PomSubmissionServiceTests
             .SupersedeCurrentAsync(session, current.Id, s_createdAt, Arg.Any<CancellationToken>())
             .Returns(true);
         var unitOfWork = UnitOfWork(session);
+        var outbox = Substitute.For<IOutboxRepository>();
         var logger = new CapturingLogger<PomSubmissionService>();
-        var service = Service(repository, logger, unitOfWork);
+        var service = Service(repository, logger, unitOfWork, outbox);
         var request = ValidRequest();
 
         // Act
@@ -62,7 +65,17 @@ public partial class PomSubmissionServiceTests
                     && saved.CreatedAtUtc == s_createdAt
                     && saved.MemberName == SamplePomSubmission.MemberName),
                 Arg.Any<CancellationToken>());
+            outbox.AddAsync(
+                session,
+                Arg.Any<IReadOnlyList<OutboxEvent>>(),
+                Arg.Any<CancellationToken>());
         });
+        await AssertSingleOutboxEvent(
+            outbox,
+            session,
+            submission.SchemeOrgId,
+            submission.CompliancePeriodYear,
+            OutboxEvent.PomSubmissionAmendedType);
         await repository.DidNotReceive().CreateAsync(Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>());
         var entry = Assert.Single(logger.Entries);
         Assert.Equal(LogLevel.Information, entry.Level);
@@ -72,17 +85,18 @@ public partial class PomSubmissionServiceTests
     }
 
     [Fact]
-    public async Task AmendAsync_WhenSaveFails_DoesNotLog()
+    public async Task AmendAsync_WhenSaveFails_LogsTheError()
     {
         // Arrange
         var repository = Substitute.For<IPomSubmissionRepository>();
         ReturnCurrentSubmission(repository);
+        var failure = new InvalidOperationException("database unavailable");
         var unitOfWork = Substitute.For<IUnitOfWork>();
         unitOfWork
             .ExecuteAsync(
                 Arg.Any<Func<IMongoTransaction, CancellationToken, Task<PomSubmissionModel>>>(),
                 Arg.Any<CancellationToken>())
-            .ThrowsAsync(new InvalidOperationException("database unavailable"));
+            .ThrowsAsync(failure);
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger, unitOfWork);
 
@@ -90,8 +104,8 @@ public partial class PomSubmissionServiceTests
         Task<PomSubmissionModel> Act() => service.AmendAsync(ValidRequest(), TestContext.Current.CancellationToken);
 
         // Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(Act);
-        Assert.Empty(logger.Entries);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(Act);
+        AssertSaveError(logger, exception);
     }
 
     [Fact]
@@ -163,9 +177,10 @@ public partial class PomSubmissionServiceTests
         repository
             .SupersedeCurrentAsync(session, current.Id, s_createdAt, Arg.Any<CancellationToken>())
             .Returns(true);
+        var failure = new InvalidOperationException("database unavailable");
         repository
             .CreateAsync(session, Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>())
-            .ThrowsAsync(new InvalidOperationException("database unavailable"));
+            .ThrowsAsync(failure);
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger, UnitOfWork(session));
 
@@ -173,8 +188,8 @@ public partial class PomSubmissionServiceTests
         Task<PomSubmissionModel> Act() => service.AmendAsync(ValidRequest(), TestContext.Current.CancellationToken);
 
         // Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(Act);
-        Assert.Empty(logger.Entries);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(Act);
+        AssertSaveError(logger, exception);
     }
 
     [Fact]

@@ -16,11 +16,17 @@ The target data model is the Compliance Scheme POM Submission page in the [waste
 
 All requests expect a Defra ID bearer token.
 
-`POST /pom-submissions` creates one initial submission for one scheme, member, year and quarter. The response is `201 Created`, with `Location: /pom-submissions/{id}` and the stored submission as the body. Documents are stored in the `pom-submissions` collection.
+`POST /pom-submissions` creates one initial submission for one scheme, member, year and quarter. The response is `201 Created`, with `Location: /pom-submissions/{id}` and the stored submission as the body. Documents are stored in the `pom-submissions` collection. The submission and its outbox event commit or roll back in one transaction.
 
-`PATCH /pom-submissions` amends the current submission, using the supplied scheme, member, year and quarter to find it. The amendment inserts a new version and sets the previous submission so it is no longer current. The response is `200 OK` and the new stored submission is the body. Both the new submission and updating the existing submission commit or roll back in one transaction.
+`PATCH /pom-submissions` amends the current submission, using the supplied scheme, member, year and quarter to find it. The amendment inserts a new version and sets the previous submission so it is no longer current. The response is `200 OK` and the new stored submission is the body. The new submission, the update of the previous submission, and the outbox event commit or roll back in one transaction.
 
-`POST /pom-submissions/upsert-batch` creates or amends a batch of submissions. The body is a required JSON array, with each element has the same shape as a single create or amend. A submission is created when no current row exists for its scheme, member, year and quarter, and amended when one does. The response is `200 OK` and the body is a JSON array in the same order as the request is returned with the `requestIndex`, `id` (the submission just saved), `schemeOrgId`, `memberOrgId`, `compliancePeriodYear`, `compliancePeriodQuarter`, and `action` (`Created` or `Amended`). 
+`POST /pom-submissions/upsert-batch` creates or amends a batch of submissions. The body is a required JSON array, with each element has the same shape as a single create or amend. A submission is created when no current row exists for its scheme, member, year and quarter, and amended when one does. The response is `200 OK` and the body is a JSON array in the same order as the request is returned with the `requestIndex`, `id` (the submission just saved), `schemeOrgId`, `memberOrgId`, `compliancePeriodYear`, `compliancePeriodQuarter`, and `action` (`Created` or `Amended`). The submissions and the outbox events commit or roll back in one transaction.
+
+Each of those saves writes one outbox document per distinct scheme and compliance year. Several members or quarters for the same scheme and year share one event. 
+The document is stored in the `outbox` collection with `id` (a GUID, the same value if the transaction is retried), `eventType` (`PomSubmissionCreated`, `PomSubmissionAmended`, 
+or `PomSubmissionSaved` when one scheme and year both creates and amends), `schemaVersion`, `subjectId` (the scheme id and year), `version` (the commit time in unix milliseconds, 
+so a later save orders after an earlier one), `partitionKey` (the scheme id), `occurredAtUtc`, `actorId` (the caller's opaque id from the configured JWT user-id claim, 
+otherwise the name claim), `correlationId`, `sent`, `schemeOrgId` and `compliancePeriodYear`. `sent` is false. `sentAtUtc` and `expiresAtUtc` are omitted until a relay publishes the event and sets the retention time. That relay is not part of this service. `correlationId` is the `x-cdp-request-id` header when the caller sent one. When the header is missing, the request's activity trace id is used, or a new id when there is no activity, and that id is stored on the request for logs and outgoing calls. An index named `sent_occurred_at` is on `sent` then `occurredAtUtc`. A TTL index named `expires_at` deletes a document at `expiresAtUtc` (`expireAfterSeconds` 0). An unsent document has no `expiresAtUtc`, so it is not deleted. 
 
 `GET /pom-submissions/{id}` returns the stored submission as `200 OK`. Accepting gzip does not compress this response. The read is by id, so a submission that is no longer current is still returned.
 
@@ -118,11 +124,11 @@ See above.
 docker compose up -d --wait mongodb
 ```
 
-The container starts a single-node replica set named `rs0`. The healthcheck initiates it and waits until the node is primary. `docker compose up` without `--wait` can return before that, and an amendment sent in that window fails.
+The container starts a single-node replica set named `rs0`. The healthcheck initiates it and waits until the node is primary. `docker compose up` without `--wait` can return before that, and a save sent in that window fails.
 
 #### MongoDB locally
 
-Alternatively install MongoDB locally. Amendments use a multi-document transaction, so the local server has to be a single-node replica set. A standalone `mongod` rejects the transaction.
+Alternatively install MongoDB locally. Creates, amendments and batch upserts use a multi-document transaction, so the local server has to be a single-node replica set. A standalone `mongod` rejects the transaction.
 
 - Install [MongoDB](https://www.mongodb.com/docs/manual/tutorial/#installation) on your local machine
 - Start MongoDB:
@@ -141,13 +147,13 @@ Connect with `directConnection=true`. The development and Compose connection str
 
 #### Retries
 
-Retryable reads and retryable writes stay at the MongoDB .NET driver default, which is on. The connection strings in this repo do not turn them off. A transient network error on a single-document read or write is retried by the driver. An amendment runs in one transaction. The driver retries that transaction when the error is labeled `TransientTransactionError`, and when the commit result is labeled `UnknownTransactionCommitResult`. The new document's id and timestamp are chosen before the transaction starts, so a retry writes the same document. Duplicate-key conflicts and validation failures are not retried. The transaction aborts and the previous current row is left unchanged.
+Retryable reads and retryable writes stay at the MongoDB .NET driver default, which is on. The connection strings in this repo do not turn them off. A transient network error on a single-document read or write is retried by the driver. A create, an amendment and a batch upsert each run in one transaction with their outbox events. The driver retries that transaction when the error is labeled `TransientTransactionError`, and when the commit result is labeled `UnknownTransactionCommitResult`. Submission ids, outbox event ids and the timestamp are chosen before the transaction starts, so a retry writes the same documents. Duplicate-key conflicts and validation failures are not retried. The transaction aborts and nothing from that save is left behind.
 
 #### MongoDB in CDP environments
 
 In CDP environments a MongoDB instance is already set up
 and the credentials exposed as environment variables.
-That instance is a replica set, which is what the amendment transaction requires. The deployed connection string is supplied by the platform. Do not add `directConnection=true` there: the driver should discover the set.
+That instance is a replica set, which is what the save transaction requires. The deployed connection string is supplied by the platform. Do not add `directConnection=true` there: the driver should discover the set.
 
 
 ### Inspect MongoDB
@@ -169,7 +175,7 @@ dotnet test
 
 `WasteBatteriesSubmitBackend.Tests.Unit` covers validators, mapping, the submission service and handlers without hosting the API.
 
-`WasteBatteriesSubmitBackend.Tests.Integration` hosts the API in process with `WebApplicationFactory`. The placed-on-market submission tests start MongoDB 7 as a single-node replica set with Testcontainers, so Docker must be running. The replica set is what lets an amendment commit or roll back its two writes.
+`WasteBatteriesSubmitBackend.Tests.Integration` hosts the API in process with `WebApplicationFactory`. The placed-on-market submission tests start MongoDB 7 as a single-node replica set with Testcontainers, so Docker must be running. The replica set is what lets a save commit or roll back the submission writes and the outbox events together.
 
 ### Running
 
