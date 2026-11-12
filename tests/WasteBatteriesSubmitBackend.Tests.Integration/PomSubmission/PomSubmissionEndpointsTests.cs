@@ -73,7 +73,24 @@ public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture
         string memberOrgId,
         int year,
         string quarter,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? memberName = null)
+    {
+        var body = SubmissionBody(schemeOrgId, memberOrgId, year, quarter, memberName);
+        var response = await client.PostAsync("/pom-submissions", Json(body), cancellationToken);
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var document = JsonDocument.Parse(json);
+        return new CreatedSubmission(document.RootElement.GetProperty("id").GetString()!, json);
+    }
+
+    private static string SubmissionBody(
+        string schemeOrgId,
+        string memberOrgId,
+        int year,
+        string quarter,
+        string? memberName = null,
+        string? tonnes = null)
     {
         var body = CreateBody
             .Replace(PomSubmissionApiFixture.SchemeOrgId, schemeOrgId, StringComparison.Ordinal)
@@ -90,11 +107,24 @@ public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture
                 $"\"compliancePeriodQuarter\": \"{SamplePomSubmission.CompliancePeriodQuarter}\"",
                 $"\"compliancePeriodQuarter\": \"{quarter}\"",
                 StringComparison.Ordinal);
-        var response = await client.PostAsync("/pom-submissions", Json(body), cancellationToken);
-        var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        using var document = JsonDocument.Parse(json);
-        return new CreatedSubmission(document.RootElement.GetProperty("id").GetString()!, json);
+
+        if (memberName is not null)
+        {
+            body = body.Replace(
+                $"\"memberName\": \"{SamplePomSubmission.MemberName}\"",
+                $"\"memberName\": \"{memberName}\"",
+                StringComparison.Ordinal);
+        }
+
+        if (tonnes is null)
+        {
+            return body;
+        }
+
+        return body.Replace(
+            $"\"tonnes\": \"{SamplePomSubmission.Tonnes}\"",
+            $"\"tonnes\": \"{tonnes}\"",
+            StringComparison.Ordinal);
     }
 
     private async Task SetCurrent(string id, bool isCurrent, CancellationToken cancellationToken)

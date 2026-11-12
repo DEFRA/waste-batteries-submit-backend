@@ -18,6 +18,19 @@ public class PomSubmissionRepositoryFilterTests
     }
 
     [Fact]
+    public void ListOrder_WhenRendered_SortsSchemeThenMemberThenLatestPeriod()
+    {
+        // Act
+        var order = PomSubmissionRepository.ListOrder();
+
+        // Assert
+        Assert.Equal(
+            "{ \"schemeOrgId\" : 1, \"memberOrgId\" : 1, \"compliancePeriodYear\" : -1, "
+            + "\"compliancePeriodQuarter\" : -1, \"version\" : -1, \"createdAtUtc\" : -1, \"_id\" : 1 }",
+            Render(order));
+    }
+
+    [Fact]
     public void Filter_WhenOnlyTheIdIsSet_MatchesThatDocument()
     {
         // Arrange
@@ -183,16 +196,99 @@ public class PomSubmissionRepositoryFilterTests
         Assert.Equal("filter", exception.ParamName);
     }
 
+    [Fact]
+    public void FilterCurrent_WhenOneKeyIsSet_MatchesThatCurrentRow()
+    {
+        // Arrange
+        var keys = new[] { SampleKey() };
+
+        // Act
+        var filter = PomSubmissionRepository.FilterCurrent(keys);
+
+        // Assert
+        Assert.Equal(CurrentClause(SampleKey()), Render(filter));
+    }
+
+    [Fact]
+    public void FilterCurrent_WhenSeveralKeysAreSet_MatchesAnyOfThoseCurrentRows()
+    {
+        // Arrange
+        var first = SampleKey();
+        var second = SampleKey() with { MemberOrgId = OtherMemberOrgId, CompliancePeriodQuarter = "Quarter 1" };
+
+        // Act
+        var filter = PomSubmissionRepository.FilterCurrent([first, second]);
+
+        // Assert
+        Assert.Equal(
+            "{ \"isCurrent\" : true, \"$or\" : ["
+            + CurrentMatch(first)
+            + ", "
+            + CurrentMatch(second)
+            + "] }",
+            Render(filter));
+    }
+
+    [Fact]
+    public void FilterCurrent_WhenNoKeyIsSupplied_Throws()
+    {
+        // Act
+        FilterDefinition<PomSubmissionModel> Act() => PomSubmissionRepository.FilterCurrent([]);
+
+        // Assert
+        var exception = Assert.Throws<ArgumentException>(Act);
+        Assert.Equal("keys", exception.ParamName);
+    }
+
+    [Fact]
+    public void FilterCurrent_WhenKeysAreNull_Throws()
+    {
+        // Act
+        FilterDefinition<PomSubmissionModel> Act() => PomSubmissionRepository.FilterCurrent(null!);
+
+        // Assert
+        var exception = Assert.Throws<ArgumentNullException>(Act);
+        Assert.Equal("keys", exception.ParamName);
+    }
+
+    private static PomSubmissionKey SampleKey() =>
+        new(
+            SamplePomSubmission.SchemeOrgId,
+            SamplePomSubmission.MemberOrgId,
+            SamplePomSubmission.CompliancePeriodYear,
+            SamplePomSubmission.CompliancePeriodQuarter);
+
+    private static string CurrentClause(PomSubmissionKey key) =>
+        "{ \"isCurrent\" : true, \"$or\" : [" + CurrentMatch(key) + "] }";
+
+    private static string CurrentMatch(PomSubmissionKey key) =>
+        "{ "
+        + "\"schemeOrgId\" : { \"$oid\" : \""
+        + key.SchemeOrgId
+        + "\" }, \"memberOrgId\" : { \"$oid\" : \""
+        + key.MemberOrgId
+        + "\" }, \"compliancePeriodYear\" : "
+        + key.CompliancePeriodYear
+        + ", \"compliancePeriodQuarter\" : \""
+        + key.CompliancePeriodQuarter
+        + "\" }";
+
     private static string IdClause(string id) =>
         $$"""{ "_id" : { "$oid" : "{{id}}" } }""";
 
     private static string ObjectIdClause(string field, string id) =>
         $$"""{ "{{field}}" : { "$oid" : "{{id}}" } }""";
 
-    private static string Render(FilterDefinition<PomSubmissionModel> filter)
+    private static string Render(FilterDefinition<PomSubmissionModel> filter) =>
+        filter.Render(RenderArgs()).ToString();
+
+    private static string Render(SortDefinition<PomSubmissionModel> sort) =>
+        sort.Render(RenderArgs()).ToString();
+
+    private static RenderArgs<PomSubmissionModel> RenderArgs()
     {
         var registry = BsonSerializer.SerializerRegistry;
-        var args = new RenderArgs<PomSubmissionModel>(
+        return new RenderArgs<PomSubmissionModel>(
             registry.GetSerializer<PomSubmissionModel>(),
             registry,
             default,
@@ -200,6 +296,5 @@ public class PomSubmissionRepositoryFilterTests
             false,
             false,
             null);
-        return filter.Render(args).ToString();
     }
 }

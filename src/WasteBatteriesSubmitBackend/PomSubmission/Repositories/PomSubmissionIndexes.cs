@@ -19,6 +19,19 @@ internal static class PomSubmissionIndexes
                 PartialFilterExpression = Builders<PomSubmissionModel>.Filter.Eq(submission => submission.IsCurrent, true)
             });
 
+        // Each version of a scheme, member, year and quarter is stored once, including rows that are no longer current.
+        var versionPerMemberQuarter = new CreateIndexModel<PomSubmissionModel>(
+            builder
+                .Ascending(submission => submission.SchemeOrgId)
+                .Ascending(submission => submission.MemberOrgId)
+                .Ascending(submission => submission.CompliancePeriodYear)
+                .Ascending(submission => submission.CompliancePeriodQuarter)
+                .Ascending(submission => submission.Version),
+            new CreateIndexOptions<PomSubmissionModel>
+            {
+                Unique = true
+            });
+
         var schemeQuarter = new CreateIndexModel<PomSubmissionModel>(
             builder
                 .Ascending(submission => submission.SchemeOrgId)
@@ -51,6 +64,7 @@ internal static class PomSubmissionIndexes
         return
         [
             currentPerMemberQuarter,
+            versionPerMemberQuarter,
             schemeQuarter,
             memberHistory,
             memberBprn,

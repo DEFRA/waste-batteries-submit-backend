@@ -35,6 +35,17 @@ public static class PomSubmissionValidationMessages
     public const string CurrentSubmissionChanged =
         "The current submission changed before this amendment was saved.";
 
+    // A row found for a batch was no longer current when the batch was saved.
+    public const string UpsertBatchSubmissionChanged =
+        "A current submission changed before this batch was saved.";
+
+    public const string SubmissionsRequired = "At least one submission is required.";
+
+    public const string SubmissionRequired = "A submission must not be empty.";
+
+    public static string SubmissionRepeated(int firstIndex) =>
+        $"This submission repeats [{firstIndex}] for the same scheme, member, year and quarter.";
+
     public const string PageNumberMinimum = "pageNumber must be at least 1.";
 
     public const string PageSizeMinimum = "pageSize must be at least 1.";

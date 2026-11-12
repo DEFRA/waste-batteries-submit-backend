@@ -16,7 +16,7 @@ public class PomSubmissionFilterRequestValidatorTests
             _validator,
             new PomSubmissionFilterRequest
             {
-                IsCurrent = true,
+                ReturnCurrentOnly = true,
                 CompliancePeriodYears = [],
                 CompliancePeriodQuarters = []
             },
@@ -55,7 +55,7 @@ public class PomSubmissionFilterRequestValidatorTests
                 MemberOrgId = "674a1b2c3d4e5f6789012347",
                 CompliancePeriodYears = [2024, SamplePomSubmission.CompliancePeriodYear],
                 CompliancePeriodQuarters = ["Quarter 1", SamplePomSubmission.CompliancePeriodQuarter],
-                IsCurrent = true,
+                ReturnCurrentOnly = true,
                 PageNumber = 1,
                 PageSize = 25
             },

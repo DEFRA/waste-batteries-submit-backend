@@ -30,7 +30,7 @@ public partial class PomSubmissionServiceTests
 
         // Act
         Task<PaginatedList<PomSubmissionModel>> Act() => service.GetAsync(
-            new PomSubmissionFilterRequest { IsCurrent = false },
+            new PomSubmissionFilterRequest { ReturnCurrentOnly = false },
             false,
             TestContext.Current.CancellationToken);
 
@@ -211,7 +211,7 @@ public partial class PomSubmissionServiceTests
     }
 
     [Fact]
-    public async Task GetAsync_WhenCurrentIsSupplied_KeepsThatValue()
+    public async Task GetAsync_WhenReturnCurrentOnlyIsTrue_ReadsCurrentSubmissions()
     {
         // Arrange
         var repository = Substitute.For<IPomSubmissionRepository>();
@@ -226,7 +226,37 @@ public partial class PomSubmissionServiceTests
             new PomSubmissionFilterRequest
             {
                 SchemeOrgId = SamplePomSubmission.SchemeOrgId,
-                IsCurrent = false,
+                ReturnCurrentOnly = true
+            },
+            false,
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        await repository.Received(1).FindAsync(
+            Arg.Is<PomSubmissionFilter>(filter =>
+                filter.SchemeOrgId == SamplePomSubmission.SchemeOrgId
+                && filter.IsCurrent == true),
+            Arg.Any<PageRequest>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetAsync_WhenReturnCurrentOnlyIsFalse_IncludesHistoricalSubmissions()
+    {
+        // Arrange
+        var repository = Substitute.For<IPomSubmissionRepository>();
+        var logger = new CapturingLogger<PomSubmissionService>();
+        var service = Service(repository, logger);
+        repository
+            .FindAsync(Arg.Any<PomSubmissionFilter>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new PaginatedList<PomSubmissionModel>([], 0, 1, 0));
+
+        // Act
+        await service.GetAsync(
+            new PomSubmissionFilterRequest
+            {
+                SchemeOrgId = SamplePomSubmission.SchemeOrgId,
+                ReturnCurrentOnly = false,
                 PageNumber = 2,
                 PageSize = 10
             },
@@ -241,7 +271,7 @@ public partial class PomSubmissionServiceTests
                 && filter.MemberOrgId == null
                 && filter.CompliancePeriodYears == null
                 && filter.CompliancePeriodQuarters == null
-                && filter.IsCurrent == false),
+                && filter.IsCurrent == null),
             new PageRequest { PageNumber = 2, PageSize = 10 },
             Arg.Any<CancellationToken>());
     }

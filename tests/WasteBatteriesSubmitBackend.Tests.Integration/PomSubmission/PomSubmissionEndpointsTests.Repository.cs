@@ -43,6 +43,12 @@ public partial class PomSubmissionEndpointsTests
         Assert.True(current["unique"].AsBoolean);
         Assert.True(current["partialFilterExpression"]["isCurrent"].AsBoolean);
 
+        var version = Index(
+            indexes,
+            "schemeOrgId_1_memberOrgId_1_compliancePeriodYear_1_compliancePeriodQuarter_1_version_1");
+        Assert.True(version["unique"].AsBoolean);
+        Assert.False(version.Contains("partialFilterExpression"));
+
         Index(indexes, "schemeOrgId_1_compliancePeriodYear_1_compliancePeriodQuarter_1");
 
         var memberHistory = Index(indexes, "memberOrgId_1_compliancePeriodYear_1");

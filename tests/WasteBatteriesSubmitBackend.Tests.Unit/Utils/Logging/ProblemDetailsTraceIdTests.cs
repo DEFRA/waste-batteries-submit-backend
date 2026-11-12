@@ -41,6 +41,17 @@ public class ProblemDetailsTraceIdTests
     }
 
     [Fact]
+    public void Select_WhenRequestIdentifierIsATraceParent_UsesItsTraceId()
+    {
+        var traceId = ProblemDetailsTraceId.Select(
+            null,
+            null,
+            "00-E9553A6557614E09143838699E68851A-19fbdea7fac6df4c-01");
+
+        Assert.Equal("e9553a6557614e09143838699e68851a", traceId);
+    }
+
+    [Fact]
     public void Apply_WhenTraceHeaderIsPresent_UsesHeader()
     {
         using var activity = new Activity("test").Start();

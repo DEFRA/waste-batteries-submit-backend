@@ -4,7 +4,7 @@ using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Validators;
 
-// Shape of a collection read. At least one business filter is required. isCurrent does not count.
+// Shape of a collection read. At least one business filter is required. returnCurrentOnly does not count.
 public sealed class PomSubmissionFilterRequestValidator : AbstractValidator<PomSubmissionFilterRequest>
 {
     public PomSubmissionFilterRequestValidator()

@@ -21,8 +21,9 @@ public sealed record PomSubmissionFilterRequest
     [FromQuery(Name = "compliancePeriodQuarters")]
     public string[]? CompliancePeriodQuarters { get; init; }
 
-    [FromQuery(Name = "isCurrent")]
-    public bool? IsCurrent { get; init; }
+    // Omitted defaults to current submissions only. False also returns submissions that are no longer current.
+    [FromQuery(Name = "returnCurrentOnly")]
+    public bool? ReturnCurrentOnly { get; init; }
 
     [FromQuery(Name = "pageNumber")]
     public int? PageNumber { get; init; }

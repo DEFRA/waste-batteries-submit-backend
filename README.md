@@ -20,9 +20,11 @@ All requests expect a Defra ID bearer token.
 
 `PATCH /pom-submissions` amends the current submission, using the supplied scheme, member, year and quarter to find it. The amendment inserts a new version and sets the previous submission so it is no longer current. The response is `200 OK` and the new stored submission is the body. Both the new submission and updating the existing submission commit or roll back in one transaction.
 
+`POST /pom-submissions/upsert-batch` creates or amends a batch of submissions. The body is a required JSON array, with each element has the same shape as a single create or amend. A submission is created when no current row exists for its scheme, member, year and quarter, and amended when one does. The response is `200 OK` and the body is a JSON array in the same order as the request is returned with the `requestIndex`, `id` (the submission just saved), `schemeOrgId`, `memberOrgId`, `compliancePeriodYear`, `compliancePeriodQuarter`, and `action` (`Created` or `Amended`). 
+
 `GET /pom-submissions/{id}` returns the stored submission as `200 OK`. Accepting gzip does not compress this response. The read is by id, so a submission that is no longer current is still returned.
 
-`GET /pom-submissions` returns a page of submission objects. The filters are combined with AND: `schemeOrgId`, `memberOrgId`, `compliancePeriodYears` (array), `compliancePeriodQuarters` (array), and `isCurrent` (optional, defaults to true). At least one of `schemeOrgId`, `memberOrgId`, `compliancePeriodYears` or `compliancePeriodQuarters` is required. `isCurrent` alone does not satisfy that rule.
+`GET /pom-submissions` returns a page of submission objects. The filters are combined with AND: `schemeOrgId`, `memberOrgId`, `compliancePeriodYears` (array), `compliancePeriodQuarters` (array), and `returnCurrentOnly` (optional, defaults to true if omitted). When it is false, the list includes current submissions and submissions that are no longer current. At least one of `schemeOrgId`, `memberOrgId`, `compliancePeriodYears` or `compliancePeriodQuarters` is required. `returnCurrentOnly` alone does not satisfy that rule.
 A missing `pageSize`, or one above the limit for that request, is replaced by `MaxPageSize` or `MaxGzipPageSize` (see below). A smaller `pageSize` is kept. `pageNumber` defaults to 1. A page past the end returns the last page. The JSON body has `items`, `pageNumber`, `pageSize`, `totalPages`, `totalCount`, `hasPreviousPage` and `hasNextPage`. No match is `200` with an empty `items` array. The list is gzip-compressed when the caller accepts gzip. A single submission is not. 
 
 #### Page sizes when getting list of submissions
@@ -30,6 +32,17 @@ A missing `pageSize`, or one above the limit for that request, is replaced by `M
 `PomSubmission:MaxPageSize` is the page size when the caller does not accept gzip. `PomSubmission:MaxGzipPageSize` is the page size when `Accept-Encoding` includes `gzip` or `*` with a quality above 0. `gzip;q=0` does not accept gzip, so the smaller limit applies and the body is plain JSON. A caller that does not accept gzip still receives `200` and uncompressed JSON. The response does not fail.
 
 Both numbers were calculated for the current `PomSubmissionModel` shape, using the maximum likely array and field characters.  See `MeasuredPomSubmission.Distinct` for details of this. If that class changes, measure the plain JSON and the gzip response again and update both settings. Until that is done, the limits are for the old shape and a page can pass the 10 MiB CDP payload limit (10,485,760 bytes). The unit tests in `PomSubmissionPageBudgetTests` read `MaxPageSize` and `MaxGzipPageSize` and fail when either full page is not under 10 MiB.
+
+#### Batch size when upserting submissions
+
+When consumers of this API call the `upsert-batch` they will need to ensure that they do not pass the payload limit, otherwise the request will never reach this API.
+
+As well as testing the page sizes for the get list response (see above) the unit tests in `PomSubmissionPageBudgetTests` also have the `RoundedBatchSize` - which is the number of requests the consumers can include in their `upsert-batch` request before hitting 10 MiB.  If the model shape subsequently changes, highlighting that we can allow more or less than submissions then this unit test will fail.  This will allow us to update the frontend limits for the upsert at the point the model shape changes.
+
+Because returning the fully saved submission for each item in the batch would exceed the payload even quicker, upon a successful save we are returning the following for each item in the upsert to help identify what happened to which item:
+
+The `requestIndex`, `id` (the submission just saved), `schemeOrgId`, `memberOrgId`, `compliancePeriodYear`, `compliancePeriodQuarter`, and `action` (`Created` or `Amended`). 
+
 
 #### Request JSON
 
@@ -72,9 +85,9 @@ Each tonnage entry also stores:
 - `activity` (from `PomSubmission:InitialActivity`, default Placed)
 - `batteryCategory` (from `PomSubmission:InitialBatteryCategory`, default Portable; not accepted on the request) 
 
-The unique index for a submission in the database is `schemeOrgId`, `memberOrgId`, `compliancePeriodYear` and `compliancePeriodQuarter`, partial on `isCurrent: true`. A submission with `isCurrent` false can share that key. 
+Two unique indexes cover a submission. The current-row index is `schemeOrgId`, `memberOrgId`, `compliancePeriodYear` and `compliancePeriodQuarter`, partial on `isCurrent: true`, so one current submission can use that key. The version index is those fields plus `version`, so each version of that key is stored once, including submissions that are no longer current.
 
-The other indexes are not unique: scheme plus year plus quarter, member plus year where `isCurrent` is true, `memberBprn`, chemistry plus battery category on the entries, and a sparse index on `supersedesSubmissionId`.
+The other indexes are scheme plus year plus quarter, member plus year where `isCurrent` is true, `memberBprn`, chemistry plus battery category on the entries, and a sparse index on `supersedesSubmissionId`.
 
 
 ### Docker Compose
