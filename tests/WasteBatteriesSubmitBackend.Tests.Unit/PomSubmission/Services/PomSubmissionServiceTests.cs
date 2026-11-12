@@ -55,10 +55,11 @@ public partial class PomSubmissionServiceTests
         ICorrelationContext? correlation = null,
         IActorContext? actor = null) =>
         new(
-            repository,
-            outbox ?? Substitute.For<IOutboxRepository>(),
-            unitOfWork ?? Substitute.For<IUnitOfWork>(),
-            new PomSubmissionMapper(s_config),
+            new PomSubmissionDocuments(
+                repository,
+                outbox ?? Substitute.For<IOutboxRepository>(),
+                unitOfWork ?? Substitute.For<IUnitOfWork>(),
+                new PomSubmissionMapper(s_config)),
             s_config,
             new PomSubmissionValidators(
                 new PomSubmissionRequestValidator(),

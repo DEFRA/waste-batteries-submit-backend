@@ -72,10 +72,18 @@ public static class OutboxEvents
         return new DateTimeOffset(occurredAtUtc).ToUnixTimeMilliseconds();
     }
 
-    private static string EventType(bool created, bool amended) =>
-        created && amended
-            ? OutboxEvent.PomSubmissionSavedType
-            : amended
-                ? OutboxEvent.PomSubmissionAmendedType
-                : OutboxEvent.PomSubmissionCreatedType;
+    private static string EventType(bool created, bool amended)
+    {
+        if (created && amended)
+        {
+            return OutboxEvent.PomSubmissionSavedType;
+        }
+
+        if (amended)
+        {
+            return OutboxEvent.PomSubmissionAmendedType;
+        }
+
+        return OutboxEvent.PomSubmissionCreatedType;
+    }
 }

@@ -36,7 +36,7 @@ public partial class PomSubmissionService
             pending.Add((request, PomSubmissionKey.From(request)));
         }
 
-        var currents = await pomSubmissionRepository.FindCurrentAsync(
+        var currents = await documents.Repository.FindCurrentAsync(
             [.. pending.Select(item => item.Key)],
             cancellationToken);
         var currentByKey = IndexCurrents(currents);
@@ -54,7 +54,7 @@ public partial class PomSubmissionService
             {
                 currentIds.Add(current.Id);
                 action = PomSubmissionUpsertAction.Amended;
-                submission = pomSubmissionMapper.ToNewSubmission(
+                submission = documents.Mapper.ToNewSubmission(
                     request,
                     savedAtUtc,
                     version: current.Version + 1,
@@ -63,7 +63,7 @@ public partial class PomSubmissionService
             else
             {
                 action = PomSubmissionUpsertAction.Created;
-                submission = pomSubmissionMapper.ToNewSubmission(request, savedAtUtc);
+                submission = documents.Mapper.ToNewSubmission(request, savedAtUtc);
             }
 
             submissions.Add(submission);
@@ -96,7 +96,7 @@ public partial class PomSubmissionService
                         savedAtUtc,
                         transactionCancellationToken);
 
-                    await outboxRepository.AddAsync(
+                    await documents.Outbox.AddAsync(
                         transaction.Session,
                         outboxEvents,
                         transactionCancellationToken);
@@ -215,7 +215,7 @@ public partial class PomSubmissionService
     {
         if (currentSubmissionIds.Count > 0)
         {
-            var superseded = await pomSubmissionRepository.SupersedeCurrentsAsync(
+            var superseded = await documents.Repository.SupersedeCurrentsAsync(
                 transaction.Session,
                 currentSubmissionIds,
                 updatedAtUtc,
@@ -230,7 +230,7 @@ public partial class PomSubmissionService
             }
         }
 
-        await pomSubmissionRepository.CreateManyAsync(transaction.Session, submissions, cancellationToken);
+        await documents.Repository.CreateManyAsync(transaction.Session, submissions, cancellationToken);
     }
 
     private static Dictionary<PomSubmissionKey, PomSubmissionModel> IndexCurrents(

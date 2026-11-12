@@ -33,7 +33,7 @@ public partial class PomSubmissionService
         }
 
         var createdAtUtc = timeProvider.UtcNow;
-        var submission = pomSubmissionMapper.ToNewSubmission(prepared.Request, createdAtUtc);
+        var submission = documents.Mapper.ToNewSubmission(prepared.Request, createdAtUtc);
         var outboxEvents = OutboxFor([(submission, false)], createdAtUtc);
 
         try
@@ -41,11 +41,11 @@ public partial class PomSubmissionService
             await ExecuteSaveAsync(
                 async (transaction, transactionCancellationToken) =>
                 {
-                    await pomSubmissionRepository.CreateAsync(
+                    await documents.Repository.CreateAsync(
                         transaction.Session,
                         submission,
                         transactionCancellationToken);
-                    await outboxRepository.AddAsync(
+                    await documents.Outbox.AddAsync(
                         transaction.Session,
                         outboxEvents,
                         transactionCancellationToken);
@@ -88,7 +88,7 @@ public partial class PomSubmissionService
         var current = prepared.Current!;
 
         var amendedAtUtc = timeProvider.UtcNow;
-        var submission = pomSubmissionMapper.ToNewSubmission(
+        var submission = documents.Mapper.ToNewSubmission(
             prepared.Request,
             amendedAtUtc,
             version: current.Version + 1,
@@ -107,7 +107,7 @@ public partial class PomSubmissionService
                         submission,
                         amendedAtUtc,
                         transactionCancellationToken);
-                    await outboxRepository.AddAsync(
+                    await documents.Outbox.AddAsync(
                         transaction.Session,
                         outboxEvents,
                         transactionCancellationToken);
@@ -175,7 +175,7 @@ public partial class PomSubmissionService
     {
         // Call this before inserting the replacement. The unique index allows one current submission for the key.
         // So we need to update the old/existing one (so isCurrent = false) before inserting the new amended submission.
-        var superseded = await pomSubmissionRepository.SupersedeCurrentAsync(
+        var superseded = await documents.Repository.SupersedeCurrentAsync(
             transaction.Session,
             currentSubmissionId,
             updatedAtUtc,
@@ -189,7 +189,7 @@ public partial class PomSubmissionService
             ]);
         }
 
-        await pomSubmissionRepository.CreateAsync(transaction.Session, amendment, cancellationToken);
+        await documents.Repository.CreateAsync(transaction.Session, amendment, cancellationToken);
     }
 
     private sealed record PreparedSubmission(

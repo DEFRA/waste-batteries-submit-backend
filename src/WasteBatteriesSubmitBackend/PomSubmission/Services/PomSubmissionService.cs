@@ -5,12 +5,9 @@ using MongoDB.Bson;
 using WasteBatteriesSubmitBackend.Config;
 using WasteBatteriesSubmitBackend.Models;
 using WasteBatteriesSubmitBackend.Outbox;
-using WasteBatteriesSubmitBackend.Outbox.Repositories;
-using WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Responses;
-using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Validators;
 using WasteBatteriesSubmitBackend.Utils.Actor;
 using WasteBatteriesSubmitBackend.Utils.Correlation;
@@ -42,10 +39,7 @@ public interface IPomSubmissionService
 // Single creates and amends are in the Save partial. The batch upsert is in UpsertBatch.
 // Reads are in the Query partial. These helpers are shared by the writes.
 public partial class PomSubmissionService(
-    IPomSubmissionRepository pomSubmissionRepository,
-    IOutboxRepository outboxRepository,
-    IUnitOfWork unitOfWork,
-    IPomSubmissionMapper pomSubmissionMapper,
+    PomSubmissionDocuments documents,
     IOptions<PomSubmissionConfig> pomSubmissionConfig,
     PomSubmissionValidators validators,
     ITimeProvider timeProvider,
@@ -75,7 +69,7 @@ public partial class PomSubmissionService(
     {
         try
         {
-            return await unitOfWork.ExecuteAsync(work, cancellationToken);
+            return await documents.UnitOfWork.ExecuteAsync(work, cancellationToken);
         }
         catch (Exception exception) when (exception is not ValidationException and not DuplicateKeyOnSaveException)
         {

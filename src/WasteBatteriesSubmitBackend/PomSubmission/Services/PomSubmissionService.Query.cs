@@ -26,7 +26,7 @@ public partial class PomSubmissionService
             ]);
         }
 
-        var matches = await pomSubmissionRepository.FindAsync(
+        var matches = await documents.Repository.FindAsync(
             new PomSubmissionFilter { Id = id, IsCurrent = null },
             new PageRequest(),
             cancellationToken);
@@ -60,7 +60,7 @@ public partial class PomSubmissionService
             filter = filter with { IsCurrent = null };
         }
 
-        return await pomSubmissionRepository.FindAsync(
+        return await documents.Repository.FindAsync(
             filter,
             new PageRequest
             {
