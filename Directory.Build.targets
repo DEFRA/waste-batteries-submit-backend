@@ -15,6 +15,14 @@
         Condition="'%(Identity)' == 'Microsoft.OpenApi' and '%(Version)' != '$(PinnedMicrosoftOpenApiVersion)'">
         <PinnedVersion>$(PinnedMicrosoftOpenApiVersion)</PinnedVersion>
       </_PinnedPackageOverride>
+      <_AspNetCorePackageOverride Include="@(PackageReference)"
+        Condition="('%(Identity)' == 'Microsoft.AspNetCore.Authentication.JwtBearer'
+          or '%(Identity)' == 'Microsoft.AspNetCore.HeaderPropagation'
+          or '%(Identity)' == 'Microsoft.AspNetCore.Mvc.Testing'
+          or '%(Identity)' == 'Microsoft.AspNetCore.OpenApi')
+          and '%(Version)' != '$(PinnedAspNetCore10Version)'">
+        <PinnedVersion>$(PinnedAspNetCore10Version)</PinnedVersion>
+      </_AspNetCorePackageOverride>
     </ItemGroup>
     <Error
       Condition="'@(_SnappierBelowMinimum)' != ''"
@@ -25,5 +33,8 @@
     <Error
       Condition="'@(_PinnedPackageOverride)' != ''"
       Text="Package %(_PinnedPackageOverride.Identity) is pinned to %(_PinnedPackageOverride.PinnedVersion) in Directory.Build.props, but a project sets %(_PinnedPackageOverride.Version). The NuGet Package Manager writes that override into the csproj and restore ignores the pin. Delete the PackageReference version from the csproj. Change the pin in Directory.Build.props only when the update is intended." />
+    <Error
+      Condition="'@(_AspNetCorePackageOverride)' != ''"
+      Text="Package %(_AspNetCorePackageOverride.Identity) is pinned to %(_AspNetCorePackageOverride.PinnedVersion) in Directory.Build.props, but a project sets %(_AspNetCorePackageOverride.Version). 11.0.0 supports net11.0 only and restore fails with NU1202 on net10.0. Set the PackageReference version back to $(PinnedAspNetCore10Version). Raise the lower bound in Directory.Build.props for a 10.x patch. Move the upper bound when the projects target net11.0." />
   </Target>
 </Project>

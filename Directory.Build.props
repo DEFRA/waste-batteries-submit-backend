@@ -10,6 +10,7 @@
     newer release. A range keeps versions outside it off that list. Applying an
     update still writes a csproj override. Directory.Build.targets rejects that
     override for an exact pin. Snappier and SharpCompress accept any version at or above their minimum.
+    The ASP.NET Core packages use one range. 11.0.0 supports net11.0 only.
   -->
   <PropertyGroup>
     <!--
@@ -24,6 +25,14 @@
     <MinimumSharpCompressVersion>0.48.0</MinimumSharpCompressVersion>
     <PinnedSharpCompressVersion>0.50.8</PinnedSharpCompressVersion>
     <PinnedMicrosoftOpenApiVersion>[2.13.0,3.0.0)</PinnedMicrosoftOpenApiVersion>
+    <!--
+      Microsoft.AspNetCore.* 11.0.0 supports net11.0 only. Restoring it on net10.0
+      fails with NU1202. The upper bound keeps 11.x off the NuGet Updates tab.
+      Raise the lower bound for a 10.x patch. Move the upper bound when these
+      projects target net11.0.
+      Applies to Authentication.JwtBearer, HeaderPropagation, Mvc.Testing, and OpenApi.
+    -->
+    <PinnedAspNetCore10Version>[10.0.14,11.0.0)</PinnedAspNetCore10Version>
   </PropertyGroup>
 
   <ItemGroup>

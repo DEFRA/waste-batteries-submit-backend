@@ -7,13 +7,23 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
+  <!--
+    Direct framework reference so NuGet prunes framework packages.
+    A framework reference that arrives through Mvc.Testing or a project
+    reference does not. Without this, Serilog.Enrichers.ClientInfo pulls
+    Microsoft.AspNetCore.WebUtilities 2.3.0 (GHSA-6527-9fp8-r4x6).
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.14" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="$(PinnedAspNetCore10Version)" />
     <PackageReference Include="NSubstitute" Version="6.2.0" />
     <PackageReference Include="Testcontainers.MongoDb" Version="4.16.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1">
