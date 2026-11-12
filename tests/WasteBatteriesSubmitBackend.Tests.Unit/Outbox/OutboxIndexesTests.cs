@@ -18,8 +18,9 @@ public class OutboxIndexesTests
         var args = RenderArgs();
         var sentByTime = indexes[0];
         var expiresAt = indexes[1];
+        var subjectVersion = indexes[2];
 
-        Assert.Equal(2, indexes.Count);
+        Assert.Equal(3, indexes.Count);
         Assert.Equal("sent_occurred_at", sentByTime.Options.Name);
         Assert.Equal(
             "{ \"sent\" : 1, \"occurredAtUtc\" : 1 }",
@@ -31,6 +32,14 @@ public class OutboxIndexesTests
         Assert.Equal("{ \"expiresAtUtc\" : 1 }", expiresAt.Keys.Render(args).ToString());
         Assert.Equal(TimeSpan.Zero, expiresAt.Options.ExpireAfter);
         Assert.Null(expiresAt.Options.PartialFilterExpression);
+        Assert.NotEqual(true, expiresAt.Options.Unique);
+
+        Assert.Equal("subject_version", subjectVersion.Options.Name);
+        Assert.Equal(
+            "{ \"subjectId\" : 1, \"version\" : 1 }",
+            subjectVersion.Keys.Render(args).ToString());
+        Assert.True(subjectVersion.Options.Unique);
+        Assert.Null(subjectVersion.Options.PartialFilterExpression);
     }
 
     private static RenderArgs<OutboxEvent> RenderArgs()

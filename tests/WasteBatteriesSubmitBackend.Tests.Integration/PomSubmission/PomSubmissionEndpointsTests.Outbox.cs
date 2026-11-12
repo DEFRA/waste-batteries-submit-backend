@@ -6,6 +6,7 @@ using NSubstitute;
 using System.Net;
 using System.Text.RegularExpressions;
 using WasteBatteriesSubmitBackend.Outbox;
+using WasteBatteriesSubmitBackend.PomSubmission.Outbox;
 using WasteBatteriesSubmitBackend.Outbox.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
@@ -42,7 +43,7 @@ public partial class PomSubmissionEndpointsTests
                 schemeOrgId,
                 SamplePomSubmission.CompliancePeriodYear,
                 correlationId,
-                OutboxEvent.PomSubmissionCreatedType);
+                PomSubmissionOutboxEvent.PomSubmissionCreatedType);
         }
         finally
         {
@@ -73,7 +74,7 @@ public partial class PomSubmissionEndpointsTests
                 schemeOrgId,
                 SamplePomSubmission.CompliancePeriodYear,
                 stored["correlationId"].AsString,
-                OutboxEvent.PomSubmissionCreatedType);
+                PomSubmissionOutboxEvent.PomSubmissionCreatedType);
         }
         finally
         {
@@ -116,7 +117,8 @@ public partial class PomSubmissionEndpointsTests
                 PomSubmissionApiFixture.SchemeOrgId,
                 SamplePomSubmission.CompliancePeriodYear,
                 correlationId,
-                OutboxEvent.PomSubmissionAmendedType);
+                PomSubmissionOutboxEvent.PomSubmissionAmendedType,
+                PomSubmissionApiFixture.CreatedAt.AddMilliseconds(1));
         }
         finally
         {
@@ -151,24 +153,25 @@ public partial class PomSubmissionEndpointsTests
             Assert.Equal(3, events.Count);
             var bySubject = events.ToDictionary(outboxEvent => outboxEvent["subjectId"].AsString);
             AssertUnsentEvent(
-                bySubject[OutboxEvents.SubjectId(schemeA, 2024)],
+                bySubject[PomSubmissionOutboxEvents.SubjectId(schemeA, 2024)],
                 schemeA,
                 2024,
                 correlationId,
-                OutboxEvent.PomSubmissionCreatedType);
+                PomSubmissionOutboxEvent.PomSubmissionCreatedType);
             AssertUnsentEvent(
-                bySubject[OutboxEvents.SubjectId(schemeA, 2025)],
+                bySubject[PomSubmissionOutboxEvents.SubjectId(schemeA, 2025)],
                 schemeA,
                 2025,
                 correlationId,
-                OutboxEvent.PomSubmissionCreatedType);
+                PomSubmissionOutboxEvent.PomSubmissionCreatedType);
             AssertUnsentEvent(
-                bySubject[OutboxEvents.SubjectId(schemeB, 2024)],
+                bySubject[PomSubmissionOutboxEvents.SubjectId(schemeB, 2024)],
                 schemeB,
                 2024,
                 correlationId,
-                OutboxEvent.PomSubmissionCreatedType);
+                PomSubmissionOutboxEvent.PomSubmissionCreatedType);
             Assert.Equal(3, events.Select(outboxEvent => outboxEvent["_id"].AsString).Distinct().Count());
+            Assert.Single(events.Select(outboxEvent => outboxEvent["version"].AsInt64).Distinct());
         }
         finally
         {
@@ -225,7 +228,7 @@ public partial class PomSubmissionEndpointsTests
         var mapper = fixture.Services.GetRequiredService<IPomSubmissionMapper>();
         var request = SamplePomSubmission.Request() with { MemberOrgId = memberOrgId };
         var submission = mapper.ToNewSubmission(request, PomSubmissionApiFixture.CreatedAt);
-        var events = OutboxEvents.ForSchemeYears(
+        var events = PomSubmissionOutboxEvents.ForSchemeYears(
             [(submission.SchemeOrgId, submission.CompliancePeriodYear, false)],
             PomSubmissionApiFixture.CreatedAt,
             correlationId,
@@ -277,7 +280,7 @@ public partial class PomSubmissionEndpointsTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var outbox = fixture.Services.GetRequiredService<IOutboxRepository>();
-        var events = OutboxEvents.ForSchemeYears(
+        var events = PomSubmissionOutboxEvents.ForSchemeYears(
             [(SamplePomSubmission.SchemeOrgId, SamplePomSubmission.CompliancePeriodYear, false)],
             PomSubmissionApiFixture.CreatedAt,
             "correlation-1",
@@ -308,6 +311,52 @@ public partial class PomSubmissionEndpointsTests
         var expiresAt = Index(indexes, "expires_at");
         Assert.Equal(1, expiresAt["key"]["expiresAtUtc"].AsInt32);
         Assert.Equal(0, expiresAt["expireAfterSeconds"].AsInt32);
+
+        var subjectVersion = Index(indexes, "subject_version");
+        Assert.Equal(1, subjectVersion["key"]["subjectId"].AsInt32);
+        Assert.Equal(1, subjectVersion["key"]["version"].AsInt32);
+        Assert.True(subjectVersion["unique"].AsBoolean);
+    }
+
+    [Fact]
+    public async Task AddAsync_WhenTheSubjectAndVersionAlreadyExist_RejectsTheInsert()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var schemeOrgId = ObjectId.GenerateNewId().ToString();
+        var correlationId = "duplicate-version-" + Guid.NewGuid().ToString("N");
+        var outbox = fixture.Services.GetRequiredService<IOutboxRepository>();
+        var unitOfWork = fixture.Services.GetRequiredService<IUnitOfWork>();
+        var version = OutboxEvents.CommitVersion(PomSubmissionApiFixture.CreatedAt);
+        var first = UnsentEvent(schemeOrgId, 2026, version, correlationId);
+        var duplicate = UnsentEvent(schemeOrgId, 2026, version, correlationId);
+
+        try
+        {
+            await unitOfWork.ExecuteAsync(
+                async (transaction, transactionCancellationToken) =>
+                {
+                    await outbox.AddAsync(transaction.Session, [first], transactionCancellationToken);
+                    return 0;
+                },
+                cancellationToken);
+
+            Task Act() => unitOfWork.ExecuteAsync(
+                async (transaction, transactionCancellationToken) =>
+                {
+                    await outbox.AddAsync(transaction.Session, [duplicate], transactionCancellationToken);
+                    return 0;
+                },
+                cancellationToken);
+
+            var exception = await Assert.ThrowsAnyAsync<MongoException>(Act);
+            Assert.Contains("E11000", exception.ToString(), StringComparison.Ordinal);
+            var stored = Assert.Single(await EventsFor(correlationId, cancellationToken));
+            Assert.Equal(first.Id, stored["_id"].AsString);
+        }
+        finally
+        {
+            await fixture.Outbox.DeleteManyAsync(CorrelationFilter(correlationId), cancellationToken);
+        }
     }
 
     private async Task RejectOutboxInserts(CancellationToken cancellationToken)
@@ -355,29 +404,54 @@ public partial class PomSubmissionEndpointsTests
         await fixture.Outbox.DeleteManyAsync(SchemeFilter(schemeOrgId), cancellationToken);
     }
 
+    private static PomSubmissionOutboxEvent UnsentEvent(
+        string schemeOrgId,
+        int year,
+        long version,
+        string correlationId) =>
+        new()
+        {
+            Id = OutboxEvents.NewId(),
+            EventType = PomSubmissionOutboxEvent.PomSubmissionCreatedType,
+            SchemaVersion = OutboxEvent.CurrentSchemaVersion,
+            SubjectId = PomSubmissionOutboxEvents.SubjectId(schemeOrgId, year),
+            Version = version,
+            PartitionKey = schemeOrgId,
+            OccurredAtUtc = PomSubmissionApiFixture.CreatedAt,
+            ActorId = TestAuthentication.UserId,
+            CorrelationId = correlationId,
+            Sent = false,
+            SchemeOrgId = schemeOrgId,
+            CompliancePeriodYear = year
+        };
+
     private static void AssertUnsentEvent(
         BsonDocument stored,
         string schemeOrgId,
         int year,
         string correlationId,
-        string eventType)
+        string eventType,
+        DateTime? occurredAtUtc = null)
     {
+        var occurredAt = occurredAtUtc ?? PomSubmissionApiFixture.CreatedAt;
         Assert.Equal(BsonType.String, stored["_id"].BsonType);
         Assert.True(Guid.TryParse(stored["_id"].AsString, out _));
         Assert.Equal(eventType, stored["eventType"].AsString);
         Assert.Equal(OutboxEvent.CurrentSchemaVersion, stored["schemaVersion"].AsInt32);
-        Assert.Equal(OutboxEvents.SubjectId(schemeOrgId, year), stored["subjectId"].AsString);
-        Assert.Equal(OutboxEvents.CommitVersion(PomSubmissionApiFixture.CreatedAt), stored["version"].AsInt64);
+        Assert.Equal(PomSubmissionOutboxEvents.SubjectId(schemeOrgId, year), stored["subjectId"].AsString);
+        Assert.Equal(OutboxEvents.CommitVersion(occurredAt), stored["version"].AsInt64);
         Assert.Equal(schemeOrgId, stored["partitionKey"].AsString);
         Assert.Equal(BsonType.ObjectId, stored["schemeOrgId"].BsonType);
         Assert.Equal(schemeOrgId, stored["schemeOrgId"].AsObjectId.ToString());
         Assert.Equal(year, stored["compliancePeriodYear"].AsInt32);
-        Assert.Equal(PomSubmissionApiFixture.CreatedAt, stored["occurredAtUtc"].ToUniversalTime());
+        Assert.Equal(occurredAt, stored["occurredAtUtc"].ToUniversalTime());
         Assert.Equal(TestAuthentication.UserId, stored["actorId"].AsString);
         Assert.Equal(correlationId, stored["correlationId"].AsString);
         Assert.False(stored["sent"].AsBoolean);
         Assert.False(stored.Contains("sentAtUtc"));
         Assert.False(stored.Contains("expiresAtUtc"));
+        Assert.False(stored.Contains("_t"));
+        Assert.False(stored.Contains("additionalFields"));
     }
 
     private static FilterDefinition<BsonDocument> CorrelationFilter(string correlationId) =>

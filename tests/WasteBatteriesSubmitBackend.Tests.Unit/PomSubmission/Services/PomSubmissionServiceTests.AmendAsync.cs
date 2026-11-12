@@ -8,6 +8,7 @@ using WasteBatteriesSubmitBackend.Models;
 using WasteBatteriesSubmitBackend.Outbox;
 using WasteBatteriesSubmitBackend.Outbox.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
+using WasteBatteriesSubmitBackend.PomSubmission.Outbox;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
@@ -75,7 +76,7 @@ public partial class PomSubmissionServiceTests
             session,
             submission.SchemeOrgId,
             submission.CompliancePeriodYear,
-            OutboxEvent.PomSubmissionAmendedType);
+            PomSubmissionOutboxEvent.PomSubmissionAmendedType);
         await repository.DidNotReceive().CreateAsync(Arg.Any<PomSubmissionModel>(), Arg.Any<CancellationToken>());
         var entry = Assert.Single(logger.Entries);
         Assert.Equal(LogLevel.Information, entry.Level);

@@ -1,53 +1,44 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
-using System.Diagnostics.CodeAnalysis;
 
 namespace WasteBatteriesSubmitBackend.Outbox;
 
-// One unpublished fact that submissions for a scheme and compliance year were saved.
-// The id is chosen before the transaction, so a retry writes the same event.
+// The fields every outbox event has. A feature adds its own properties on a subclass.
+// AdditionalFields is for values that do not have a property yet. They are stored as their own
+// elements, beside the properties, not nested under this name.
 // Sent, SentAtUtc and ExpiresAtUtc stay unset until a relay publishes the event.
 // That relay is not part of this service. An unsent event has no ExpiresAtUtc, so the TTL index leaves it.
 [BsonIgnoreExtraElements]
-[method: BsonConstructor]
-[method: SetsRequiredMembers]
-public sealed class OutboxEvent()
+public abstract class OutboxEvent
 {
-    // The shape of this document. A new field or meaning is a code change, so this is not configuration.
+    // The shape of the shared fields. A new shared field or meaning is a code change, so this is not configuration.
     public const int CurrentSchemaVersion = 1;
-
-    public const string PomSubmissionCreatedType = "PomSubmissionCreated";
-
-    public const string PomSubmissionAmendedType = "PomSubmissionAmended";
-
-    // A scheme-year that both creates and amends in one save (e.g. batch upsert that contains both).
-    public const string PomSubmissionSavedType = "PomSubmissionSaved";
 
     // A GUID. The id is stable across a retry; it is not the ordering token.
     [BsonId]
-    public required string Id { get; init; } = null!;
+    public required string Id { get; init; }
 
-    public required string EventType { get; init; } = null!;
+    public required string EventType { get; init; }
 
     public int SchemaVersion { get; init; }
 
-    // The scheme and compliance year that changed, not one submission id.
-    public required string SubjectId { get; init; } = null!;
+    // What changed. The feature that builds the event chooses the text.
+    public required string SubjectId { get; init; }
 
-    // Commit time in unix milliseconds. A scheme-year has no single submission version,
-    // and a GUID does not order a later message against an earlier one.
+    // Commit time in unix milliseconds. A GUID does not order a later message against an earlier one.
+    // Unique together with SubjectId. Different subjects written in one save share this value.
     public long Version { get; init; }
 
-    // The organisation to act for. The scheme id, with no personal details.
-    public required string PartitionKey { get; init; } = null!;
+    // Who to act for. No personal details.
+    public required string PartitionKey { get; init; }
 
     [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
     public DateTime OccurredAtUtc { get; init; }
 
     // The caller's opaque id. No name or other personal details.
-    public required string ActorId { get; init; } = null!;
+    public required string ActorId { get; init; }
 
-    public required string CorrelationId { get; init; } = null!;
+    public required string CorrelationId { get; init; }
 
     public bool Sent { get; init; }
 
@@ -61,8 +52,6 @@ public sealed class OutboxEvent()
     [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
     public DateTime? ExpiresAtUtc { get; init; }
 
-    [BsonRepresentation(BsonType.ObjectId)]
-    public required string SchemeOrgId { get; init; } = null!;
-
-    public int CompliancePeriodYear { get; init; }
+    [BsonExtraElements]
+    public BsonDocument AdditionalFields { get; init; } = new();
 }

@@ -25,7 +25,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IValidator<PomSubmissionRequest>, PomSubmissionRequestValidator>();
         services.AddScoped<IValidator<PomSubmissionFilterRequest>, PomSubmissionFilterRequestValidator>();
         services.AddScoped<PomSubmissionValidators>();
-        services.AddScoped<PomSubmissionDocuments>();
+        services.AddScoped<PomSubmissionDependencies>();
         services.AddScoped<IPomSubmissionService, PomSubmissionService>();
         return services;
     }

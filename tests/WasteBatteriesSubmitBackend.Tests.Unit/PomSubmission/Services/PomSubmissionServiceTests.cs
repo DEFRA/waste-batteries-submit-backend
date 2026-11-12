@@ -10,6 +10,7 @@ using WasteBatteriesSubmitBackend.PomSubmission.Mapping;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
+using WasteBatteriesSubmitBackend.PomSubmission.Outbox;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
 using WasteBatteriesSubmitBackend.PomSubmission.Validators;
@@ -55,15 +56,15 @@ public partial class PomSubmissionServiceTests
         ICorrelationContext? correlation = null,
         IActorContext? actor = null) =>
         new(
-            new PomSubmissionDocuments(
+            new PomSubmissionDependencies(
                 repository,
                 outbox ?? Substitute.For<IOutboxRepository>(),
                 unitOfWork ?? Substitute.For<IUnitOfWork>(),
-                new PomSubmissionMapper(s_config)),
-            s_config,
-            new PomSubmissionValidators(
-                new PomSubmissionRequestValidator(),
-                new PomSubmissionFilterRequestValidator()),
+                new PomSubmissionMapper(s_config),
+                new PomSubmissionValidators(
+                    new PomSubmissionRequestValidator(),
+                    new PomSubmissionFilterRequestValidator()),
+                s_config),
             new FixedTime(s_createdAt),
             correlation ?? new TestCorrelationContext(TestCorrelationId),
             actor ?? new TestActorContext(TestActorId),
@@ -102,8 +103,8 @@ public partial class PomSubmissionServiceTests
                 && events[0].SubjectId == schemeOrgId + ":" + year
                 && events[0].Version == OutboxEvents.CommitVersion(s_createdAt)
                 && events[0].PartitionKey == schemeOrgId
-                && events[0].SchemeOrgId == schemeOrgId
-                && events[0].CompliancePeriodYear == year
+                && ((PomSubmissionOutboxEvent)events[0]).SchemeOrgId == schemeOrgId
+                && ((PomSubmissionOutboxEvent)events[0]).CompliancePeriodYear == year
                 && events[0].OccurredAtUtc == s_createdAt
                 && events[0].ActorId == TestActorId
                 && events[0].CorrelationId == TestCorrelationId

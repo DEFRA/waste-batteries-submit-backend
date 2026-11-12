@@ -267,13 +267,13 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal(JsonValueKind.Null, amended.GetProperty("updatedAtUtc").ValueKind);
         Assert.Equal(fixture.Defaults.InitialVersion + 1, amended.GetProperty("version").GetInt32());
         Assert.Equal("3.000", amended.GetProperty("tonnageEntries")[0].GetProperty("tonnes").GetString());
-        Assert.Equal(PomSubmissionApiFixture.CreatedAt, amended.GetProperty("createdAtUtc").GetDateTime().ToUniversalTime());
+        Assert.Equal(PomSubmissionApiFixture.CreatedAt.AddMilliseconds(1), amended.GetProperty("createdAtUtc").GetDateTime().ToUniversalTime());
 
         Assert.Equal(2, stored.Count);
         var previous = Assert.Single(stored, document => document["_id"].AsObjectId.ToString() == created.Id);
         var replacement = Assert.Single(stored, document => document["_id"].AsObjectId.ToString() == amendedId);
         Assert.False(previous["isCurrent"].AsBoolean);
-        Assert.Equal(PomSubmissionApiFixture.CreatedAt, previous["updatedAtUtc"].ToUniversalTime());
+        Assert.Equal(PomSubmissionApiFixture.CreatedAt.AddMilliseconds(1), previous["updatedAtUtc"].ToUniversalTime());
         Assert.Equal(BsonNull.Value, previous["supersedesSubmissionId"]);
         Assert.Equal(fixture.Defaults.InitialVersion, previous["version"].AsInt32);
         Assert.Equal(SamplePomSubmission.Tonnes, previous["tonnageEntries"][0]["tonnes"].AsDecimal128.ToString());
@@ -357,7 +357,7 @@ public partial class PomSubmissionEndpointsTests
         Assert.False(first["isCurrent"].AsBoolean);
         Assert.Equal(created.Id, first["supersedesSubmissionId"].AsObjectId.ToString());
         Assert.Equal(fixture.Defaults.InitialVersion + 1, first["version"].AsInt32);
-        Assert.Equal(PomSubmissionApiFixture.CreatedAt, first["updatedAtUtc"].ToUniversalTime());
+        Assert.Equal(PomSubmissionApiFixture.CreatedAt.AddMilliseconds(2), first["updatedAtUtc"].ToUniversalTime());
         Assert.True(second["isCurrent"].AsBoolean);
         Assert.Equal(firstId, second["supersedesSubmissionId"].AsObjectId.ToString());
         Assert.Equal(fixture.Defaults.InitialVersion + 2, second["version"].AsInt32);

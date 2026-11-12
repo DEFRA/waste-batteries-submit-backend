@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using System.Net;
@@ -5,11 +6,23 @@ using System.Text;
 using System.Text.Json;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.Tests.Common;
+using WasteBatteriesSubmitBackend.Utils.Time;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
 
-public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture) : IClassFixture<PomSubmissionApiFixture>
+public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture)
+    : IClassFixture<PomSubmissionApiFixture>, IAsyncLifetime
 {
+    // The clock restarts at the fixed instant, and earlier outbox rows are removed.
+    // A later test can then save the same subject at that version.
+    public async ValueTask InitializeAsync()
+    {
+        Assert.IsType<SteppingTime>(fixture.Services.GetRequiredService<ITimeProvider>()).Reset();
+        await fixture.Outbox.DeleteManyAsync(FilterDefinition<BsonDocument>.Empty);
+    }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
     private static string CreateBody => SamplePomSubmission.Json;
 
     private void AssertStoredShape(BsonDocument stored, string id)

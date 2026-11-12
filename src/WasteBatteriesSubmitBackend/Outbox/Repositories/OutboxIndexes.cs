@@ -1,5 +1,4 @@
 using MongoDB.Driver;
-using WasteBatteriesSubmitBackend.Outbox;
 
 namespace WasteBatteriesSubmitBackend.Outbox.Repositories;
 
@@ -20,6 +19,14 @@ internal static class OutboxIndexes
             builder.Ascending(outboxEvent => outboxEvent.ExpiresAtUtc),
             new CreateIndexOptions { Name = "expires_at", ExpireAfter = TimeSpan.Zero });
 
-        return [sentByTime, expiresAt];
+        // One subject cannot store the same version twice, or a consumer cannot order those events.
+        // Version alone is not unique: one save writes several subjects at one commit time.
+        var subjectVersion = new CreateIndexModel<OutboxEvent>(
+            builder
+                .Ascending(outboxEvent => outboxEvent.SubjectId)
+                .Ascending(outboxEvent => outboxEvent.Version),
+            new CreateIndexOptions { Name = "subject_version", Unique = true });
+
+        return [sentByTime, expiresAt, subjectVersion];
     }
 }

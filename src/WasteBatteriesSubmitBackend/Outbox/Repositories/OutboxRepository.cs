@@ -1,3 +1,4 @@
+using MongoDB.Bson;
 using MongoDB.Driver;
 using WasteBatteriesSubmitBackend.Outbox;
 using WasteBatteriesSubmitBackend.Utils.Mongo;
@@ -32,7 +33,11 @@ public class OutboxRepository(IMongoDbClientFactory connectionFactory, ILoggerFa
             return Task.CompletedTask;
         }
 
-        return Collection.InsertManyAsync(session, events, options: null, cancellationToken);
+        // The runtime type supplies the feature's own fields. Inserting as the base type would drop them.
+        var documents = events.Select(OutboxDocuments.ToBsonDocument).ToList();
+        return Collection.Database
+            .GetCollection<BsonDocument>(CollectionName)
+            .InsertManyAsync(session, documents, cancellationToken: cancellationToken);
     }
 
     protected override List<CreateIndexModel<OutboxEvent>> DefineIndexes(IndexKeysDefinitionBuilder<OutboxEvent> builder) =>

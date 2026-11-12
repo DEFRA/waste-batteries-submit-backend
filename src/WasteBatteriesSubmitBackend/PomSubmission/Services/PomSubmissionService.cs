@@ -1,13 +1,12 @@
 using FluentValidation;
 using FluentValidation.Results;
-using Microsoft.Extensions.Options;
 using MongoDB.Bson;
-using WasteBatteriesSubmitBackend.Config;
 using WasteBatteriesSubmitBackend.Models;
 using WasteBatteriesSubmitBackend.Outbox;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Responses;
+using WasteBatteriesSubmitBackend.PomSubmission.Outbox;
 using WasteBatteriesSubmitBackend.PomSubmission.Validators;
 using WasteBatteriesSubmitBackend.Utils.Actor;
 using WasteBatteriesSubmitBackend.Utils.Correlation;
@@ -36,12 +35,10 @@ public interface IPomSubmissionService
         CancellationToken cancellationToken = default);
 }
 
-// Single creates and amends are in the Save partial. The batch upsert is in UpsertBatch.
+// Single creates and amends are in the Save partial. The batch upsert is in UpsertBatch partial.
 // Reads are in the Query partial. These helpers are shared by the writes.
 public partial class PomSubmissionService(
-    PomSubmissionDocuments documents,
-    IOptions<PomSubmissionConfig> pomSubmissionConfig,
-    PomSubmissionValidators validators,
+    PomSubmissionDependencies dependencies,
     ITimeProvider timeProvider,
     ICorrelationContext correlationContext,
     IActorContext actorContext,
@@ -50,12 +47,12 @@ public partial class PomSubmissionService(
     private static ValidationFailure SubmissionFailure(string message) =>
         new("Submission", message);
 
-    // One event per scheme and compliance year, in the order those pairs first appear.
+    // Gets one event per scheme and compliance year, in the order those pairs first appear.
     // Ids are allocated here so a transaction retry writes the same events.
-    private IReadOnlyList<OutboxEvent> OutboxFor(
+    private IReadOnlyList<OutboxEvent> GetOutboxEvents(
         IEnumerable<(PomSubmissionModel Submission, bool Amended)> saved,
         DateTime occurredAtUtc) =>
-        OutboxEvents.ForSchemeYears(
+        PomSubmissionOutboxEvents.ForSchemeYears(
             saved.Select(item => (item.Submission.SchemeOrgId, item.Submission.CompliancePeriodYear, item.Amended)),
             occurredAtUtc,
             correlationContext.CorrelationId,
@@ -69,7 +66,7 @@ public partial class PomSubmissionService(
     {
         try
         {
-            return await documents.UnitOfWork.ExecuteAsync(work, cancellationToken);
+            return await dependencies.UnitOfWork.ExecuteAsync(work, cancellationToken);
         }
         catch (Exception exception) when (exception is not ValidationException and not DuplicateKeyOnSaveException)
         {

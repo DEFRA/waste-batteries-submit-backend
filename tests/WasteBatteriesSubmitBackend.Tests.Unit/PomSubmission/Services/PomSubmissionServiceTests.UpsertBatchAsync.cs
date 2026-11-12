@@ -10,6 +10,7 @@ using WasteBatteriesSubmitBackend.Outbox.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
+using WasteBatteriesSubmitBackend.PomSubmission.Outbox;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Responses;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
@@ -78,7 +79,7 @@ public partial class PomSubmissionServiceTests
             session,
             SamplePomSubmission.SchemeOrgId,
             SamplePomSubmission.CompliancePeriodYear,
-            OutboxEvent.PomSubmissionCreatedType);
+            PomSubmissionOutboxEvent.PomSubmissionCreatedType);
         await repository.DidNotReceive().FindAsync(
             Arg.Any<PomSubmissionFilter>(),
             Arg.Any<PageRequest>(),
@@ -596,14 +597,14 @@ public partial class PomSubmissionServiceTests
             session,
             Arg.Is<IReadOnlyList<OutboxEvent>>(events =>
                 events.Count == 3
-                && events[0].SchemeOrgId == SamplePomSubmission.SchemeOrgId
-                && events[0].CompliancePeriodYear == SamplePomSubmission.CompliancePeriodYear
-                && events[1].SchemeOrgId == SamplePomSubmission.SchemeOrgId
-                && events[1].CompliancePeriodYear == 2025
-                && events[2].SchemeOrgId == otherSchemeOrgId
-                && events[2].CompliancePeriodYear == SamplePomSubmission.CompliancePeriodYear
+                && ((PomSubmissionOutboxEvent)events[0]).SchemeOrgId == SamplePomSubmission.SchemeOrgId
+                && ((PomSubmissionOutboxEvent)events[0]).CompliancePeriodYear == SamplePomSubmission.CompliancePeriodYear
+                && ((PomSubmissionOutboxEvent)events[1]).SchemeOrgId == SamplePomSubmission.SchemeOrgId
+                && ((PomSubmissionOutboxEvent)events[1]).CompliancePeriodYear == 2025
+                && ((PomSubmissionOutboxEvent)events[2]).SchemeOrgId == otherSchemeOrgId
+                && ((PomSubmissionOutboxEvent)events[2]).CompliancePeriodYear == SamplePomSubmission.CompliancePeriodYear
                 && events.All(outboxEvent =>
-                    outboxEvent.EventType == OutboxEvent.PomSubmissionCreatedType
+                    outboxEvent.EventType == PomSubmissionOutboxEvent.PomSubmissionCreatedType
                     && outboxEvent.ActorId == TestActorId
                     && outboxEvent.CorrelationId == TestCorrelationId
                     && !outboxEvent.Sent

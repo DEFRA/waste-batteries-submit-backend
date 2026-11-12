@@ -26,7 +26,7 @@ public partial class PomSubmissionService
             ]);
         }
 
-        var matches = await documents.Repository.FindAsync(
+        var matches = await dependencies.Repository.FindAsync(
             new PomSubmissionFilter { Id = id, IsCurrent = null },
             new PageRequest(),
             cancellationToken);
@@ -45,7 +45,7 @@ public partial class PomSubmissionService
         CancellationToken cancellationToken = default)
     {
         request = request.Trimmed();
-        await validators.Filter.ValidateAndThrowAsync(request, cancellationToken);
+        await dependencies.Validators.Filter.ValidateAndThrowAsync(request, cancellationToken);
 
         var filter = new PomSubmissionFilter
         {
@@ -60,7 +60,7 @@ public partial class PomSubmissionService
             filter = filter with { IsCurrent = null };
         }
 
-        return await documents.Repository.FindAsync(
+        return await dependencies.Repository.FindAsync(
             filter,
             new PageRequest
             {
@@ -72,7 +72,7 @@ public partial class PomSubmissionService
 
     private int LimitedPageSize(int? pageSize, bool gzipResponse)
     {
-        var limits = pomSubmissionConfig.Value;
+        var limits = dependencies.Config.Value;
         var maximum = gzipResponse ? limits.MaxGzipPageSize : limits.MaxPageSize;
         return pageSize is null || pageSize.Value > maximum ? maximum : pageSize.Value;
     }

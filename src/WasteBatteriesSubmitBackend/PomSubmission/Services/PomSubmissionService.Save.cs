@@ -33,19 +33,20 @@ public partial class PomSubmissionService
         }
 
         var createdAtUtc = timeProvider.UtcNow;
-        var submission = documents.Mapper.ToNewSubmission(prepared.Request, createdAtUtc);
-        var outboxEvents = OutboxFor([(submission, false)], createdAtUtc);
+        var submission = dependencies.Mapper.ToNewSubmission(prepared.Request, createdAtUtc);
+        var outboxEvents = GetOutboxEvents([(submission, false)], createdAtUtc);
 
         try
         {
             await ExecuteSaveAsync(
                 async (transaction, transactionCancellationToken) =>
                 {
-                    await documents.Repository.CreateAsync(
+                    await dependencies.Repository.CreateAsync(
                         transaction.Session,
                         submission,
                         transactionCancellationToken);
-                    await documents.Outbox.AddAsync(
+
+                    await dependencies.Outbox.AddAsync(
                         transaction.Session,
                         outboxEvents,
                         transactionCancellationToken);
@@ -88,12 +89,12 @@ public partial class PomSubmissionService
         var current = prepared.Current!;
 
         var amendedAtUtc = timeProvider.UtcNow;
-        var submission = documents.Mapper.ToNewSubmission(
+        var submission = dependencies.Mapper.ToNewSubmission(
             prepared.Request,
             amendedAtUtc,
             version: current.Version + 1,
             supersedesSubmissionId: current.Id);
-        var outboxEvents = OutboxFor([(submission, true)], amendedAtUtc);
+        var outboxEvents = GetOutboxEvents([(submission, true)], amendedAtUtc);
 
         try
         {
@@ -107,7 +108,8 @@ public partial class PomSubmissionService
                         submission,
                         amendedAtUtc,
                         transactionCancellationToken);
-                    await documents.Outbox.AddAsync(
+
+                    await dependencies.Outbox.AddAsync(
                         transaction.Session,
                         outboxEvents,
                         transactionCancellationToken);
@@ -134,7 +136,7 @@ public partial class PomSubmissionService
         CancellationToken cancellationToken)
     {
         request = request.Trimmed();
-        var result = await validators.Request.ValidateAsync(request, cancellationToken);
+        var result = await dependencies.Validators.Request.ValidateAsync(request, cancellationToken);
         var failures = new List<ValidationFailure>(result.Errors);
         PomSubmissionModel? current = null;
 
@@ -175,7 +177,7 @@ public partial class PomSubmissionService
     {
         // Call this before inserting the replacement. The unique index allows one current submission for the key.
         // So we need to update the old/existing one (so isCurrent = false) before inserting the new amended submission.
-        var superseded = await documents.Repository.SupersedeCurrentAsync(
+        var superseded = await dependencies.Repository.SupersedeCurrentAsync(
             transaction.Session,
             currentSubmissionId,
             updatedAtUtc,
@@ -189,7 +191,7 @@ public partial class PomSubmissionService
             ]);
         }
 
-        await documents.Repository.CreateAsync(transaction.Session, amendment, cancellationToken);
+        await dependencies.Repository.CreateAsync(transaction.Session, amendment, cancellationToken);
     }
 
     private sealed record PreparedSubmission(
