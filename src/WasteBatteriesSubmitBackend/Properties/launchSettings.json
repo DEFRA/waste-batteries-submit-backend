@@ -9,7 +9,10 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "Mongo__DatabaseUri": "mongodb://127.0.0.1:27017/?directConnection=true",
-        "Mongo__DatabaseName": "waste-batteries-submit-backend"
+        "Mongo__DatabaseName": "waste-batteries-submit-backend",
+        "AWS_ACCESS_KEY_ID": "test",
+        "AWS_SECRET_ACCESS_KEY": "test",
+        "AWS_REGION": "eu-west-2"
       }
     }
   }

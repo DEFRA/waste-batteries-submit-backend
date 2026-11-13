@@ -69,7 +69,8 @@ static void ConfigureServices(WebApplicationBuilder builder)
     services.AddHeaderPropagationFromConfiguration(configuration);
     services.AddProxyHttpClients();
     services.AddMongo(configuration);
-    services.AddOutbox();
+    // Registers the outbox repository and OutboxRelay, adds the relay hosted service that processes the events.
+    services.AddOutbox(configuration);
     services.AddHealth();
     services.AddApiOpenApi();
 

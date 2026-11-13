@@ -47,7 +47,7 @@ The `requestIndex`, `id` (the submission just saved), `schemeOrgId`, `memberOrgI
 
 Each of the saves writes one outbox document per distinct scheme and compliance year, meaning several members or quarters for the same scheme and year share one event for a batch upsert.
 
-This is done within the same trabsaction, which ensures that the save and the outbox are an atomic operation. The outbox document is then used as an event and a relay publishes this to an SNS topic for consumers to subscribe to via an SQS queue.
+This is done within the same transaction, which ensures that the save and the outbox are an atomic operation. A relay in this process then publishes each unsent document to the service's SNS topic. Consumers subscribe a queue to that topic.
 
 The outbox event document is stored in the `outbox` collection with 
 - `id` (a GUID, the same value if the transaction is retried), 
@@ -63,11 +63,19 @@ The outbox event document is stored in the `outbox` collection with
 - `schemeOrgId`,
 - `compliancePeriodYear`. 
  
-`sent` is false. `sentAtUtc` and `expiresAtUtc` are omitted until a relay publishes the event and sets the retention time.  
+`sent` is false. `sentAtUtc` and `expiresAtUtc` are omitted until the relay publishes the event. `expiresAtUtc` is `sentAtUtc` plus `OutboxRelay:RetentionDays` (90 by default).
 
-An index named `sent_occurred_at` is on `sent` then `occurredAtUtc`. A unique index named `subject_version` is on `subjectId` then `version`, so one subject cannot store the same version twice. 
+An index named `sent_occurred_at` is on `sent` then `occurredAtUtc`. A unique index named `subject_version` is on `subjectId` then `version`, so one subject cannot store the same version twice.
 
-A TTL index named `expires_at` deletes a document at `expiresAtUtc` (`expireAfterSeconds` 0). An unsent document has no `expiresAtUtc`, so it is not deleted. 
+A TTL index named `expires_at` deletes a document at `expiresAtUtc` (`expireAfterSeconds` 0). An unsent document has no `expiresAtUtc`, so it is not deleted.
+
+The relay is a background service in this API. On each pass it claims the oldest unsent document whose claim has expired and whose next attempt is due, publishes it, and sets `sent`. A second instance cannot take that document until `claimedUntilUtc`. A failed publish leaves `sent` false and sets `nextAttemptAtUtc`, so the same document is tried again with backoff. The published `eventId` is the stored id. AWS assigns its own SNS message id on every publish, and the relay does not use that id.
+
+The message body is `eventId`, `eventType`, `schemaVersion`, `subjectId`, `version` (the commit time in unix milliseconds, not the submission row's version), `partitionKey`, `occurredAt`, `actorId`, `correlationId`, `schemeOrgId` and `compliancePeriodYear`. `eventId` and `eventType` are the SNS message attributes. `sent` and `sentAtUtc` stay on the document.
+
+The relay does nothing unless `OutboxRelay:Enabled` is true. `OutboxRelay:PollIntervalSeconds` defaults to 5. In CDP, request one standard SNS topic named `waste-batteries-submit-backend-pom-submissions-by-scheme-and-year` (Portal, Create, Resource Request). `cdp-app-config` sets `OutboxRelay__Enabled=true` and `OutboxRelay__TopicArn` to that topic's ARN for dev, test, perf-test, ext-test and prod. Redeploy after the topic exists. Leave `OutboxRelay__ServiceUrl` empty so the SDK uses the regional endpoint and the task role. Each API task runs the relay. The claim means only one task publishes a document.
+
+Locally the relay publishes to the topic `waste_batteries_submit_events`. A demo queue, `waste_batteries_submit_events_demo`, is subscribed to that topic. After a successful publish the outbox document has `sent` true and `expiresAtUtc` 90 days later. The document stays in Mongo. The envelope stays on the demo queue until something deletes it. [Running](#running) covers starting the API and reading that queue. 
 
 
 #### Request JSON
@@ -199,9 +207,63 @@ dotnet test
 
 ### Running
 
-Run CDP-Deployments application:
+The Development launch profile listens on <http://localhost:3001>. Swagger UI is at `/swagger`. In that profile the relay is on. It publishes to floci at `http://localhost:4566` about every 5 seconds (`OutboxRelay:PollIntervalSeconds`).
+
+#### API from the debugger or the command line
+
+Start MongoDB and floci from this repo. When the floci container starts, `compose/floci/start.d/10-setup-resources.sh` creates the local topic and the demo queue.
+
 ```bash
+docker compose up -d --wait mongodb floci
 dotnet run --project src/WasteBatteriesSubmitBackend --launch-profile Development
+```
+
+Visual Studio uses the same Development profile. The profile sets the local floci credentials (`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are `test`).
+
+To run the submit UI against this API, start the Defra ID stub, MongoDB and floci from `waste-batteries-submit-frontend`, then the UI. That compose publishes port 4566, so leave floci stopped in this repo while you do.
+
+```bash
+docker compose up -d cdp-defra-id-stub mongodb
+npm install
+npm run dev
+```
+
+The frontend floci script `compose/floci/start.d/30-create-submit-outbox-topic.sh` creates the same topic and demo queue. Then run this API with the Development profile, as above. Create or amend a submission. Within about one poll the matching outbox document is `sent` and the envelope is on the demo queue.
+
+#### API in Compose
+
+```bash
+docker compose up --build -d
+```
+
+The API container listens on <http://localhost:8085>. The relay in that container publishes to `http://floci:4566`.
+
+#### Read a published message
+
+The demo queue is `waste_batteries_submit_events_demo`. These commands run the AWS CLI that is already in the floci image, so they work on Windows, macOS and Linux with Docker alone. Run them from the directory of the Compose file that started floci: this repo, or `waste-batteries-submit-frontend` when the UI compose started it.
+
+Count the messages waiting:
+
+```bash
+docker compose exec floci aws sqs get-queue-attributes --queue-url http://localhost:4566/000000000000/waste_batteries_submit_events_demo --attribute-names ApproximateNumberOfMessages
+```
+
+Read one envelope and leave it visible on the queue:
+
+```bash
+docker compose exec floci aws sqs receive-message --queue-url http://localhost:4566/000000000000/waste_batteries_submit_events_demo --visibility-timeout 0
+```
+
+`--visibility-timeout 0` keeps the message visible to the next read. A receive without it hides the message for the queue's visibility timeout. The message stays on the queue until something deletes it.
+
+With the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) installed on the machine, call floci on localhost directly:
+
+```bash
+aws --endpoint-url http://localhost:4566 sqs get-queue-attributes --queue-url http://localhost:4566/000000000000/waste_batteries_submit_events_demo --attribute-names ApproximateNumberOfMessages
+```
+
+```bash
+aws --endpoint-url http://localhost:4566 sqs receive-message --queue-url http://localhost:4566/000000000000/waste_batteries_submit_events_demo --visibility-timeout 0
 ```
 
 The backend requires a Defra ID access token in the `Authorization: Bearer <token>`
