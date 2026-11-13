@@ -69,6 +69,64 @@ internal static partial class LoggerExtensions
     [LoggerMessage(
         EventId = 1000,
         Level = LogLevel.Information,
+        Message = "Outbox relay is off")]
+    public static partial void OutboxRelayOff(this ILogger logger);
+
+    [LoggerMessage(
+        EventId = 1001,
+        Level = LogLevel.Error,
+        Message = "Outbox relay pass failed")]
+    public static partial void OutboxRelayPassFailed(this ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        EventId = 1002,
+        Level = LogLevel.Information,
+        Message = "Publishing outbox event {EventId} {CorrelationId}")]
+    public static partial void PublishingOutboxEvent(
+        this ILogger logger,
+        string eventId,
+        string correlationId);
+
+    [LoggerMessage(
+        EventId = 1003,
+        Level = LogLevel.Information,
+        Message = "Published outbox event {EventId} {CorrelationId}")]
+    public static partial void PublishedOutboxEvent(
+        this ILogger logger,
+        string eventId,
+        string correlationId);
+
+    [LoggerMessage(
+        EventId = 1004,
+        Level = LogLevel.Error,
+        Message = "Failed to publish outbox event {EventId} {CorrelationId}")]
+    public static partial void FailedToPublishOutboxEvent(
+        this ILogger logger,
+        Exception exception,
+        string eventId,
+        string correlationId);
+
+    [LoggerMessage(
+        EventId = 1005,
+        Level = LogLevel.Warning,
+        Message = "Outbox event {EventId} was published but the claim was no longer held {CorrelationId}")]
+    public static partial void OutboxClaimLostAfterPublish(
+        this ILogger logger,
+        string eventId,
+        string correlationId);
+
+    [LoggerMessage(
+        EventId = 1006,
+        Level = LogLevel.Warning,
+        Message = "Outbox event {EventId} failed to publish and the claim was no longer held {CorrelationId}")]
+    public static partial void OutboxClaimLostAfterFailure(
+        this ILogger logger,
+        string eventId,
+        string correlationId);
+
+    [LoggerMessage(
+        EventId = 2000,
+        Level = LogLevel.Information,
         Message = "Searching for {Name}, found {Result}")]
     public static partial void SearchingForExample(
         this ILogger logger,
@@ -76,7 +134,7 @@ internal static partial class LoggerExtensions
         object? result);
 
     [LoggerMessage(
-        EventId = 1001,
+        EventId = 2001,
         Level = LogLevel.Information,
         Message = "Searching for {ExampleId}, found {Result}")]
     public static partial void SearchingForExampleData(
@@ -85,14 +143,14 @@ internal static partial class LoggerExtensions
         object? result);
 
     [LoggerMessage(
-        EventId = 1002,
+        EventId = 2002,
         Level = LogLevel.Debug,
         Message = "Creating proxy http client")]
     public static partial void CreatingProxyHttpClient(
         this ILogger logger);
 
     [LoggerMessage(
-        EventId = 1003,
+        EventId = 2003,
         Level = LogLevel.Warning,
         Message = "HTTP_PROXY is NOT set, proxy client will be disabled")]
     public static partial void ProxyNotConfigured(

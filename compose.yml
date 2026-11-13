@@ -88,6 +88,10 @@ services:
       Jwt__Audience: 63983fc2-cfff-45bb-8ec2-959e21062b9a
       Jwt__RequireHttpsMetadata: false
       Mongo__DatabaseUri: mongodb://mongodb:27017/?directConnection=true
+      AWS_ENDPOINT_URL: http://floci:4566
+      OutboxRelay__Enabled: "true"
+      OutboxRelay__TopicArn: arn:aws:sns:eu-west-2:000000000000:waste_batteries_submit_events
+      OutboxRelay__ServiceUrl: http://floci:4566
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     networks:

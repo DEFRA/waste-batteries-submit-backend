@@ -24,7 +24,9 @@ public static class TestAuthentication
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Jwt:MetadataAddress"] = "https://idp.test/.well-known/openid-configuration",
-                ["Jwt:Audience"] = "test-audience"
+                ["Jwt:Audience"] = "test-audience",
+                // Development turns the relay on for Visual Studio. The test host must leave it off.
+                ["OutboxRelay:Enabled"] = "false"
             });
         });
 
