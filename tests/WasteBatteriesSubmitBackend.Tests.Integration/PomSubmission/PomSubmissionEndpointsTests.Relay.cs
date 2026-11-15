@@ -306,18 +306,18 @@ public partial class PomSubmissionEndpointsTests
             fixture.Services.GetRequiredService<ITimeProvider>(),
             NullLogger<OutboxRelay>.Instance);
 
-    private Task DeleteOutbox(CancellationToken cancellationToken, params string[] ids) =>
+    private Task<DeleteResult> DeleteOutbox(CancellationToken cancellationToken, params string[] ids) =>
         fixture.Outbox.DeleteManyAsync(
             Builders<BsonDocument>.Filter.In("_id", ids),
             cancellationToken);
 
-    private Task DeleteOutbox(string first, string second, CancellationToken cancellationToken) =>
+    private Task<DeleteResult> DeleteOutbox(string first, string second, CancellationToken cancellationToken) =>
         DeleteOutbox(cancellationToken, first, second);
 
-    private Task DeleteOutbox(string first, string second, string third, string fourth, CancellationToken cancellationToken) =>
+    private Task<DeleteResult> DeleteOutbox(string first, string second, string third, string fourth, CancellationToken cancellationToken) =>
         DeleteOutbox(cancellationToken, first, second, third, fourth);
 
-    private Task DeleteOutbox(string id, CancellationToken cancellationToken) =>
+    private Task<DeleteResult> DeleteOutbox(string id, CancellationToken cancellationToken) =>
         DeleteOutbox(cancellationToken, id);
 
     private static BsonDocument UnsentDocument(string id, DateTime occurredAtUtc, int year)

@@ -56,6 +56,7 @@ public sealed class OutboxRelay(
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
+                // The host stops a disabled relay by cancelling this wait.
             }
 
             return;

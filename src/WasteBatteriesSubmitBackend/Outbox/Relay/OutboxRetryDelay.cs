@@ -6,10 +6,7 @@ internal static class OutboxRetryDelay
     public static TimeSpan ForAttempt(OutboxRelayOptions options, int attemptCount)
     {
         ArgumentNullException.ThrowIfNull(options);
-        if (attemptCount < 1)
-        {
-            throw new ArgumentOutOfRangeException(nameof(attemptCount));
-        }
+        ArgumentOutOfRangeException.ThrowIfLessThan(attemptCount, 1);
 
         var delaySeconds = (double)options.RetryInitialDelaySeconds;
         for (var attempt = 1; attempt < attemptCount; attempt++)

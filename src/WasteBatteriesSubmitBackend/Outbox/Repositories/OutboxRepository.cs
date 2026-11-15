@@ -46,6 +46,8 @@ public class OutboxRepository(IMongoDbClientFactory connectionFactory, ILoggerFa
 {
     public const string CollectionName = "outbox";
 
+    private const string ClaimedUntilUtcField = "claimedUntilUtc";
+
     public Task AddAsync(
         IClientSessionHandle session,
         IReadOnlyList<OutboxEvent> events,
@@ -76,7 +78,7 @@ public class OutboxRepository(IMongoDbClientFactory connectionFactory, ILoggerFa
 
         var update = Builders<BsonDocument>.Update
             .Set("claimedBy", claimedBy)
-            .Set("claimedUntilUtc", claimedUntilUtc);
+            .Set(ClaimedUntilUtcField, claimedUntilUtc);
         var options = new FindOneAndUpdateOptions<BsonDocument>
         {
             Sort = Builders<BsonDocument>.Sort.Ascending("occurredAtUtc").Ascending("_id"),
@@ -104,7 +106,7 @@ public class OutboxRepository(IMongoDbClientFactory connectionFactory, ILoggerFa
             .Set("sentAtUtc", sentAtUtc)
             .Set("expiresAtUtc", expiresAtUtc)
             .Unset("claimedBy")
-            .Unset("claimedUntilUtc")
+            .Unset(ClaimedUntilUtcField)
             .Unset("attemptCount")
             .Unset("nextAttemptAtUtc");
         var result = await Documents.UpdateOneAsync(
@@ -124,16 +126,13 @@ public class OutboxRepository(IMongoDbClientFactory connectionFactory, ILoggerFa
         ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
         ArgumentException.ThrowIfNullOrWhiteSpace(claimedBy);
         RequireUtc(nextAttemptAtUtc, nameof(nextAttemptAtUtc));
-        if (attemptCount < 1)
-        {
-            throw new ArgumentOutOfRangeException(nameof(attemptCount));
-        }
+        ArgumentOutOfRangeException.ThrowIfLessThan(attemptCount, 1);
 
         var update = Builders<BsonDocument>.Update
             .Set("attemptCount", attemptCount)
             .Set("nextAttemptAtUtc", nextAttemptAtUtc)
             .Unset("claimedBy")
-            .Unset("claimedUntilUtc");
+            .Unset(ClaimedUntilUtcField);
         var result = await Documents.UpdateOneAsync(
             HeldClaim(eventId, claimedBy),
             update,
@@ -154,7 +153,7 @@ public class OutboxRepository(IMongoDbClientFactory connectionFactory, ILoggerFa
         var filter = Builders<BsonDocument>.Filter;
         return filter.And(
             filter.Eq("sent", false),
-            filter.Or(filter.Exists("claimedUntilUtc", false), filter.Lte("claimedUntilUtc", utcNow)),
+            filter.Or(filter.Exists(ClaimedUntilUtcField, false), filter.Lte(ClaimedUntilUtcField, utcNow)),
             filter.Or(filter.Exists("nextAttemptAtUtc", false), filter.Lte("nextAttemptAtUtc", utcNow)));
     }
 
