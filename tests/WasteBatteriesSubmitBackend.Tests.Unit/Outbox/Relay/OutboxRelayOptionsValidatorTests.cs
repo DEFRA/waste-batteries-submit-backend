@@ -8,9 +8,18 @@ public class OutboxRelayOptionsValidatorTests
     private readonly OutboxRelayOptionsValidator _validator = new();
 
     [Fact]
-    public void Validate_WhenTheRelayIsOff_AllowsThePlaceholderTopic()
+    public void Validate_WhenEnabledIsLeftAtTheDefault_RejectsThePlaceholderTopic()
     {
         var result = _validator.Validate(Options.DefaultName, new OutboxRelayOptions());
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures, failure => failure.Contains("TopicArn", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validate_WhenTheRelayIsOff_AllowsThePlaceholderTopic()
+    {
+        var result = _validator.Validate(Options.DefaultName, new OutboxRelayOptions { Enabled = false });
 
         Assert.False(result.Failed);
     }
@@ -47,7 +56,7 @@ public class OutboxRelayOptionsValidatorTests
     {
         var result = _validator.Validate(
             Options.DefaultName,
-            new OutboxRelayOptions { LeaseSeconds = OutboxRelayOptions.PublishTimeoutSeconds });
+            new OutboxRelayOptions { Enabled = false, LeaseSeconds = OutboxRelayOptions.PublishTimeoutSeconds });
 
         Assert.True(result.Failed);
         Assert.Contains(result.Failures, failure => failure.Contains("LeaseSeconds", StringComparison.Ordinal));
@@ -56,7 +65,9 @@ public class OutboxRelayOptionsValidatorTests
     [Fact]
     public void Validate_WhenThePollIntervalIsZero_Fails()
     {
-        var result = _validator.Validate(Options.DefaultName, new OutboxRelayOptions { PollIntervalSeconds = 0 });
+        var result = _validator.Validate(
+            Options.DefaultName,
+            new OutboxRelayOptions { Enabled = false, PollIntervalSeconds = 0 });
 
         Assert.True(result.Failed);
         Assert.Contains(result.Failures, failure => failure.Contains("PollIntervalSeconds", StringComparison.Ordinal));
@@ -67,7 +78,7 @@ public class OutboxRelayOptionsValidatorTests
     {
         var result = _validator.Validate(
             Options.DefaultName,
-            new OutboxRelayOptions { RetryInitialDelaySeconds = 10, RetryMaxDelaySeconds = 5 });
+            new OutboxRelayOptions { Enabled = false, RetryInitialDelaySeconds = 10, RetryMaxDelaySeconds = 5 });
 
         Assert.True(result.Failed);
         Assert.Contains(result.Failures, failure => failure.Contains("RetryMaxDelaySeconds", StringComparison.Ordinal));
@@ -76,7 +87,9 @@ public class OutboxRelayOptionsValidatorTests
     [Fact]
     public void Validate_WhenTheMultiplierIsBelowOne_Fails()
     {
-        var result = _validator.Validate(Options.DefaultName, new OutboxRelayOptions { RetryMultiplier = 0.5 });
+        var result = _validator.Validate(
+            Options.DefaultName,
+            new OutboxRelayOptions { Enabled = false, RetryMultiplier = 0.5 });
 
         Assert.True(result.Failed);
         Assert.Contains(result.Failures, failure => failure.Contains("RetryMultiplier", StringComparison.Ordinal));

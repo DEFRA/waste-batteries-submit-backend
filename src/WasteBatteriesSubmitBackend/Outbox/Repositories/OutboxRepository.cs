@@ -1,6 +1,7 @@
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
-using WasteBatteriesSubmitBackend.Outbox;
+using System.Linq.Expressions;
 using WasteBatteriesSubmitBackend.Utils.Mongo;
 
 namespace WasteBatteriesSubmitBackend.Outbox.Repositories;
@@ -46,8 +47,6 @@ public class OutboxRepository(IMongoDbClientFactory connectionFactory, ILoggerFa
 {
     public const string CollectionName = "outbox";
 
-    private const string ClaimedUntilUtcField = "claimedUntilUtc";
-
     public Task AddAsync(
         IClientSessionHandle session,
         IReadOnlyList<OutboxEvent> events,
@@ -77,11 +76,13 @@ public class OutboxRepository(IMongoDbClientFactory connectionFactory, ILoggerFa
         ArgumentException.ThrowIfNullOrWhiteSpace(claimedBy);
 
         var update = Builders<BsonDocument>.Update
-            .Set("claimedBy", claimedBy)
-            .Set(ClaimedUntilUtcField, claimedUntilUtc);
+            .Set(Field(outboxEvent => outboxEvent.ClaimedBy), claimedBy)
+            .Set(Field(outboxEvent => outboxEvent.ClaimedUntilUtc), claimedUntilUtc);
         var options = new FindOneAndUpdateOptions<BsonDocument>
         {
-            Sort = Builders<BsonDocument>.Sort.Ascending("occurredAtUtc").Ascending("_id"),
+            Sort = Builders<BsonDocument>.Sort
+                .Ascending(Field(outboxEvent => outboxEvent.OccurredAtUtc))
+                .Ascending(Field(outboxEvent => outboxEvent.Id)),
             ReturnDocument = ReturnDocument.After
         };
 
@@ -102,13 +103,13 @@ public class OutboxRepository(IMongoDbClientFactory connectionFactory, ILoggerFa
         RequireUtc(expiresAtUtc, nameof(expiresAtUtc));
 
         var update = Builders<BsonDocument>.Update
-            .Set("sent", true)
-            .Set("sentAtUtc", sentAtUtc)
-            .Set("expiresAtUtc", expiresAtUtc)
-            .Unset("claimedBy")
-            .Unset(ClaimedUntilUtcField)
-            .Unset("attemptCount")
-            .Unset("nextAttemptAtUtc");
+            .Set(Field(outboxEvent => outboxEvent.Sent), true)
+            .Set(Field(outboxEvent => outboxEvent.SentAtUtc), sentAtUtc)
+            .Set(Field(outboxEvent => outboxEvent.ExpiresAtUtc), expiresAtUtc)
+            .Unset(Field(outboxEvent => outboxEvent.ClaimedBy))
+            .Unset(Field(outboxEvent => outboxEvent.ClaimedUntilUtc))
+            .Unset(Field(outboxEvent => outboxEvent.AttemptCount))
+            .Unset(Field(outboxEvent => outboxEvent.NextAttemptAtUtc));
         var result = await Documents.UpdateOneAsync(
             HeldClaim(eventId, claimedBy),
             update,
@@ -129,10 +130,10 @@ public class OutboxRepository(IMongoDbClientFactory connectionFactory, ILoggerFa
         ArgumentOutOfRangeException.ThrowIfLessThan(attemptCount, 1);
 
         var update = Builders<BsonDocument>.Update
-            .Set("attemptCount", attemptCount)
-            .Set("nextAttemptAtUtc", nextAttemptAtUtc)
-            .Unset("claimedBy")
-            .Unset(ClaimedUntilUtcField);
+            .Set(Field(outboxEvent => outboxEvent.AttemptCount), attemptCount)
+            .Set(Field(outboxEvent => outboxEvent.NextAttemptAtUtc), nextAttemptAtUtc)
+            .Unset(Field(outboxEvent => outboxEvent.ClaimedBy))
+            .Unset(Field(outboxEvent => outboxEvent.ClaimedUntilUtc));
         var result = await Documents.UpdateOneAsync(
             HeldClaim(eventId, claimedBy),
             update,
@@ -151,19 +152,40 @@ public class OutboxRepository(IMongoDbClientFactory connectionFactory, ILoggerFa
     private static FilterDefinition<BsonDocument> DueUnsent(DateTime utcNow)
     {
         var filter = Builders<BsonDocument>.Filter;
+        var claimedUntilUtc = Field(outboxEvent => outboxEvent.ClaimedUntilUtc);
+        var nextAttemptAtUtc = Field(outboxEvent => outboxEvent.NextAttemptAtUtc);
         return filter.And(
-            filter.Eq("sent", false),
-            filter.Or(filter.Exists(ClaimedUntilUtcField, false), filter.Lte(ClaimedUntilUtcField, utcNow)),
-            filter.Or(filter.Exists("nextAttemptAtUtc", false), filter.Lte("nextAttemptAtUtc", utcNow)));
+            filter.Eq(Field(outboxEvent => outboxEvent.Sent), false),
+            filter.Or(filter.Exists(claimedUntilUtc, false), filter.Lte(claimedUntilUtc, utcNow)),
+            filter.Or(filter.Exists(nextAttemptAtUtc, false), filter.Lte(nextAttemptAtUtc, utcNow)));
     }
 
     private static FilterDefinition<BsonDocument> HeldClaim(string eventId, string claimedBy)
     {
         var filter = Builders<BsonDocument>.Filter;
         return filter.And(
-            filter.Eq("_id", eventId),
-            filter.Eq("claimedBy", claimedBy),
-            filter.Eq("sent", false));
+            filter.Eq(Field(outboxEvent => outboxEvent.Id), eventId),
+            filter.Eq(Field(outboxEvent => outboxEvent.ClaimedBy), claimedBy),
+            filter.Eq(Field(outboxEvent => outboxEvent.Sent), false));
+    }
+
+    // The collection is BsonDocument, so a property expression is not rendered for us.
+    // The class map applies the same camel-case convention and BsonId as the documents we insert.
+    internal static string Field<T>(Expression<Func<OutboxEvent, T>> property)
+    {
+        MongoConventions.Register();
+        if (property.Body is not MemberExpression member)
+        {
+            throw new ArgumentException("The field must be an OutboxEvent property.", nameof(property));
+        }
+
+        var memberMap = BsonClassMap.LookupClassMap(typeof(OutboxEvent)).GetMemberMap(member.Member.Name);
+        if (memberMap is null)
+        {
+            throw new InvalidOperationException($"OutboxEvent has no stored field {member.Member.Name}.");
+        }
+
+        return memberMap.ElementName;
     }
 
     private static void RequireUtc(DateTime value, string paramName)

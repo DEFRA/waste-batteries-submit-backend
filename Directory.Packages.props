@@ -1,0 +1,82 @@
+<Project>
+  <!--
+    One version list for the repository. Project files name packages and do not set Version.
+
+    Visual Studio's NuGet Package Manager updates this file. It does not add a version
+    to a csproj. CentralPackageVersionOverrideEnabled is false so a project cannot
+    keep a private version either.
+
+    A range such as [10.0.15,11.0.0) is a minimum of 10.0.15 and excludes 11.0.0.
+    The Updates tab lists a release inside that range and leaves the excluded major off.
+    A minimum with no upper bound, such as 10.0.15, lists every newer release.
+    Restore selects the bottom of the range until that lower bound is raised.
+    Everything else is a normal version, so Update writes the new number here.
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <CentralPackageVersionOverrideEnabled>false</CentralPackageVersionOverrideEnabled>
+
+    <MinimumSnappierVersion>1.1.0</MinimumSnappierVersion>
+    <MinimumSharpCompressVersion>0.48.0</MinimumSharpCompressVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      4.x requires AWSSDK.Core 4, and MongoDB.Driver.Authentication.AWS 3.14.0
+      requires AWSSDK.SecurityToken 3.7, which only allows Core 3.x (NU1608).
+      AWS SDK v4 support is in the MongoDB driver 4.0 line, which is not released.
+      3.7.502.61 is the newest 3.x release. The upper bound keeps 4.x off the Updates tab.
+    -->
+    <PackageVersion Include="AWSSDK.SimpleNotificationService" Version="[3.7.502.61,4.0.0)" />
+    <PackageVersion Include="Elastic.CommonSchema.Serilog" Version="9.0.0" />
+    <PackageVersion Include="Elastic.Serilog.Enrichers.Web" Version="9.0.0" />
+    <PackageVersion Include="FluentValidation" Version="12.2.0" />
+    <PackageVersion Include="MongoDB.Bson" Version="3.14.0" />
+    <PackageVersion Include="MongoDB.Driver" Version="3.14.0" />
+    <PackageVersion Include="MongoDB.Driver.Authentication.AWS" Version="3.14.0" />
+    <PackageVersion Include="NSubstitute" Version="6.2.0" />
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Enrichers.ClientInfo" Version="3.0.0" />
+    <PackageVersion Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+    <PackageVersion Include="Serilog.Enrichers.Thread" Version="4.0.0" />
+    <PackageVersion Include="Serilog.Formatting.Compact" Version="3.0.0" />
+    <PackageVersion Include="Serilog.Settings.Configuration" Version="10.0.1" />
+    <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUI" Version="11.0.1" />
+    <PackageVersion Include="Testcontainers.MongoDb" Version="4.17.0" />
+
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
+    <PackageVersion Include="xunit.v3" Version="4.0.3" />
+
+    <!--
+      11.0.0 supports net11.0 only (NU1202 on net10.0). 10.0.15 is the newest 10.0 release.
+      The range allows a later 10.0 patch and keeps 11.0.0 off the Updates tab.
+      Raise the lower bound here when that patch is applied.
+    -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="[10.0.15,11.0.0)" />
+    <PackageVersion Include="Microsoft.AspNetCore.HeaderPropagation" Version="[10.0.15,11.0.0)" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="[10.0.15,11.0.0)" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="[10.0.15,11.0.0)" />
+
+    <!--
+      Snappier before 1.1.0 is vulnerable (https://github.com/advisories/GHSA-pggp-6c3x-2vxg).
+      SharpCompress before 0.48.0 is vulnerable (https://github.com/advisories/GHSA-6c8g-7p36-r338).
+      Both are transitive. Transitive pinning forces these versions for every project
+      without a PackageReference, so Update does not copy them into each csproj.
+      SharpCompress 1.0.0 is unlisted and is not a release to restore.
+    -->
+    <PackageVersion Include="Snappier" Version="1.3.2" />
+    <PackageVersion Include="SharpCompress" Version="0.50.9" />
+
+    <!--
+      2.7.5 or later fixes https://github.com/advisories/GHSA-v5pm-xwqc-g5wc.
+      Microsoft.AspNetCore.OpenApi 10.0.15 accepts [2.13.0, 3.0.0) only.
+      OpenAPI 3.x makes IOpenApiMediaType.Example read-only, and the ASP.NET OpenAPI
+      source generator still assigns that property, so the build fails.
+      2.13.1 is the newest 2.x release. The range allows a later 2.x patch and keeps
+      3.x off the Updates tab. Move to 3.x only with ASP.NET Core 11.
+    -->
+    <PackageVersion Include="Microsoft.OpenApi" Version="[2.13.1,3.0.0)" />
+  </ItemGroup>
+</Project>

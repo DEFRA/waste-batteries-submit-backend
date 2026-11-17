@@ -8,8 +8,8 @@ public sealed class OutboxRelayOptions
     // fails and the claim is released before another task can take the document.
     public const int PublishTimeoutSeconds = 30;
 
-    // The hosted loop publishes only when this is true. A deploy with no topic yet leaves it false.
-    public bool Enabled { get; init; }
+    // The hosted loop publishes only when this is true. Set false to leave events in the outbox.
+    public bool Enabled { get; init; } = true;
 
     public string TopicArn { get; init; } = "";
 
