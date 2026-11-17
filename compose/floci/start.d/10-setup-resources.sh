@@ -28,10 +28,10 @@ aws sqs set-queue-attributes \
     --attributes file:///tmp/waste-batteries-submit-queue-policy.json
 
 existing="$(aws sns list-subscriptions-by-topic --topic-arn "$topic_arn" --query "Subscriptions[?Endpoint=='$queue_arn'].SubscriptionArn | [0]" --output text)"
-if [ "$existing" = "None" ]; then
+if [[ "$existing" == "None" ]]; then
     existing=""
 fi
-if [ -z "$existing" ]; then
+if [[ -z "$existing" ]]; then
     aws sns subscribe \
         --topic-arn "$topic_arn" \
         --protocol sqs \
