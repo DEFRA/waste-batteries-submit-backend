@@ -4,14 +4,14 @@ using MongoDB.Bson;
 
 namespace WasteBatteriesSubmitBackend.Outbox.Relay;
 
-// The ADR-161 envelope. sent and sentAt stay in the outbox. So do the claim and retry fields.
+// sent and sentAt stay in the outbox. So do the claim and retry fields.
 internal static class OutboxMessage
 {
     public const string EventIdAttribute = "eventId";
 
     public const string EventTypeAttribute = "eventType";
 
-    private static readonly HashSet<string> Omitted = new(StringComparer.Ordinal)
+    private static readonly HashSet<string> s_omitted = new(StringComparer.Ordinal)
     {
         "sent",
         "sentAtUtc",
@@ -48,7 +48,7 @@ internal static class OutboxMessage
         foreach (var element in document)
         {
             if (element.Name is "_id" or "occurredAtUtc"
-                || Omitted.Contains(element.Name)
+                || s_omitted.Contains(element.Name)
                 || json.ContainsKey(element.Name))
             {
                 continue;

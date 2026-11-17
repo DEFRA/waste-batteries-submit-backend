@@ -11,36 +11,13 @@ namespace WasteBatteriesSubmitBackend.Outbox.Relay;
 // Started by the generic host from AddOutbox in Program.cs. ExecuteAsync is the loop.
 public sealed class OutboxRelay(
     Func<IOutboxRepository> repositoryFactory,
-    IOutboxPublisher publisher,
     IOptions<OutboxRelayOptions> options,
     ITimeProvider time,
-    ILogger<OutboxRelay> logger) : BackgroundService
+    ILogger<OutboxRelay> logger,
+    IOutboxPublisher? publisher = null) : BackgroundService
 {
     // Stable for this process. Two tasks on one host still claim as different callers.
     internal string ClaimedBy { get; } = $"{Environment.MachineName}:{Guid.NewGuid():N}";
-
-    public async Task PublishPendingAsync(CancellationToken cancellationToken = default)
-    {
-        // Resolved here, not in the constructor. A process with the relay off never opens Mongo.
-        var repository = repositoryFactory();
-        var relayOptions = options.Value;
-        for (var index = 0; index < relayOptions.BatchSize; index++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var utcNow = UtcNow();
-            var document = await repository.ClaimNextAsync(
-                utcNow,
-                utcNow.AddSeconds(relayOptions.LeaseSeconds),
-                ClaimedBy,
-                cancellationToken);
-            if (document is null)
-            {
-                return;
-            }
-
-            await PublishOneAsync(repository, document, relayOptions, cancellationToken);
-        }
-    }
 
     // Test entry to the same loop. The host does not call this. It calls ExecuteAsync.
     internal Task RunAsync(CancellationToken stoppingToken) => ExecuteAsync(stoppingToken);
@@ -88,7 +65,36 @@ public sealed class OutboxRelay(
         }
     }
 
+    internal async Task PublishPendingAsync(CancellationToken cancellationToken = default)
+    {
+        if (publisher is null)
+        {
+            throw new InvalidOperationException("The outbox relay is off.");
+        }
+
+        // Resolved here, not in the constructor. A process with the relay off never opens Mongo.
+        var repository = repositoryFactory();
+        var relayOptions = options.Value;
+        for (var index = 0; index < relayOptions.BatchSize; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var utcNow = UtcNow();
+            var document = await repository.ClaimNextAsync(
+                utcNow,
+                utcNow.AddSeconds(relayOptions.LeaseSeconds),
+                ClaimedBy,
+                cancellationToken);
+            if (document is null)
+            {
+                return;
+            }
+
+            await PublishOneAsync(publisher, repository, document, relayOptions, cancellationToken);
+        }
+    }
+
     private async Task PublishOneAsync(
+        IOutboxPublisher publisher,
         IOutboxRepository repository,
         BsonDocument document,
         OutboxRelayOptions relayOptions,
@@ -133,7 +139,7 @@ public sealed class OutboxRelay(
                     eventId,
                     ClaimedBy,
                     attemptCount,
-                    UtcNow().Add(OutboxRetryDelay.ForAttempt(relayOptions, attemptCount)),
+                    UtcNow().Add(GetNextAttempt(relayOptions, attemptCount)),
                     cancellationToken);
                 if (!recorded)
                 {
@@ -147,6 +153,30 @@ public sealed class OutboxRelay(
     {
         var utcNow = time.UtcNow;
         return utcNow.Kind == DateTimeKind.Utc ? utcNow : DateTime.SpecifyKind(utcNow, DateTimeKind.Utc);
+    }
+
+    // The poll interval is separate: a document is not claimed again before this delay.
+    private static TimeSpan GetNextAttempt(OutboxRelayOptions options, int attemptCount)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentOutOfRangeException.ThrowIfLessThan(attemptCount, 1);
+
+        var delaySeconds = (double)options.RetryInitialDelaySeconds;
+        for (var attempt = 1; attempt < attemptCount; attempt++)
+        {
+            delaySeconds *= options.RetryMultiplier;
+            if (delaySeconds >= options.RetryMaxDelaySeconds)
+            {
+                return TimeSpan.FromSeconds(options.RetryMaxDelaySeconds);
+            }
+        }
+
+        if (delaySeconds >= options.RetryMaxDelaySeconds)
+        {
+            return TimeSpan.FromSeconds(options.RetryMaxDelaySeconds);
+        }
+
+        return TimeSpan.FromSeconds(delaySeconds);
     }
 
     private static int AttemptCount(BsonDocument document)

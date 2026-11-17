@@ -8,7 +8,7 @@ namespace WasteBatteriesSubmitBackend.Outbox.Repositories;
 
 public interface IOutboxRepository
 {
-    // Inserts the events on the caller's session so they commit or roll back with the submissions.
+    // Inserts the events on the caller's session so they commit or roll back with the database inserts/updates.
     // An empty list writes nothing. Sent stays false and expiresAt is omitted. The relay sets those later.
     Task AddAsync(
         IClientSessionHandle session,

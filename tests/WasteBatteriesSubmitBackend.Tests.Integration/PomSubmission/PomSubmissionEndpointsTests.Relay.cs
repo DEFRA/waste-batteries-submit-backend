@@ -290,7 +290,6 @@ public partial class PomSubmissionEndpointsTests
     private OutboxRelay Relay(RecordingPublisher publisher) =>
         new(
             Repository,
-            publisher,
             Options.Create(new OutboxRelayOptions
             {
                 Enabled = true,
@@ -304,7 +303,8 @@ public partial class PomSubmissionEndpointsTests
                 RetryMultiplier = 2
             }),
             fixture.Services.GetRequiredService<ITimeProvider>(),
-            NullLogger<OutboxRelay>.Instance);
+            NullLogger<OutboxRelay>.Instance,
+            publisher);
 
     private Task<DeleteResult> DeleteOutbox(CancellationToken cancellationToken, params string[] ids) =>
         fixture.Outbox.DeleteManyAsync(

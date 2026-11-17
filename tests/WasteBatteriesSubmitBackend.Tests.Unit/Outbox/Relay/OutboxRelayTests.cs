@@ -135,6 +135,73 @@ public class OutboxRelayTests
     }
 
     [Fact]
+    public async Task PublishPending_WhenTheDelayWouldPassTheCap_StopsAtTheCap()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var document = Document("00000000-0000-0000-0000-000000000003", Now, "corr-retry");
+        document["attemptCount"] = 9;
+        var repository = Substitute.For<IOutboxRepository>();
+        var publisher = Substitute.For<IOutboxPublisher>();
+        repository.ClaimNextAsync(
+                Arg.Any<DateTime>(),
+                Arg.Any<DateTime>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(document, (BsonDocument?)null);
+        publisher.PublishAsync(document, Arg.Any<CancellationToken>())
+            .Returns<Task>(_ => throw new InvalidOperationException("sns down"));
+        var relay = CreateRelay(
+            repository,
+            publisher,
+            new CapturingLogger<OutboxRelay>(),
+            initialDelaySeconds: 1,
+            maxDelaySeconds: 300,
+            multiplier: 2);
+
+        await relay.PublishPendingAsync(cancellationToken);
+
+        await repository.Received(1).RecordFailureAsync(
+            document["_id"].AsString,
+            relay.ClaimedBy,
+            10,
+            Now.AddSeconds(300),
+            cancellationToken);
+    }
+
+    [Fact]
+    public async Task PublishPending_WhenTheInitialDelayIsAlreadyAboveTheCap_UsesTheCap()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var document = Document("00000000-0000-0000-0000-000000000003", Now, "corr-retry");
+        var repository = Substitute.For<IOutboxRepository>();
+        var publisher = Substitute.For<IOutboxPublisher>();
+        repository.ClaimNextAsync(
+                Arg.Any<DateTime>(),
+                Arg.Any<DateTime>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(document, (BsonDocument?)null);
+        publisher.PublishAsync(document, Arg.Any<CancellationToken>())
+            .Returns<Task>(_ => throw new InvalidOperationException("sns down"));
+        var relay = CreateRelay(
+            repository,
+            publisher,
+            new CapturingLogger<OutboxRelay>(),
+            initialDelaySeconds: 10,
+            maxDelaySeconds: 5,
+            multiplier: 2);
+
+        await relay.PublishPendingAsync(cancellationToken);
+
+        await repository.Received(1).RecordFailureAsync(
+            document["_id"].AsString,
+            relay.ClaimedBy,
+            1,
+            Now.AddSeconds(5),
+            cancellationToken);
+    }
+
+    [Fact]
     public async Task PublishPending_WhenTheFirstPublishFails_StillPublishesTheNextDocument()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -407,10 +474,10 @@ public class OutboxRelayTests
         int retentionDays = 90,
         int pollIntervalSeconds = 5,
         int initialDelaySeconds = 1,
+        int maxDelaySeconds = 300,
         double multiplier = 2) =>
         new(
             () => repository,
-            publisher,
             Options.Create(new OutboxRelayOptions
             {
                 Enabled = enabled,
@@ -419,11 +486,12 @@ public class OutboxRelayTests
                 RetentionDays = retentionDays,
                 PollIntervalSeconds = pollIntervalSeconds,
                 RetryInitialDelaySeconds = initialDelaySeconds,
-                RetryMaxDelaySeconds = 300,
+                RetryMaxDelaySeconds = maxDelaySeconds,
                 RetryMultiplier = multiplier
             }),
             new FixedTime(Now),
-            logger);
+            logger,
+            publisher);
 
     private static BsonDocument Document(string id, DateTime occurredAtUtc, string correlationId) => new()
     {

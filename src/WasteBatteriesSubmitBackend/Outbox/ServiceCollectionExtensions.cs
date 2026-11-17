@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using System.Diagnostics.CodeAnalysis;
 using WasteBatteriesSubmitBackend.Outbox.Relay;
 using WasteBatteriesSubmitBackend.Outbox.Repositories;
+using WasteBatteriesSubmitBackend.Utils.Time;
 
 namespace WasteBatteriesSubmitBackend.Outbox;
 
@@ -24,14 +25,17 @@ public static class ServiceCollectionExtensions
         {
             services.AddSingleton<IAmazonSimpleNotificationService>(_ => CreateClient(relay));
             services.AddSingleton<IOutboxPublisher, SnsOutboxPublisher>();
+            services.AddHostedService<OutboxRelay>();
         }
         else
         {
-            services.AddSingleton<IOutboxPublisher, DisabledOutboxPublisher>();
+            // No SNS client. The relay still starts, logs that it is off, and does not publish.
+            services.AddSingleton<IHostedService>(provider => new OutboxRelay(
+                provider.GetRequiredService<Func<IOutboxRepository>>(),
+                provider.GetRequiredService<IOptions<OutboxRelayOptions>>(),
+                provider.GetRequiredService<ITimeProvider>(),
+                provider.GetRequiredService<ILogger<OutboxRelay>>()));
         }
-
-        //Add the relay hosted service
-        services.AddHostedService<OutboxRelay>();
         return services;
     }
 

@@ -5,6 +5,11 @@ using MongoDB.Bson;
 
 namespace WasteBatteriesSubmitBackend.Outbox.Relay;
 
+public interface IOutboxPublisher
+{
+    Task PublishAsync(BsonDocument document, CancellationToken cancellationToken = default);
+}
+
 public sealed class SnsOutboxPublisher(
     IAmazonSimpleNotificationService simpleNotificationService,
     IOptions<OutboxRelayOptions> options) : IOutboxPublisher

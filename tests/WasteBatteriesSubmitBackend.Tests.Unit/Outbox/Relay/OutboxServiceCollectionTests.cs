@@ -4,8 +4,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using NSubstitute;
 using WasteBatteriesSubmitBackend.Outbox;
 using WasteBatteriesSubmitBackend.Outbox.Relay;
+using WasteBatteriesSubmitBackend.Utils.Time;
 
 namespace WasteBatteriesSubmitBackend.Tests.Unit.Outbox.Relay;
 
@@ -19,10 +21,14 @@ public class OutboxServiceCollectionTests
         var configuration = Config(("OutboxRelay:Enabled", "false"));
 
         services.AddOutbox(configuration);
+        services.AddSingleton(Substitute.For<ITimeProvider>());
         using var provider = services.BuildServiceProvider();
 
-        Assert.IsType<DisabledOutboxPublisher>(provider.GetRequiredService<IOutboxPublisher>());
+        Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(IOutboxPublisher));
         Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(IAmazonSimpleNotificationService));
+        Assert.Contains(
+            provider.GetServices<IHostedService>(),
+            service => service is OutboxRelay);
         Assert.False(provider.GetRequiredService<IOptions<OutboxRelayOptions>>().Value.Enabled);
     }
 
