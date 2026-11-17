@@ -81,7 +81,7 @@ internal static partial class LoggerExtensions
     [LoggerMessage(
         EventId = 1002,
         Level = LogLevel.Information,
-        Message = "Publishing outbox event {EventId} {CorrelationId}")]
+        Message = "Publishing outbox event {EventId} for correlation {CorrelationId}")]
     public static partial void PublishingOutboxEvent(
         this ILogger logger,
         string eventId,
@@ -90,7 +90,7 @@ internal static partial class LoggerExtensions
     [LoggerMessage(
         EventId = 1003,
         Level = LogLevel.Information,
-        Message = "Published outbox event {EventId} {CorrelationId}")]
+        Message = "Published outbox event {EventId} for correlation {CorrelationId}")]
     public static partial void PublishedOutboxEvent(
         this ILogger logger,
         string eventId,
@@ -99,7 +99,7 @@ internal static partial class LoggerExtensions
     [LoggerMessage(
         EventId = 1004,
         Level = LogLevel.Error,
-        Message = "Failed to publish outbox event {EventId} {CorrelationId}")]
+        Message = "Failed to publish outbox event {EventId} for correlation {CorrelationId}")]
     public static partial void FailedToPublishOutboxEvent(
         this ILogger logger,
         Exception exception,
@@ -109,7 +109,7 @@ internal static partial class LoggerExtensions
     [LoggerMessage(
         EventId = 1005,
         Level = LogLevel.Warning,
-        Message = "Outbox event {EventId} was published but the claim was no longer held {CorrelationId}")]
+        Message = "Outbox event {EventId} was published but the claim was no longer held for correlation {CorrelationId}")]
     public static partial void OutboxClaimLostAfterPublish(
         this ILogger logger,
         string eventId,
@@ -118,7 +118,7 @@ internal static partial class LoggerExtensions
     [LoggerMessage(
         EventId = 1006,
         Level = LogLevel.Warning,
-        Message = "Outbox event {EventId} failed to publish and the claim was no longer held {CorrelationId}")]
+        Message = "Outbox event {EventId} failed to publish and the claim was no longer held for correlation {CorrelationId}")]
     public static partial void OutboxClaimLostAfterFailure(
         this ILogger logger,
         string eventId,

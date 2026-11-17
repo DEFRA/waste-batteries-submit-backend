@@ -13,7 +13,7 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.Outbox.Relay;
 
 public class SnsOutboxPublisherTests
 {
-    private const string TopicArn = "arn:aws:sns:eu-west-2:000000000000:waste_batteries_submit_events";
+    private const string TopicArn = "arn:aws:sns:eu-west-2:000000000000:waste_batteries_submit_pom_submission_events";
 
     [Fact]
     public async Task PublishAsync_WhenTheDocumentIsUnsent_SetsTheTopicAndTheTwoAttributes()

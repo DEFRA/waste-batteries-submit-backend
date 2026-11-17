@@ -4,6 +4,10 @@ public sealed class OutboxRelayOptions
 {
     public const string SectionName = "OutboxRelay";
 
+    // The SNS call is cancelled after this long. The lease must be longer, so a slow publish
+    // fails and the claim is released before another task can take the document.
+    public const int PublishTimeoutSeconds = 30;
+
     // The hosted loop publishes only when this is true. A deploy with no topic yet leaves it false.
     public bool Enabled { get; init; }
 

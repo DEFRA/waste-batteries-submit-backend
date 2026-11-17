@@ -43,8 +43,8 @@ public class OutboxRelayTests
 
         Received.InOrder(() =>
         {
-            publisher.PublishAsync(earlier, cancellationToken);
-            publisher.PublishAsync(later, cancellationToken);
+            publisher.PublishAsync(earlier, Arg.Any<CancellationToken>());
+            publisher.PublishAsync(later, Arg.Any<CancellationToken>());
         });
         await repository.Received(1).MarkSentAsync(
             earlier["_id"].AsString,
@@ -75,7 +75,7 @@ public class OutboxRelayTests
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
             .Returns(document, (BsonDocument?)null);
-        publisher.PublishAsync(document, cancellationToken)
+        publisher.PublishAsync(document, Arg.Any<CancellationToken>())
             .Returns<Task>(_ => throw new InvalidOperationException("sns down"));
         repository.RecordFailureAsync(
                 Arg.Any<string>(),
@@ -120,7 +120,7 @@ public class OutboxRelayTests
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
             .Returns(document, (BsonDocument?)null);
-        publisher.PublishAsync(document, cancellationToken)
+        publisher.PublishAsync(document, Arg.Any<CancellationToken>())
             .Returns<Task>(_ => throw new InvalidOperationException("sns down"));
         var relay = CreateRelay(repository, publisher, new CapturingLogger<OutboxRelay>(), initialDelaySeconds: 1, multiplier: 2);
 
@@ -148,7 +148,7 @@ public class OutboxRelayTests
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
             .Returns(failed, next, (BsonDocument?)null);
-        publisher.PublishAsync(failed, cancellationToken)
+        publisher.PublishAsync(failed, Arg.Any<CancellationToken>())
             .Returns<Task>(_ => throw new InvalidOperationException("sns down"));
         repository.RecordFailureAsync(
                 Arg.Any<string>(),
@@ -168,7 +168,7 @@ public class OutboxRelayTests
 
         await relay.PublishPendingAsync(cancellationToken);
 
-        await publisher.Received(1).PublishAsync(next, cancellationToken);
+        await publisher.Received(1).PublishAsync(next, Arg.Any<CancellationToken>());
         await repository.Received(1).MarkSentAsync(
             next["_id"].AsString,
             relay.ClaimedBy,
@@ -224,7 +224,7 @@ public class OutboxRelayTests
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
             .Returns(document, (BsonDocument?)null);
-        publisher.PublishAsync(document, cancellationToken)
+        publisher.PublishAsync(document, Arg.Any<CancellationToken>())
             .Returns<Task>(_ => throw new InvalidOperationException("sns down"));
         repository.RecordFailureAsync(
                 Arg.Any<string>(),
@@ -241,6 +241,72 @@ public class OutboxRelayTests
         Assert.Contains(
             logger.Entries,
             entry => entry.Level == LogLevel.Warning && entry.Message.Contains("corr-lost-failure", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PublishPending_WhenThePublishIsCancelledIndependently_RecordsTheFailure()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var document = Document("00000000-0000-0000-0000-000000000008", Now, "corr-timeout");
+        var repository = Substitute.For<IOutboxRepository>();
+        var publisher = Substitute.For<IOutboxPublisher>();
+        repository.ClaimNextAsync(
+                Arg.Any<DateTime>(),
+                Arg.Any<DateTime>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(document, (BsonDocument?)null);
+        publisher.PublishAsync(document, Arg.Any<CancellationToken>())
+            .Returns<Task>(_ => throw new TaskCanceledException());
+        repository.RecordFailureAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<int>(),
+                Arg.Any<DateTime>(),
+                Arg.Any<CancellationToken>())
+            .Returns(true);
+        var relay = CreateRelay(repository, publisher, new CapturingLogger<OutboxRelay>(), initialDelaySeconds: 1, multiplier: 2);
+
+        await relay.PublishPendingAsync(cancellationToken);
+
+        await repository.Received(1).RecordFailureAsync(
+            document["_id"].AsString,
+            relay.ClaimedBy,
+            1,
+            Now.AddSeconds(1),
+            cancellationToken);
+    }
+
+    [Fact]
+    public async Task PublishPending_WhenTheCallerCancelsDuringPublish_DoesNotRecordAFailure()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var caller = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var document = Document("00000000-0000-0000-0000-000000000009", Now, "corr-shutdown");
+        var repository = Substitute.For<IOutboxRepository>();
+        var publisher = Substitute.For<IOutboxPublisher>();
+        repository.ClaimNextAsync(
+                Arg.Any<DateTime>(),
+                Arg.Any<DateTime>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(document, (BsonDocument?)null);
+        publisher.PublishAsync(document, Arg.Any<CancellationToken>())
+            .Returns<Task>(_ =>
+            {
+                caller.Cancel();
+                throw new OperationCanceledException(caller.Token);
+            });
+        var relay = CreateRelay(repository, publisher, new CapturingLogger<OutboxRelay>());
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => relay.PublishPendingAsync(caller.Token));
+
+        await repository.DidNotReceive().RecordFailureAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<int>(),
+            Arg.Any<DateTime>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

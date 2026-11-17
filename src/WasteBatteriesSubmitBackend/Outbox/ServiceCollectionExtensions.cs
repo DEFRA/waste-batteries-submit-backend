@@ -1,5 +1,6 @@
 using Amazon;
 using Amazon.SimpleNotificationService;
+using Microsoft.Extensions.Options;
 using System.Diagnostics.CodeAnalysis;
 using WasteBatteriesSubmitBackend.Outbox.Relay;
 using WasteBatteriesSubmitBackend.Outbox.Repositories;
@@ -13,7 +14,10 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<IOutboxRepository, OutboxRepository>();
         services.AddSingleton<Func<IOutboxRepository>>(provider => () => provider.GetRequiredService<IOutboxRepository>());
-        services.AddOptions<OutboxRelayOptions>().Bind(configuration.GetSection(OutboxRelayOptions.SectionName));
+        services.AddSingleton<IValidateOptions<OutboxRelayOptions>, OutboxRelayOptionsValidator>();
+        services.AddOptions<OutboxRelayOptions>()
+            .Bind(configuration.GetSection(OutboxRelayOptions.SectionName))
+            .ValidateOnStart();
 
         var relay = configuration.GetSection(OutboxRelayOptions.SectionName).Get<OutboxRelayOptions>() ?? new OutboxRelayOptions();
         if (relay.Enabled)
@@ -33,7 +37,11 @@ public static class ServiceCollectionExtensions
 
     private static AmazonSimpleNotificationServiceClient CreateClient(OutboxRelayOptions relay)
     {
-        var config = new AmazonSimpleNotificationServiceConfig();
+        var config = new AmazonSimpleNotificationServiceConfig
+        {
+            // The relay also cancels the call after this long. One HTTP attempt must not outlive that.
+            Timeout = TimeSpan.FromSeconds(OutboxRelayOptions.PublishTimeoutSeconds)
+        };
         if (string.IsNullOrWhiteSpace(relay.ServiceUrl))
         {
             config.RegionEndpoint = RegionEndpoint.EUWest2;

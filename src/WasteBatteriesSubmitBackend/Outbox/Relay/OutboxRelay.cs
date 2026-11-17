@@ -101,7 +101,10 @@ public sealed class OutboxRelay(
             try
             {
                 logger.PublishingOutboxEvent(eventId, correlationId);
-                await publisher.PublishAsync(document, cancellationToken);
+                // Cancel a slow call before the lease ends. The caller's token still means shutdown.
+                using var publishTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                publishTimeout.CancelAfter(TimeSpan.FromSeconds(OutboxRelayOptions.PublishTimeoutSeconds));
+                await publisher.PublishAsync(document, publishTimeout.Token);
                 var sentAtUtc = UtcNow();
                 var marked = await repository.MarkSentAsync(
                     eventId,
@@ -118,7 +121,11 @@ public sealed class OutboxRelay(
                     logger.OutboxClaimLostAfterPublish(eventId, correlationId);
                 }
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
             {
                 logger.FailedToPublishOutboxEvent(exception, eventId, correlationId);
                 var attemptCount = AttemptCount(document) + 1;

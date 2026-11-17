@@ -294,7 +294,7 @@ public partial class PomSubmissionEndpointsTests
             Options.Create(new OutboxRelayOptions
             {
                 Enabled = true,
-                TopicArn = "arn:aws:sns:eu-west-2:000000000000:waste_batteries_submit_events",
+                TopicArn = "arn:aws:sns:eu-west-2:000000000000:waste_batteries_submit_pom_submission_events",
                 BatchSize = 20,
                 LeaseSeconds = 60,
                 RetentionDays = 90,
