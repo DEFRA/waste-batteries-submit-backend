@@ -252,19 +252,41 @@ docker compose exec floci aws sqs get-queue-attributes --queue-url http://localh
 Read one envelope and leave it visible on the queue:
 
 ```bash
-docker compose exec floci aws sqs receive-message --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --visibility-timeout 0
+docker compose exec floci aws --no-cli-pager sqs receive-message --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --visibility-timeout 0
 ```
 
-`--visibility-timeout 0` keeps the message visible to the next read. A receive without it hides the message for the queue's visibility timeout. The message stays on the queue until something deletes it.
+A receive returns one message. That is the SQS default for `--max-number-of-messages`. A batch upsert publishes one event per submission, so the queue can hold several while this command keeps returning the same one. `--visibility-timeout 0` puts that message straight back, and the next call often receives it again.
+
+Read up to 10 envelopes in one call, which is the SQS maximum per receive:
+
+```bash
+docker compose exec floci aws --no-cli-pager sqs receive-message --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --visibility-timeout 0 --max-number-of-messages 10
+```
+
+`--no-cli-pager` prints the whole response in the terminal. Without it the AWS CLI opens a pager once the JSON is longer than the window. The pager waits at the bottom of the first screen, and its status line reads `standard input`. Events further down the response look missing until you press Space to scroll, or `q` to leave the pager.
+
+`--visibility-timeout 0` keeps every returned message visible to the next read. A receive without it hides those messages for the queue's visibility timeout. Messages stay on the queue until something deletes them. When more than 10 are waiting, leave the visibility timeout off for the first call so those 10 stay hidden, then call again for the rest. With the timeout left at 0, the next call can return the same messages.
+
+Clear every message from the local queue. This leaves the queue and its SNS subscription in place:
+
+```bash
+docker compose exec floci aws --no-cli-pager sqs purge-queue --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue
+```
+
+SQS accepts one purge every 60 seconds. A second call inside that window fails. The command returns no body when the purge is accepted.
 
 With the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) installed on the machine, call floci on localhost directly:
 
 ```bash
-aws --endpoint-url http://localhost:4566 sqs get-queue-attributes --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --attribute-names ApproximateNumberOfMessages
+aws --no-cli-pager --endpoint-url http://localhost:4566 sqs get-queue-attributes --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --attribute-names ApproximateNumberOfMessages
 ```
 
 ```bash
-aws --endpoint-url http://localhost:4566 sqs receive-message --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --visibility-timeout 0
+aws --no-cli-pager --endpoint-url http://localhost:4566 sqs receive-message --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --visibility-timeout 0 --max-number-of-messages 10
+```
+
+```bash
+aws --no-cli-pager --endpoint-url http://localhost:4566 sqs purge-queue --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue
 ```
 
 The backend requires a Defra ID access token in the `Authorization: Bearer <token>`
