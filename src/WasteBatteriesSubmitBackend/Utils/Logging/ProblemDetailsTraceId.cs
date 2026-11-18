@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.AspNetCore.Http.Features;
 
 namespace WasteBatteriesSubmitBackend.Utils.Logging;
 
@@ -12,7 +13,7 @@ internal static class ProblemDetailsTraceId
         var httpContext = context.HttpContext;
         context.ProblemDetails.Extensions["traceId"] = Select(
             ReadHeader(httpContext, traceHeaderName),
-            ActivityTraceId(),
+            ActivityTraceId(httpContext),
             httpContext.TraceIdentifier);
     }
 
@@ -44,9 +45,16 @@ internal static class ProblemDetailsTraceId
         return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
 
-    private static string? ActivityTraceId()
+    // Activity.Current is cleared when hosting stops the request activity, which can
+    // happen before problem details are written. The request keeps that activity.
+    private static string? ActivityTraceId(HttpContext httpContext)
     {
-        var activity = Activity.Current;
+        return TraceIdOrNull(httpContext.Features.Get<IHttpActivityFeature>()?.Activity)
+            ?? TraceIdOrNull(Activity.Current);
+    }
+
+    private static string? TraceIdOrNull(Activity? activity)
+    {
         if (activity is null)
         {
             return null;
