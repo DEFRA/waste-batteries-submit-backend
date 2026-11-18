@@ -43,41 +43,6 @@ Because returning the fully saved submission for each item in the batch would ex
 
 The `requestIndex`, `id` (the submission just saved), `schemeOrgId`, `memberOrgId`, `compliancePeriodYear`, `compliancePeriodQuarter`, and `action` (`Created` or `Amended`). 
 
-#### Outbox pattern when saving a submission
-
-Each of the saves writes one outbox document per distinct scheme and compliance year, meaning several members or quarters for the same scheme and year share one event for a batch upsert.
-
-This is done within the same transaction, which ensures that the save and the outbox are an atomic operation. A relay in this process then publishes each unsent document to the service's SNS topic. Consumers subscribe a queue to that topic.
-
-The outbox event document is stored in the `outbox` collection with 
-- `id` (a GUID, the same value if the transaction is retried), 
-- `eventType` (`PomSubmissionCreated`, `PomSubmissionAmended`, or `PomSubmissionSaved` when one scheme and year both creates and amends),
-- `schemaVersion` (set by the submission event, constant 1), 
-- `subjectId` (the scheme id and year), 
-- `version` (the commit time in unix milliseconds, so a later save orders after an earlier one), 
-- `partitionKey` (the scheme id), 
-- `occurredAtUtc`, 
-- `actorId` (the users id from the configured JWT user-id claim, otherwise the name claim), 
-- `correlationId` (from the `x-cdp-request-id` header, if passed in, else the activity trace id if this exists, else a new id), 
-- `sent`, 
-- `schemeOrgId`,
-- `compliancePeriodYear`. 
- 
-`sent` is false. `sentAtUtc` and `expiresAtUtc` are omitted until the relay publishes the event. `expiresAtUtc` is `sentAtUtc` plus `OutboxRelay:RetentionDays` (90 by default).
-
-An index named `sent_occurred_at` is on `sent` then `occurredAtUtc`. A unique index named `subject_version` is on `subjectId` then `version`, so one subject cannot store the same version twice.
-
-A TTL index named `expires_at` deletes a document at `expiresAtUtc` (`expireAfterSeconds` 0). An unsent document has no `expiresAtUtc`, so it is not deleted.
-
-The relay is a background service in this API. On each pass it claims the oldest unsent document whose claim has expired and whose next attempt is due, publishes it, and sets `sent`. A second instance cannot take that document until `claimedUntilUtc`. The publish call is cancelled after 30 seconds, which is shorter than `OutboxRelay:LeaseSeconds` (60 by default), so a slow call fails and the claim is released before another task can publish the same document. A failed publish leaves `sent` false and sets `nextAttemptAtUtc`, so the same document is tried again with backoff. The published `eventId` is the stored id. AWS assigns its own SNS message id on every publish, and the relay does not use that id.
-
-The message body is `eventId`, `eventType`, `schemaVersion`, `subjectId`, `version` (the commit time in unix milliseconds, not the submission row's version), `partitionKey`, `occurredAt`, `actorId`, `correlationId`, `schemeOrgId` and `compliancePeriodYear`. `eventId` and `eventType` are the SNS message attributes. `sent` and `sentAtUtc` stay on the document.
-
-The relay is on unless `OutboxRelay:Enabled` is false. The API does not start when the relay is on and `OutboxRelay:TopicArn` is not an SNS topic ARN, or when the lease is not longer than the 30 second publish timeout. `OutboxRelay:PollIntervalSeconds` defaults to 5. In CDP, request one standard SNS topic named `waste_batteries_submit_pom_submission_events` (Portal, Create, Resource Request). `cdp-app-config` sets `OutboxRelay__TopicArn` to that topic's ARN for dev, test, perf-test, ext-test and prod. Set `OutboxRelay__Enabled` to false to leave events in the outbox. Redeploy after the topic exists. Leave `OutboxRelay__ServiceUrl` empty so the SDK uses the regional endpoint and the task role. Each API task runs the relay. The claim means only one task publishes a document.
-
-Locally the relay publishes to the topic `waste_batteries_submit_pom_submission_events`. The queue `waste_batteries_obligations_pom_submission_evts_queue` is subscribed to that topic. These are the same names as the CDP topic and the obligations queue. After a successful publish the outbox document has `sent` true and `expiresAtUtc` 90 days later. The document stays in Mongo. The envelope stays on that queue until something deletes it. [Running](#running) covers starting the API and reading that queue. 
-
-
 #### Request JSON
 
 ```json
@@ -122,6 +87,42 @@ Each tonnage entry also stores:
 Two unique indexes cover a submission. The current-row index is `schemeOrgId`, `memberOrgId`, `compliancePeriodYear` and `compliancePeriodQuarter`, partial on `isCurrent: true`, so one current submission can use that key. The version index is those fields plus `version`, so each version of that key is stored once, including submissions that are no longer current.
 
 The other indexes are scheme plus year plus quarter, member plus year where `isCurrent` is true, `memberBprn`, chemistry plus battery category on the entries, and a sparse index on `supersedesSubmissionId`.
+
+#### Outbox pattern when saving a submission
+
+Each of the saves writes one outbox document per distinct scheme and compliance year, meaning several members or quarters for the same scheme and year share one event for a batch upsert.
+
+This is done within the same transaction, which ensures that the save and the outbox are an atomic operation. A relay in this process then publishes each unsent document to the service's SNS topic. Consumers subscribe a queue to that topic.
+
+The outbox event document is stored in the `outbox` collection with 
+- `id` (a GUID, the same value if the transaction is retried), 
+- `eventType` (`PomSubmissionCreated`, `PomSubmissionAmended`, or `PomSubmissionSaved` when one scheme and year both creates and amends),
+- `schemaVersion` (set by the submission event, constant 1), 
+- `subjectId` (the scheme id and year), 
+- `version` (the commit time in unix milliseconds, so a later save orders after an earlier one), 
+- `partitionKey` (the scheme id), 
+- `occurredAtUtc`, 
+- `actorId` (the users id from the configured JWT user-id claim, otherwise the name claim), 
+- `correlationId` (from the `x-cdp-request-id` header, if passed in, else the activity trace id if this exists, else a new id), 
+- `sent`, 
+- `schemeOrgId`,
+- `compliancePeriodYear`. 
+ 
+`sent` is false when the document is written. `sentAtUtc` and `expiresAtUtc` are omitted until the relay publishes the event. `expiresAtUtc` is `sentAtUtc` plus `OutboxRelay:RetentionDays` (90 by default). `claimedBy` and `claimedUntilUtc` are omitted until a relay claims the document, and are removed when that publish succeeds or fails. `attemptCount` is omitted while it is zero. A failed publish sets `attemptCount` and `nextAttemptAtUtc`. Both are removed once the event is sent. `nextAttemptAtUtc` is omitted until a publish fails.
+
+An index named `sent_occurred_at` is on `sent` then `occurredAtUtc`. A unique index named `subject_version` is on `subjectId` then `version`, so one subject cannot store the same version twice.
+
+A TTL index named `expires_at` deletes a document at `expiresAtUtc` (`expireAfterSeconds` 0). An unsent document has no `expiresAtUtc`, so it is not deleted.
+
+The relay is a background service in this API. On each pass it claims up to `OutboxRelay:BatchSize` (20 by default) of the oldest unsent documents whose claim is missing or has expired, and whose next attempt is missing or due. It publishes each one and sets `sent`, `sentAtUtc` and `expiresAtUtc`. A claimed document stores `claimedBy` and `claimedUntilUtc`. A second instance cannot take that document until `claimedUntilUtc`. The publish call is cancelled after 30 seconds, which is shorter than `OutboxRelay:LeaseSeconds` (60 by default), so a slow call fails and the claim is released before another task can publish the same document. A failed publish leaves `sent` false, clears `claimedBy` and `claimedUntilUtc`, and sets `attemptCount` and `nextAttemptAtUtc`, so the same document is tried again after a delay. The delay starts at `OutboxRelay:RetryInitialDelaySeconds` (1) and is multiplied by `OutboxRelay:RetryMultiplier` (2) after each failure, up to `OutboxRelay:RetryMaxDelaySeconds` (300). The published `eventId` is the stored id. AWS assigns its own SNS message id on every publish, and the relay does not use that id.
+
+The message body is `eventId`, `eventType`, `schemaVersion`, `subjectId`, `version` (the commit time in unix milliseconds, not the submission row's version), `partitionKey`, `occurredAt`, `actorId`, `correlationId`, `schemeOrgId` and `compliancePeriodYear`. `eventId` and `eventType` are the SNS message attributes. The message omits `sent`, `sentAtUtc`, `expiresAtUtc`, `claimedBy`, `claimedUntilUtc`, `attemptCount` and `nextAttemptAtUtc`.
+
+The relay is on unless `OutboxRelay:Enabled` is false. The API does not start when the relay is on and `OutboxRelay:TopicArn` is not an SNS topic ARN, or when the lease is not longer than the 30 second publish timeout. `OutboxRelay:PollIntervalSeconds` defaults to 5. 
+
+In CDP the SNS has been setup by following the [cdp-documentation](https://github.com/DEFRA/cdp-documentation/blob/main/how-to/sqs-sns.md), with a standard SNS topic named `waste_batteries_submit_pom_submission_events`. `cdp-app-config` sets `OutboxRelay__TopicArn` to that topic's ARN for dev, test, perf-test, ext-test and prod. Set `OutboxRelay__Enabled` to false to leave events in the outbox.
+
+Locally the relay publishes to the topic `waste_batteries_submit_pom_submission_events`. The queue `waste_batteries_obligations_pom_submission_evts_queue` is subscribed to that topic. These are the same names as the CDP topic and the obligations queue. After a successful publish the outbox document has `sent` true, `sentAtUtc` set and `expiresAtUtc` 90 days later. The claim and retry fields are removed. The document stays in Mongo. The envelope stays on that queue until something deletes it. [Running](#running) covers starting the API and reading that queue. 
 
 
 ### Docker Compose
