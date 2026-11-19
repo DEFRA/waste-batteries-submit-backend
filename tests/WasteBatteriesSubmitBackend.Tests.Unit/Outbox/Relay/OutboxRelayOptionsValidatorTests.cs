@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using WasteBatteriesSubmitBackend.Outbox.Relay;
 
@@ -5,12 +6,15 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.Outbox.Relay;
 
 public class OutboxRelayOptionsValidatorTests
 {
-    private readonly OutboxRelayOptionsValidator _validator = new();
+    private const string SectionName = "SampleOutboxRelay";
+
+    private readonly OutboxRelayOptionsValidator _validator =
+        new(new ConfigurationBuilder().Build(), SectionName);
 
     [Fact]
     public void Validate_WhenEnabledIsLeftAtTheDefault_RejectsThePlaceholderTopic()
     {
-        var result = _validator.Validate(Options.DefaultName, new OutboxRelayOptions());
+        var result = _validator.Validate(SectionName, new OutboxRelayOptions());
 
         Assert.True(result.Failed);
         Assert.Contains(result.Failures, failure => failure.Contains("TopicArn", StringComparison.Ordinal));
@@ -19,7 +23,7 @@ public class OutboxRelayOptionsValidatorTests
     [Fact]
     public void Validate_WhenTheRelayIsOff_AllowsThePlaceholderTopic()
     {
-        var result = _validator.Validate(Options.DefaultName, new OutboxRelayOptions { Enabled = false });
+        var result = _validator.Validate(SectionName, new OutboxRelayOptions { Enabled = false });
 
         Assert.False(result.Failed);
     }
@@ -27,7 +31,7 @@ public class OutboxRelayOptionsValidatorTests
     [Fact]
     public void Validate_WhenTheRelayIsOnWithATopic_Succeeds()
     {
-        var result = _validator.Validate(Options.DefaultName, Enabled(serviceUrl: ""));
+        var result = _validator.Validate(SectionName, Enabled(serviceUrl: ""));
 
         Assert.False(result.Failed);
     }
@@ -35,7 +39,7 @@ public class OutboxRelayOptionsValidatorTests
     [Fact]
     public void Validate_WhenTheServiceUrlIsAnAbsoluteHttpUrl_Succeeds()
     {
-        var result = _validator.Validate(Options.DefaultName, Enabled(serviceUrl: "http://floci:4566"));
+        var result = _validator.Validate(SectionName, Enabled(serviceUrl: "http://floci:4566"));
 
         Assert.False(result.Failed);
     }
@@ -44,7 +48,7 @@ public class OutboxRelayOptionsValidatorTests
     public void Validate_WhenTheRelayIsOnWithoutAnSnsArn_Fails()
     {
         var result = _validator.Validate(
-            Options.DefaultName,
+            SectionName,
             new OutboxRelayOptions { Enabled = true, TopicArn = "set-automatically-when-deployed" });
 
         Assert.True(result.Failed);
@@ -55,7 +59,7 @@ public class OutboxRelayOptionsValidatorTests
     public void Validate_WhenTheLeaseDoesNotOutlastThePublishTimeout_Fails()
     {
         var result = _validator.Validate(
-            Options.DefaultName,
+            SectionName,
             new OutboxRelayOptions { Enabled = false, LeaseSeconds = OutboxRelayOptions.PublishTimeoutSeconds });
 
         Assert.True(result.Failed);
@@ -66,7 +70,7 @@ public class OutboxRelayOptionsValidatorTests
     public void Validate_WhenThePollIntervalIsZero_Fails()
     {
         var result = _validator.Validate(
-            Options.DefaultName,
+            SectionName,
             new OutboxRelayOptions { Enabled = false, PollIntervalSeconds = 0 });
 
         Assert.True(result.Failed);
@@ -77,7 +81,7 @@ public class OutboxRelayOptionsValidatorTests
     public void Validate_WhenTheRetryCapIsBelowTheInitialDelay_Fails()
     {
         var result = _validator.Validate(
-            Options.DefaultName,
+            SectionName,
             new OutboxRelayOptions { Enabled = false, RetryInitialDelaySeconds = 10, RetryMaxDelaySeconds = 5 });
 
         Assert.True(result.Failed);
@@ -88,7 +92,7 @@ public class OutboxRelayOptionsValidatorTests
     public void Validate_WhenTheMultiplierIsBelowOne_Fails()
     {
         var result = _validator.Validate(
-            Options.DefaultName,
+            SectionName,
             new OutboxRelayOptions { Enabled = false, RetryMultiplier = 0.5 });
 
         Assert.True(result.Failed);
@@ -96,9 +100,25 @@ public class OutboxRelayOptionsValidatorTests
     }
 
     [Fact]
+    public void Validate_WhenTheRelayIsOnWithoutEventTypes_Fails()
+    {
+        var result = _validator.Validate(
+            SectionName,
+            new OutboxRelayOptions
+            {
+                Enabled = true,
+                TopicArn = "arn:aws:sns:eu-west-2:000000000000:events",
+                EventTypes = []
+            });
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures, failure => failure.Contains("EventTypes", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Validate_WhenTheServiceUrlIsNotHttp_Fails()
     {
-        var result = _validator.Validate(Options.DefaultName, Enabled(serviceUrl: "floci:4566"));
+        var result = _validator.Validate(SectionName, Enabled(serviceUrl: "floci:4566"));
 
         Assert.True(result.Failed);
         Assert.Contains(result.Failures, failure => failure.Contains("ServiceUrl", StringComparison.Ordinal));
@@ -108,6 +128,7 @@ public class OutboxRelayOptionsValidatorTests
     {
         Enabled = true,
         TopicArn = "arn:aws:sns:eu-west-2:000000000000:waste_batteries_submit_pom_submission_events",
-        ServiceUrl = serviceUrl
+        ServiceUrl = serviceUrl,
+        EventTypes = ["SampleEvent"]
     };
 }

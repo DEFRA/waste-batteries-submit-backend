@@ -30,7 +30,7 @@ public partial class PomSubmissionEndpointsTests
         {
             await fixture.Outbox.InsertManyAsync([later, earlier], cancellationToken: cancellationToken);
 
-            var claimed = await repository.ClaimNextAsync(laterAt.AddHours(1), laterAt.AddHours(2), "relay-a", cancellationToken);
+            var claimed = await repository.ClaimNextAsync(laterAt.AddHours(1), laterAt.AddHours(2), "relay-a", CreatedEventType, cancellationToken);
 
             Assert.NotNull(claimed);
             Assert.Equal(earlier["_id"].AsString, claimed["_id"].AsString);
@@ -39,6 +39,33 @@ public partial class PomSubmissionEndpointsTests
         finally
         {
             await DeleteOutbox(earlier["_id"].AsString, later["_id"].AsString, cancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task ClaimNext_WhenTheEventTypeBelongsToAnotherRelay_LeavesItUnclaimed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var now = new DateTime(2026, 1, 2, 1, 0, 0, DateTimeKind.Utc);
+        var other = UnsentDocument("00000000-0000-0000-0000-000000000013", now, 2031);
+        other["eventType"] = "OtherEvent";
+        var pom = UnsentDocument("00000000-0000-0000-0000-000000000014", now.AddMinutes(1), 2032);
+        var repository = Repository();
+
+        try
+        {
+            await fixture.Outbox.InsertManyAsync([other, pom], cancellationToken: cancellationToken);
+
+            var claimed = await repository.ClaimNextAsync(now.AddHours(1), now.AddHours(2), "relay-a", CreatedEventType, cancellationToken);
+            var storedOther = await fixture.Outbox.Find(Builders<BsonDocument>.Filter.Eq("_id", other["_id"])).SingleAsync(cancellationToken);
+
+            Assert.NotNull(claimed);
+            Assert.Equal(pom["_id"].AsString, claimed["_id"].AsString);
+            Assert.False(storedOther.Contains("claimedBy"));
+        }
+        finally
+        {
+            await DeleteOutbox(other["_id"].AsString, pom["_id"].AsString, cancellationToken);
         }
     }
 
@@ -62,7 +89,7 @@ public partial class PomSubmissionEndpointsTests
         {
             await fixture.Outbox.InsertManyAsync([sent, leased, waiting, due], cancellationToken: cancellationToken);
 
-            var claimed = await repository.ClaimNextAsync(now, now.AddMinutes(1), "relay-a", cancellationToken);
+            var claimed = await repository.ClaimNextAsync(now, now.AddMinutes(1), "relay-a", CreatedEventType, cancellationToken);
 
             Assert.NotNull(claimed);
             Assert.Equal(due["_id"].AsString, claimed["_id"].AsString);
@@ -94,8 +121,8 @@ public partial class PomSubmissionEndpointsTests
             var until = now.AddMinutes(1);
 
             var results = await Task.WhenAll(
-                repository.ClaimNextAsync(now, until, "relay-a", cancellationToken),
-                repository.ClaimNextAsync(now, until, "relay-b", cancellationToken));
+                repository.ClaimNextAsync(now, until, "relay-a", CreatedEventType, cancellationToken),
+                repository.ClaimNextAsync(now, until, "relay-b", CreatedEventType, cancellationToken));
 
             var winner = Assert.Single(results, claimed => claimed is not null);
             Assert.Equal(document["_id"].AsString, winner!["_id"].AsString);
@@ -117,11 +144,11 @@ public partial class PomSubmissionEndpointsTests
         try
         {
             await fixture.Outbox.InsertOneAsync(document, cancellationToken: cancellationToken);
-            var held = await repository.ClaimNextAsync(now, now.AddSeconds(60), "relay-a", cancellationToken);
+            var held = await repository.ClaimNextAsync(now, now.AddSeconds(60), "relay-a", CreatedEventType, cancellationToken);
             Assert.NotNull(held);
 
-            var blocked = await repository.ClaimNextAsync(now.AddSeconds(59), now.AddMinutes(2), "relay-b", cancellationToken);
-            var reclaimed = await repository.ClaimNextAsync(now.AddSeconds(60), now.AddMinutes(2), "relay-b", cancellationToken);
+            var blocked = await repository.ClaimNextAsync(now.AddSeconds(59), now.AddMinutes(2), "relay-b", CreatedEventType, cancellationToken);
+            var reclaimed = await repository.ClaimNextAsync(now.AddSeconds(60), now.AddMinutes(2), "relay-b", CreatedEventType, cancellationToken);
 
             Assert.Null(blocked);
             Assert.NotNull(reclaimed);
@@ -145,7 +172,7 @@ public partial class PomSubmissionEndpointsTests
         try
         {
             await fixture.Outbox.InsertOneAsync(document, cancellationToken: cancellationToken);
-            await repository.ClaimNextAsync(now, now.AddMinutes(1), "relay-a", cancellationToken);
+            await repository.ClaimNextAsync(now, now.AddMinutes(1), "relay-a", CreatedEventType, cancellationToken);
             var sentAt = now.AddSeconds(2);
 
             var lost = await repository.MarkSentAsync(document["_id"].AsString, "relay-b", sentAt, sentAt.AddDays(90), cancellationToken);
@@ -178,7 +205,7 @@ public partial class PomSubmissionEndpointsTests
         try
         {
             await fixture.Outbox.InsertOneAsync(document, cancellationToken: cancellationToken);
-            await repository.ClaimNextAsync(now, now.AddMinutes(1), "relay-a", cancellationToken);
+            await repository.ClaimNextAsync(now, now.AddMinutes(1), "relay-a", CreatedEventType, cancellationToken);
             var nextAttempt = now.AddSeconds(4);
 
             var lost = await repository.RecordFailureAsync(document["_id"].AsString, "relay-b", 1, nextAttempt, cancellationToken);
@@ -285,6 +312,8 @@ public partial class PomSubmissionEndpointsTests
         }
     }
 
+    private static readonly string[] CreatedEventType = [PomSubmissionOutboxEvent.PomSubmissionCreatedType];
+
     private IOutboxRepository Repository() => fixture.Services.GetRequiredService<IOutboxRepository>();
 
     private OutboxRelay Relay(RecordingPublisher publisher) =>
@@ -300,7 +329,8 @@ public partial class PomSubmissionEndpointsTests
                 PollIntervalSeconds = 5,
                 RetryInitialDelaySeconds = 1,
                 RetryMaxDelaySeconds = 300,
-                RetryMultiplier = 2
+                RetryMultiplier = 2,
+                EventTypes = PomSubmissionOutboxEvent.AllEventTypes
             }),
             fixture.Services.GetRequiredService<ITimeProvider>(),
             NullLogger<OutboxRelay>.Instance,
