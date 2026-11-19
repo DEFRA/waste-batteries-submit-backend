@@ -26,7 +26,7 @@ public static class TestAuthentication
                 ["Jwt:MetadataAddress"] = "https://idp.test/.well-known/openid-configuration",
                 ["Jwt:Audience"] = "test-audience",
                 // Development turns the relay on for Visual Studio. The test host must leave it off.
-                ["OutboxRelay:Enabled"] = "false"
+                ["PomSubmissionOutboxRelay:Enabled"] = "false"
             });
         });
 

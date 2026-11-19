@@ -7,6 +7,7 @@ using WasteBatteriesSubmitBackend.ExampleData;
 using WasteBatteriesSubmitBackend.OpenApi;
 using WasteBatteriesSubmitBackend.PomSubmission;
 using WasteBatteriesSubmitBackend.PomSubmission.Endpoints;
+using WasteBatteriesSubmitBackend.PomSubmission.Outbox;
 using WasteBatteriesSubmitBackend.Outbox;
 using WasteBatteriesSubmitBackend.Utils;
 using WasteBatteriesSubmitBackend.Utils.Actor;
@@ -69,8 +70,9 @@ static void ConfigureServices(WebApplicationBuilder builder)
     services.AddHeaderPropagationFromConfiguration(configuration);
     services.AddProxyHttpClients();
     services.AddMongo(configuration);
-    // Registers the outbox repository and OutboxRelay, adds the relay hosted service that processes the events.
-    services.AddOutbox(configuration);
+    // Registers the outbox repository, then the POM submission relay. Another event family adds its own relay section.
+    services.AddOutbox();
+    services.AddOutboxRelay(configuration, PomSubmissionOutboxRelay.SectionName, PomSubmissionOutboxEvent.AllEventTypes);
     services.AddHealth();
     services.AddApiOpenApi();
 

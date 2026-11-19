@@ -15,12 +15,13 @@ public interface IOutboxRepository
         IReadOnlyList<OutboxEvent> events,
         CancellationToken cancellationToken = default);
 
-    // Takes the oldest unsent document that is due and not already claimed. Null when nothing is due.
-    // The claim is conditional, so a second caller does not receive the same document.
+    // Takes the oldest unsent document of these event types that is due and not already claimed.
+    // Null when nothing is due. The claim is conditional, so a second caller does not receive the same document.
     Task<BsonDocument?> ClaimNextAsync(
         DateTime utcNow,
         DateTime claimedUntilUtc,
         string claimedBy,
+        IReadOnlyCollection<string> eventTypes,
         CancellationToken cancellationToken = default);
 
     // Sets sent, sentAtUtc and expiresAtUtc when this caller still holds the claim.
@@ -69,11 +70,17 @@ public class OutboxRepository(IMongoDbClientFactory connectionFactory, ILoggerFa
         DateTime utcNow,
         DateTime claimedUntilUtc,
         string claimedBy,
+        IReadOnlyCollection<string> eventTypes,
         CancellationToken cancellationToken = default)
     {
         RequireUtc(utcNow, nameof(utcNow));
         RequireUtc(claimedUntilUtc, nameof(claimedUntilUtc));
         ArgumentException.ThrowIfNullOrWhiteSpace(claimedBy);
+        ArgumentNullException.ThrowIfNull(eventTypes);
+        if (eventTypes.Count == 0 || eventTypes.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new ArgumentException("At least one event type is required.", nameof(eventTypes));
+        }
 
         var update = Builders<BsonDocument>.Update
             .Set(Field(outboxEvent => outboxEvent.ClaimedBy), claimedBy)
@@ -86,8 +93,8 @@ public class OutboxRepository(IMongoDbClientFactory connectionFactory, ILoggerFa
             ReturnDocument = ReturnDocument.After
         };
 
-        // The driver declares a document, and returns null when no document is due.
-        return await Documents.FindOneAndUpdateAsync(DueUnsent(utcNow), update, options, cancellationToken);
+        // The driver declares a document, and returns null when no document of these types is due.
+        return await Documents.FindOneAndUpdateAsync(DueUnsent(utcNow, eventTypes), update, options, cancellationToken);
     }
 
     public async Task<bool> MarkSentAsync(
@@ -147,15 +154,16 @@ public class OutboxRepository(IMongoDbClientFactory connectionFactory, ILoggerFa
     private IMongoCollection<BsonDocument> Documents =>
         Collection.Database.GetCollection<BsonDocument>(CollectionName);
 
-    // sent is false, the claim is missing or already over, and the next attempt is missing or due.
-    // occurredAtUtc then _id is the order a pass publishes in.
-    private static FilterDefinition<BsonDocument> DueUnsent(DateTime utcNow)
+    // sent is false, eventType is one this relay publishes, the claim is missing or already over,
+    // and the next attempt is missing or due. occurredAtUtc then _id is the order a pass publishes in.
+    private static FilterDefinition<BsonDocument> DueUnsent(DateTime utcNow, IReadOnlyCollection<string> eventTypes)
     {
         var filter = Builders<BsonDocument>.Filter;
         var claimedUntilUtc = Field(outboxEvent => outboxEvent.ClaimedUntilUtc);
         var nextAttemptAtUtc = Field(outboxEvent => outboxEvent.NextAttemptAtUtc);
         return filter.And(
             filter.Eq(Field(outboxEvent => outboxEvent.Sent), false),
+            filter.In(Field(outboxEvent => outboxEvent.EventType), eventTypes),
             filter.Or(filter.Exists(claimedUntilUtc, false), filter.Lte(claimedUntilUtc, utcNow)),
             filter.Or(filter.Exists(nextAttemptAtUtc, false), filter.Lte(nextAttemptAtUtc, utcNow)));
     }

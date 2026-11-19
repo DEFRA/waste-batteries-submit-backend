@@ -276,8 +276,9 @@ public partial class PomSubmissionEndpointsTests
 
         var indexes = await fixture.Outbox.Indexes.List(cancellationToken).ToListAsync(cancellationToken);
 
-        var sentByTime = Index(indexes, "sent_occurred_at");
+        var sentByTime = Index(indexes, "sent_event_type_occurred_at");
         Assert.Equal(1, sentByTime["key"]["sent"].AsInt32);
+        Assert.Equal(1, sentByTime["key"]["eventType"].AsInt32);
         Assert.Equal(1, sentByTime["key"]["occurredAtUtc"].AsInt32);
         Assert.False(sentByTime.Contains("partialFilterExpression"));
         Assert.False(sentByTime.Contains("unique"));

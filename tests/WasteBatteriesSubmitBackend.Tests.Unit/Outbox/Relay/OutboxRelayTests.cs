@@ -5,7 +5,6 @@ using NSubstitute;
 using WasteBatteriesSubmitBackend.Outbox;
 using WasteBatteriesSubmitBackend.Outbox.Relay;
 using WasteBatteriesSubmitBackend.Outbox.Repositories;
-using WasteBatteriesSubmitBackend.PomSubmission.Outbox;
 using WasteBatteriesSubmitBackend.Tests.Common;
 using WasteBatteriesSubmitBackend.Utils.Time;
 
@@ -27,6 +26,7 @@ public class OutboxRelayTests
                 Arg.Any<DateTime>(),
                 Arg.Any<DateTime>(),
                 Arg.Any<string>(),
+                Arg.Any<IReadOnlyCollection<string>>(),
                 Arg.Any<CancellationToken>())
             .Returns(earlier, later, (BsonDocument?)null);
         repository.MarkSentAsync(
@@ -73,6 +73,7 @@ public class OutboxRelayTests
                 Arg.Any<DateTime>(),
                 Arg.Any<DateTime>(),
                 Arg.Any<string>(),
+                Arg.Any<IReadOnlyCollection<string>>(),
                 Arg.Any<CancellationToken>())
             .Returns(document, (BsonDocument?)null);
         publisher.PublishAsync(document, Arg.Any<CancellationToken>())
@@ -118,6 +119,7 @@ public class OutboxRelayTests
                 Arg.Any<DateTime>(),
                 Arg.Any<DateTime>(),
                 Arg.Any<string>(),
+                Arg.Any<IReadOnlyCollection<string>>(),
                 Arg.Any<CancellationToken>())
             .Returns(document, (BsonDocument?)null);
         publisher.PublishAsync(document, Arg.Any<CancellationToken>())
@@ -146,6 +148,7 @@ public class OutboxRelayTests
                 Arg.Any<DateTime>(),
                 Arg.Any<DateTime>(),
                 Arg.Any<string>(),
+                Arg.Any<IReadOnlyCollection<string>>(),
                 Arg.Any<CancellationToken>())
             .Returns(document, (BsonDocument?)null);
         publisher.PublishAsync(document, Arg.Any<CancellationToken>())
@@ -179,6 +182,7 @@ public class OutboxRelayTests
                 Arg.Any<DateTime>(),
                 Arg.Any<DateTime>(),
                 Arg.Any<string>(),
+                Arg.Any<IReadOnlyCollection<string>>(),
                 Arg.Any<CancellationToken>())
             .Returns(document, (BsonDocument?)null);
         publisher.PublishAsync(document, Arg.Any<CancellationToken>())
@@ -213,6 +217,7 @@ public class OutboxRelayTests
                 Arg.Any<DateTime>(),
                 Arg.Any<DateTime>(),
                 Arg.Any<string>(),
+                Arg.Any<IReadOnlyCollection<string>>(),
                 Arg.Any<CancellationToken>())
             .Returns(failed, next, (BsonDocument?)null);
         publisher.PublishAsync(failed, Arg.Any<CancellationToken>())
@@ -255,6 +260,7 @@ public class OutboxRelayTests
                 Arg.Any<DateTime>(),
                 Arg.Any<DateTime>(),
                 Arg.Any<string>(),
+                Arg.Any<IReadOnlyCollection<string>>(),
                 Arg.Any<CancellationToken>())
             .Returns(document, (BsonDocument?)null);
         repository.MarkSentAsync(
@@ -289,6 +295,7 @@ public class OutboxRelayTests
                 Arg.Any<DateTime>(),
                 Arg.Any<DateTime>(),
                 Arg.Any<string>(),
+                Arg.Any<IReadOnlyCollection<string>>(),
                 Arg.Any<CancellationToken>())
             .Returns(document, (BsonDocument?)null);
         publisher.PublishAsync(document, Arg.Any<CancellationToken>())
@@ -321,6 +328,7 @@ public class OutboxRelayTests
                 Arg.Any<DateTime>(),
                 Arg.Any<DateTime>(),
                 Arg.Any<string>(),
+                Arg.Any<IReadOnlyCollection<string>>(),
                 Arg.Any<CancellationToken>())
             .Returns(document, (BsonDocument?)null);
         publisher.PublishAsync(document, Arg.Any<CancellationToken>())
@@ -356,6 +364,7 @@ public class OutboxRelayTests
                 Arg.Any<DateTime>(),
                 Arg.Any<DateTime>(),
                 Arg.Any<string>(),
+                Arg.Any<IReadOnlyCollection<string>>(),
                 Arg.Any<CancellationToken>())
             .Returns(document, (BsonDocument?)null);
         publisher.PublishAsync(document, Arg.Any<CancellationToken>())
@@ -392,6 +401,7 @@ public class OutboxRelayTests
             Arg.Any<DateTime>(),
             Arg.Any<DateTime>(),
             Arg.Any<string>(),
+            Arg.Any<IReadOnlyCollection<string>>(),
             Arg.Any<CancellationToken>());
         Assert.Contains(logger.Entries, entry => entry.Message.Contains("off", StringComparison.Ordinal));
     }
@@ -404,6 +414,7 @@ public class OutboxRelayTests
                 Arg.Any<DateTime>(),
                 Arg.Any<DateTime>(),
                 Arg.Any<string>(),
+                Arg.Any<IReadOnlyCollection<string>>(),
                 Arg.Any<CancellationToken>())
             .Returns<Task<BsonDocument?>>(_ => Task.FromException<BsonDocument?>(new InvalidOperationException("mongo down")));
         var logger = new CapturingLogger<OutboxRelay>();
@@ -427,11 +438,12 @@ public class OutboxRelayTests
                 Arg.Any<DateTime>(),
                 Arg.Any<DateTime>(),
                 Arg.Any<string>(),
+                Arg.Any<IReadOnlyCollection<string>>(),
                 Arg.Any<CancellationToken>())
             .Returns(call =>
             {
                 started.TrySetResult();
-                var cancellationToken = call.ArgAt<CancellationToken>(3);
+                var cancellationToken = call.ArgAt<CancellationToken>(4);
                 return WaitUntilCancelled(cancellationToken);
             });
         var logger = new CapturingLogger<OutboxRelay>();
@@ -445,6 +457,30 @@ public class OutboxRelayTests
         await running.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
 
         Assert.DoesNotContain(logger.Entries, entry => entry.Message.Contains("pass failed", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PublishPending_WhenEventTypesAreSet_ClaimsOnlyThoseTypes()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var repository = Substitute.For<IOutboxRepository>();
+        repository.ClaimNextAsync(
+                Arg.Any<DateTime>(),
+                Arg.Any<DateTime>(),
+                Arg.Any<string>(),
+                Arg.Any<IReadOnlyCollection<string>>(),
+                Arg.Any<CancellationToken>())
+            .Returns((BsonDocument?)null);
+        var relay = CreateRelay(repository, Substitute.For<IOutboxPublisher>(), new CapturingLogger<OutboxRelay>());
+
+        await relay.PublishPendingAsync(cancellationToken);
+
+        await repository.Received(1).ClaimNextAsync(
+            Now,
+            Now.AddSeconds(60),
+            relay.ClaimedBy,
+            Arg.Is<IReadOnlyCollection<string>>(types => types.SequenceEqual(new[] { "SampleEvent" })),
+            cancellationToken);
     }
 
     private static async Task WaitForLogAsync(
@@ -487,7 +523,8 @@ public class OutboxRelayTests
                 PollIntervalSeconds = pollIntervalSeconds,
                 RetryInitialDelaySeconds = initialDelaySeconds,
                 RetryMaxDelaySeconds = maxDelaySeconds,
-                RetryMultiplier = multiplier
+                RetryMultiplier = multiplier,
+                EventTypes = ["SampleEvent"]
             }),
             new FixedTime(Now),
             logger,
@@ -496,7 +533,7 @@ public class OutboxRelayTests
     private static BsonDocument Document(string id, DateTime occurredAtUtc, string correlationId) => new()
     {
         { "_id", id },
-        { "eventType", PomSubmissionOutboxEvent.PomSubmissionCreatedType },
+        { "eventType", "SampleEvent" },
         { "schemaVersion", 1 },
         { "subjectId", "scheme:2026" },
         { "version", OutboxEvents.CommitVersion(occurredAtUtc) },
