@@ -39,26 +39,31 @@ internal sealed class OutboxRelayOptionsValidator(IConfiguration configuration, 
 
         if (options.Enabled)
         {
-            if (string.IsNullOrWhiteSpace(options.TopicArn)
-                || !options.TopicArn.StartsWith("arn:aws:sns:", StringComparison.Ordinal))
-            {
-                errors.Add($"{Setting("TopicArn")} must be an SNS topic ARN when the relay is on.");
-            }
-
-            if (options.EventTypes is null
-                || options.EventTypes.Length == 0
-                || options.EventTypes.Any(string.IsNullOrWhiteSpace))
-            {
-                errors.Add($"{Setting("EventTypes")} must list the event types this relay publishes.");
-            }
-
-            if (!string.IsNullOrWhiteSpace(options.ServiceUrl) && !IsHttpUrl(options.ServiceUrl))
-            {
-                errors.Add($"{Setting("ServiceUrl")} must be an absolute http or https URL when it is set.");
-            }
+            AddEnabledErrors(errors, options);
         }
 
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
+    }
+
+    private void AddEnabledErrors(List<string> errors, OutboxRelayOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.TopicArn)
+            || !options.TopicArn.StartsWith("arn:aws:sns:", StringComparison.Ordinal))
+        {
+            errors.Add($"{Setting("TopicArn")} must be an SNS topic ARN when the relay is on.");
+        }
+
+        if (options.EventTypes is null
+            || options.EventTypes.Length == 0
+            || options.EventTypes.Any(string.IsNullOrWhiteSpace))
+        {
+            errors.Add($"{Setting("EventTypes")} must list the event types this relay publishes.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.ServiceUrl) && !IsHttpUrl(options.ServiceUrl))
+        {
+            errors.Add($"{Setting("ServiceUrl")} must be an absolute http or https URL when it is set.");
+        }
     }
 
     // A key set on the relay names that section. Otherwise it names the shared defaults.
