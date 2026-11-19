@@ -42,5 +42,9 @@ public class OutboxDocumentsTests
         Assert.Equal("upload-1", document["batchRef"].AsString);
         Assert.False(document.Contains("sentAtUtc"));
         Assert.False(document.Contains("expiresAtUtc"));
+        Assert.False(document.Contains("claimedBy"));
+        Assert.False(document.Contains("claimedUntilUtc"));
+        Assert.False(document.Contains("attemptCount"));
+        Assert.False(document.Contains("nextAttemptAtUtc"));
     }
 }

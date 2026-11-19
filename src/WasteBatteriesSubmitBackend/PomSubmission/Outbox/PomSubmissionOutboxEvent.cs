@@ -15,6 +15,14 @@ public sealed class PomSubmissionOutboxEvent : OutboxEvent
     // A scheme-year that both creates and amends in one save. The consumer re-reads the current rows.
     public const string PomSubmissionSavedType = "PomSubmissionSaved";
 
+    // The types this feature writes. The POM relay publishes this same set.
+    public static readonly string[] AllEventTypes =
+    [
+        PomSubmissionCreatedType,
+        PomSubmissionAmendedType,
+        PomSubmissionSavedType
+    ];
+
     [BsonRepresentation(BsonType.ObjectId)]
     public required string SchemeOrgId { get; init; }
 

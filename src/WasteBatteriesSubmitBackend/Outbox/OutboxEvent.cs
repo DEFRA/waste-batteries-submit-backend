@@ -50,6 +50,24 @@ public abstract class OutboxEvent
     [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
     public DateTime? ExpiresAtUtc { get; init; }
 
+    // Set while one instance holds the document, so another instance does not publish it.
+    // Cleared when the publish succeeds or fails. Omitted from the message.
+    [BsonIgnoreIfNull]
+    public string? ClaimedBy { get; init; }
+
+    [BsonIgnoreIfNull]
+    [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
+    public DateTime? ClaimedUntilUtc { get; init; }
+
+    // How many publishes have failed. Omitted while it is zero, and cleared once the event is sent.
+    [BsonIgnoreIfDefault]
+    public int AttemptCount { get; init; }
+
+    // The next time a failed publish may be claimed. Omitted until a publish fails.
+    [BsonIgnoreIfNull]
+    [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
+    public DateTime? NextAttemptAtUtc { get; init; }
+
     [BsonExtraElements]
     public BsonDocument AdditionalFields { get; init; } = new();
 }

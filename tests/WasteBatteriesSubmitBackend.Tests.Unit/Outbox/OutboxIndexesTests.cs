@@ -21,9 +21,9 @@ public class OutboxIndexesTests
         var subjectVersion = indexes[2];
 
         Assert.Equal(3, indexes.Count);
-        Assert.Equal("sent_occurred_at", sentByTime.Options.Name);
+        Assert.Equal("sent_event_type_occurred_at", sentByTime.Options.Name);
         Assert.Equal(
-            "{ \"sent\" : 1, \"occurredAtUtc\" : 1 }",
+            "{ \"sent\" : 1, \"eventType\" : 1, \"occurredAtUtc\" : 1 }",
             sentByTime.Keys.Render(args).ToString());
         Assert.Null(sentByTime.Options.PartialFilterExpression);
         Assert.NotEqual(true, sentByTime.Options.Unique);
