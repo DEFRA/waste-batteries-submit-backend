@@ -32,6 +32,7 @@
     <PackageVersion Include="Elastic.CommonSchema.Serilog" Version="9.0.0" />
     <PackageVersion Include="Elastic.Serilog.Enrichers.Web" Version="9.0.0" />
     <PackageVersion Include="FluentValidation" Version="12.2.0" />
+    <PackageVersion Include="JsonSchema.Net" Version="9.7.0" />
     <PackageVersion Include="MongoDB.Bson" Version="3.14.0" />
     <PackageVersion Include="MongoDB.Driver" Version="3.14.0" />
     <PackageVersion Include="MongoDB.Driver.Authentication.AWS" Version="3.14.0" />
