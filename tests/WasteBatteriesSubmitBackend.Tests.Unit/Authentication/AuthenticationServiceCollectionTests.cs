@@ -23,7 +23,7 @@ public class AuthenticationServiceCollectionTests
         var options = provider
             .GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
             .Get(JwtBearerDefaults.AuthenticationScheme);
-        var configurationManager = Assert.IsAssignableFrom<BaseConfigurationManager>(options.ConfigurationManager);
+        var configurationManager = Assert.IsType<BaseConfigurationManager>(options.ConfigurationManager, exactMatch: false);
 
         Assert.True(AppContext.TryGetSwitch("Switch.Microsoft.IdentityModel.UpdateConfigAsBlocking", out var blocking));
         Assert.True(blocking);
@@ -49,7 +49,7 @@ public class AuthenticationServiceCollectionTests
         var options = provider
             .GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
             .Get(JwtBearerDefaults.AuthenticationScheme);
-        var configurationManager = Assert.IsAssignableFrom<BaseConfigurationManager>(options.ConfigurationManager);
+        var configurationManager = Assert.IsType<BaseConfigurationManager>(options.ConfigurationManager, exactMatch: false);
 
         Assert.Equal(TimeSpan.FromMinutes(10), options.AutomaticRefreshInterval);
         Assert.Equal(TimeSpan.FromSeconds(30), options.RefreshInterval);
