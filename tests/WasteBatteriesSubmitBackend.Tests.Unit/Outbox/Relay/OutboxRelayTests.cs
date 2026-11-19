@@ -14,6 +14,8 @@ public class OutboxRelayTests
 {
     private static readonly DateTime Now = new(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc);
 
+    private static readonly string[] SampleEventTypes = ["SampleEvent"];
+
     [Fact]
     public async Task PublishPending_WhenTwoDocumentsAreClaimed_PublishesEachIdAndMarksItSent()
     {
@@ -479,7 +481,7 @@ public class OutboxRelayTests
             Now,
             Now.AddSeconds(60),
             relay.ClaimedBy,
-            Arg.Is<IReadOnlyCollection<string>>(types => types.SequenceEqual(new[] { "SampleEvent" })),
+            Arg.Is<IReadOnlyCollection<string>>(types => types.SequenceEqual(SampleEventTypes)),
             cancellationToken);
     }
 
@@ -524,7 +526,7 @@ public class OutboxRelayTests
                 RetryInitialDelaySeconds = initialDelaySeconds,
                 RetryMaxDelaySeconds = maxDelaySeconds,
                 RetryMultiplier = multiplier,
-                EventTypes = ["SampleEvent"]
+                EventTypes = SampleEventTypes
             }),
             new FixedTime(Now),
             logger,
