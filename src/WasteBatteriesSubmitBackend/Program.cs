@@ -7,7 +7,11 @@ using WasteBatteriesSubmitBackend.ExampleData;
 using WasteBatteriesSubmitBackend.OpenApi;
 using WasteBatteriesSubmitBackend.PomSubmission;
 using WasteBatteriesSubmitBackend.PomSubmission.Endpoints;
+using WasteBatteriesSubmitBackend.PomSubmission.Outbox;
+using WasteBatteriesSubmitBackend.Outbox;
 using WasteBatteriesSubmitBackend.Utils;
+using WasteBatteriesSubmitBackend.Utils.Actor;
+using WasteBatteriesSubmitBackend.Utils.Correlation;
 using WasteBatteriesSubmitBackend.Utils.Health;
 using WasteBatteriesSubmitBackend.Utils.Http;
 using WasteBatteriesSubmitBackend.Utils.Logging;
@@ -59,11 +63,16 @@ static void ConfigureServices(WebApplicationBuilder builder)
     });
     services.AddValidation();
     services.AddHttpContextAccessor();
+    services.AddCorrelationId();
 
     services.AddAuthenticationAuthorization(configuration);
+    services.AddActorContext();
     services.AddHeaderPropagationFromConfiguration(configuration);
     services.AddProxyHttpClients();
     services.AddMongo(configuration);
+    // Registers the outbox repository, then the POM submission relay. Another event family adds its own relay section.
+    services.AddOutbox();
+    services.AddOutboxRelay(configuration, PomSubmissionOutboxRelay.SectionName, PomSubmissionOutboxEvent.AllEventTypes);
     services.AddHealth();
     services.AddApiOpenApi();
 
@@ -77,6 +86,9 @@ static void ConfigureServices(WebApplicationBuilder builder)
 [ExcludeFromCodeCoverage]
 static void ConfigureMiddleware(WebApplication app)
 {
+    // Before request logging and header propagation. A missing trace header is filled in once,
+    // then logs, outgoing calls, and the outbox event share that id.
+    app.UseCorrelationId();
     // Outside the exception handler, so the request log has the status the handler wrote.
     // Inside it, every handled exception (including a validation 400) is logged as an error 500.
     app.UseSerilogRequestLogging();

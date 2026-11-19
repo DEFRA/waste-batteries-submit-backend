@@ -26,7 +26,7 @@ public partial class PomSubmissionEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
-        var countBefore = await SubmissionCount(cancellationToken);
+        var countBefore = await CountStored(cancellationToken);
         using var client = fixture.CreateAnonymousClient();
 
         // Act
@@ -42,7 +42,7 @@ public partial class PomSubmissionEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
-        var countBefore = await SubmissionCount(cancellationToken);
+        var countBefore = await CountStored(cancellationToken);
         using var client = fixture.CreateAnonymousClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "not-the-test-token");
 
@@ -63,7 +63,7 @@ public partial class PomSubmissionEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
-        var countBefore = await SubmissionCount(cancellationToken);
+        var countBefore = await CountStored(cancellationToken);
         using var client = fixture.CreateClient();
 
         // Act
@@ -79,7 +79,7 @@ public partial class PomSubmissionEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
-        var countBefore = await SubmissionCount(cancellationToken);
+        var countBefore = await CountStored(cancellationToken);
         using var client = fixture.CreateClient();
         var body = BatchBody(CreateBody.Replace(
             $"\"dataBasis\": \"{SamplePomSubmission.DataBasis}\",",
@@ -103,7 +103,7 @@ public partial class PomSubmissionEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
-        var countBefore = await SubmissionCount(cancellationToken);
+        var countBefore = await CountStored(cancellationToken);
         using var client = fixture.CreateClient();
 
         // Act
@@ -122,7 +122,7 @@ public partial class PomSubmissionEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
-        var countBefore = await SubmissionCount(cancellationToken);
+        var countBefore = await CountStored(cancellationToken);
         using var client = fixture.CreateClient();
 
         // Act
@@ -142,7 +142,7 @@ public partial class PomSubmissionEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
-        var countBefore = await SubmissionCount(cancellationToken);
+        var countBefore = await CountStored(cancellationToken);
         using var client = fixture.CreateClient();
         var body = BatchBody(BodyForMember(ObjectId.GenerateNewId().ToString()), "null");
 
@@ -162,7 +162,7 @@ public partial class PomSubmissionEndpointsTests
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
-        var countBefore = await SubmissionCount(cancellationToken);
+        var countBefore = await CountStored(cancellationToken);
         using var client = fixture.CreateClient();
         var valid = BodyForMember(ObjectId.GenerateNewId().ToString());
         var missingName = BodyForMember(ObjectId.GenerateNewId().ToString()).Replace(
@@ -236,7 +236,7 @@ public partial class PomSubmissionEndpointsTests
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
         var memberOrgId = ObjectId.GenerateNewId().ToString();
-        var countBefore = await SubmissionCount(cancellationToken);
+        var countBefore = await CountStored(cancellationToken);
         using var client = fixture.CreateClient();
         var body = BatchBody(BodyForMember(memberOrgId), BodyForMember(memberOrgId.ToUpperInvariant(), "3.000"));
 

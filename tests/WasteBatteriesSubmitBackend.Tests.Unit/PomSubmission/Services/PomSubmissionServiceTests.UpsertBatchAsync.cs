@@ -5,9 +5,12 @@ using MongoDB.Driver;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using WasteBatteriesSubmitBackend.Models;
+using WasteBatteriesSubmitBackend.Outbox;
+using WasteBatteriesSubmitBackend.Outbox.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
+using WasteBatteriesSubmitBackend.PomSubmission.Outbox;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Responses;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
@@ -27,9 +30,10 @@ public partial class PomSubmissionServiceTests
         var repository = Substitute.For<IPomSubmissionRepository>();
         ReturnNoCurrents(repository);
         var session = Substitute.For<IClientSessionHandle>();
+        var outbox = Substitute.For<IOutboxRepository>();
         AllowCreateMany(repository, session);
         var logger = new CapturingLogger<PomSubmissionService>();
-        var service = Service(repository, logger, BatchUnitOfWork(session));
+        var service = Service(repository, logger, BatchUnitOfWork(session), outbox);
         var first = ValidRequest();
         var second = RequestFor(OtherMemberOrgId, "Quarter 1");
 
@@ -70,6 +74,12 @@ public partial class PomSubmissionServiceTests
                 && saved[1].MemberOrgId == OtherMemberOrgId
                 && saved[1].CompliancePeriodQuarter == "Quarter 1"),
             Arg.Any<CancellationToken>());
+        await AssertSingleOutboxEvent(
+            outbox,
+            session,
+            SamplePomSubmission.SchemeOrgId,
+            SamplePomSubmission.CompliancePeriodYear,
+            PomSubmissionOutboxEvent.PomSubmissionCreatedType);
         await repository.DidNotReceive().FindAsync(
             Arg.Any<PomSubmissionFilter>(),
             Arg.Any<PageRequest>(),
@@ -533,9 +543,10 @@ public partial class PomSubmissionServiceTests
         var repository = Substitute.For<IPomSubmissionRepository>();
         ReturnNoCurrents(repository);
         var session = Substitute.For<IClientSessionHandle>();
+        var failure = new InvalidOperationException("database unavailable");
         repository
             .CreateManyAsync(session, Arg.Any<IReadOnlyList<PomSubmissionModel>>(), Arg.Any<CancellationToken>())
-            .ThrowsAsync(new InvalidOperationException("database unavailable"));
+            .ThrowsAsync(failure);
         var logger = new CapturingLogger<PomSubmissionService>();
         var service = Service(repository, logger, BatchUnitOfWork(session));
 
@@ -544,8 +555,65 @@ public partial class PomSubmissionServiceTests
             service.UpsertBatchAsync([ValidRequest()], TestContext.Current.CancellationToken);
 
         // Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(Act);
-        Assert.Empty(logger.Entries);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(Act);
+        AssertSaveError(logger, exception);
+    }
+
+    [Fact]
+    public async Task UpsertBatchAsync_WhenSchemesOrYearsDiffer_WritesOneOutboxEventForEachPair()
+    {
+        // Arrange
+        var repository = Substitute.For<IPomSubmissionRepository>();
+        ReturnNoCurrents(repository);
+        var session = Substitute.For<IClientSessionHandle>();
+        var outbox = Substitute.For<IOutboxRepository>();
+        AllowCreateMany(repository, session);
+        var logger = new CapturingLogger<PomSubmissionService>();
+        var service = Service(repository, logger, BatchUnitOfWork(session), outbox);
+        const string otherSchemeOrgId = "674a1b2c3d4e5f6789012349";
+        var sameSchemeAndYear = RequestFor(OtherMemberOrgId) with
+        {
+            SchemeOrgId = SamplePomSubmission.SchemeOrgId.ToUpperInvariant()
+        };
+        var nextYear = ValidRequest() with
+        {
+            MemberOrgId = "674a1b2c3d4e5f6789012348",
+            CompliancePeriodYear = 2025,
+            MemberBprn = "BPRN-EA-2025-000123"
+        };
+        var otherScheme = ValidRequest() with
+        {
+            SchemeOrgId = otherSchemeOrgId,
+            MemberOrgId = "674a1b2c3d4e5f678901234a"
+        };
+
+        // Act
+        await service.UpsertBatchAsync(
+            [ValidRequest(), sameSchemeAndYear, nextYear, otherScheme],
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        await outbox.Received(1).AddAsync(
+            session,
+            Arg.Is<IReadOnlyList<OutboxEvent>>(events =>
+                events.Count == 3
+                && ((PomSubmissionOutboxEvent)events[0]).SchemeOrgId == SamplePomSubmission.SchemeOrgId
+                && ((PomSubmissionOutboxEvent)events[0]).CompliancePeriodYear == SamplePomSubmission.CompliancePeriodYear
+                && ((PomSubmissionOutboxEvent)events[1]).SchemeOrgId == SamplePomSubmission.SchemeOrgId
+                && ((PomSubmissionOutboxEvent)events[1]).CompliancePeriodYear == 2025
+                && ((PomSubmissionOutboxEvent)events[2]).SchemeOrgId == otherSchemeOrgId
+                && ((PomSubmissionOutboxEvent)events[2]).CompliancePeriodYear == SamplePomSubmission.CompliancePeriodYear
+                && events.All(outboxEvent =>
+                    outboxEvent.EventType == PomSubmissionOutboxEvent.PomSubmissionCreatedType
+                    && outboxEvent.ActorId == TestActorId
+                    && outboxEvent.CorrelationId == TestCorrelationId
+                    && !outboxEvent.Sent
+                    && outboxEvent.SentAtUtc == null
+                    && outboxEvent.ExpiresAtUtc == null)
+                && events.Select(outboxEvent => outboxEvent.Id).Distinct().Count() == 3),
+            Arg.Any<CancellationToken>());
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal("Upserted batch of 4 POM submissions (4 created, 0 amended)", entry.Message);
     }
 
     private static void ReturnNoCurrents(IPomSubmissionRepository repository) =>

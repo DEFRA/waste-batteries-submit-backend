@@ -24,7 +24,7 @@
       }],
     "submittedOnUtc" : { "$date" : { "$numberLong" : "1792573200000" } },
     "createdAtUtc" : { "$date" : { "$numberLong" : "1792573200000" } },
-    "updatedAtUtc" : { "$date" : { "$numberLong" : "1792573200000" } }
+    "updatedAtUtc" : { "$date" : { "$numberLong" : "1792573200001" } }
   }, {
     "_id" : { "$oid" : "000000000000000000000002" },
     "schemeOrgId" : { "$oid" : "674a1b2c3d4e5f6789012345" },
@@ -49,7 +49,7 @@
         "id" : { "$oid" : "000000000000000000000005" },
         "activity" : "Placed"
       }],
-    "submittedOnUtc" : { "$date" : { "$numberLong" : "1792573200000" } },
-    "createdAtUtc" : { "$date" : { "$numberLong" : "1792573200000" } },
+    "submittedOnUtc" : { "$date" : { "$numberLong" : "1792573200001" } },
+    "createdAtUtc" : { "$date" : { "$numberLong" : "1792573200001" } },
     "updatedAtUtc" : null
   }]

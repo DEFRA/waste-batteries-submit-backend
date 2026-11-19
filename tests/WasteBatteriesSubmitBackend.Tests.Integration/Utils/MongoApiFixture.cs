@@ -99,7 +99,9 @@ public abstract class MongoApiFixture : IAsyncLifetime
                 if (fixedUtcNow is not null)
                 {
                     services.RemoveAll<ITimeProvider>();
-                    services.AddSingleton<ITimeProvider>(new FixedTime(fixedUtcNow.Value));
+                    // One millisecond per read. Two saves of one subject then get two outbox versions.
+                    // A batch reads the clock once, so its events still share a version.
+                    services.AddSingleton<ITimeProvider>(new SteppingTime(fixedUtcNow.Value));
                 }
 
                 configureServices(services);
