@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using WasteBatteriesSubmitBackend.Config;
+using WasteBatteriesSubmitBackend.Outbox.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Repositories;
 using WasteBatteriesSubmitBackend.PomSubmission.Services;
 using WasteBatteriesSubmitBackend.Tests.Common;
@@ -32,6 +33,8 @@ public sealed class PomSubmissionApiFixture : MongoApiFixture
 
     public IMongoCollection<BsonDocument> Submissions => Collection(PomSubmissionRepository.CollectionName);
 
+    public IMongoCollection<BsonDocument> Outbox => Collection(OutboxRepository.CollectionName);
+
     protected override DateTime? FixedUtcNow => CreatedAt;
 
     protected override void ConfigureTestServices(IServiceCollection services)
@@ -43,5 +46,6 @@ public sealed class PomSubmissionApiFixture : MongoApiFixture
     protected override void OnStarted()
     {
         _ = Factory.Services.GetRequiredService<IPomSubmissionRepository>();
+        _ = Factory.Services.GetRequiredService<IOutboxRepository>();
     }
 }

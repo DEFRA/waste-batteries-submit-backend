@@ -16,11 +16,11 @@ The target data model is the Compliance Scheme POM Submission page in the [waste
 
 All requests expect a Defra ID bearer token.
 
-`POST /pom-submissions` creates one initial submission for one scheme, member, year and quarter. The response is `201 Created`, with `Location: /pom-submissions/{id}` and the stored submission as the body. Documents are stored in the `pom-submissions` collection.
+`POST /pom-submissions` creates one initial submission for one scheme, member, year and quarter. The response is `201 Created`, with `Location: /pom-submissions/{id}` and the stored submission as the body. Documents are stored in the `pom-submissions` collection. The submission and its outbox event commit or roll back in one transaction.
 
-`PATCH /pom-submissions` amends the current submission, using the supplied scheme, member, year and quarter to find it. The amendment inserts a new version and sets the previous submission so it is no longer current. The response is `200 OK` and the new stored submission is the body. Both the new submission and updating the existing submission commit or roll back in one transaction.
+`PATCH /pom-submissions` amends the current submission, using the supplied scheme, member, year and quarter to find it. The amendment inserts a new version and sets the previous submission so it is no longer current. The response is `200 OK` and the new stored submission is the body. The new submission, the update of the previous submission, and the outbox event commit or roll back in one transaction.
 
-`POST /pom-submissions/upsert-batch` creates or amends a batch of submissions. The body is a required JSON array, with each element has the same shape as a single create or amend. A submission is created when no current row exists for its scheme, member, year and quarter, and amended when one does. The response is `200 OK` and the body is a JSON array in the same order as the request is returned with the `requestIndex`, `id` (the submission just saved), `schemeOrgId`, `memberOrgId`, `compliancePeriodYear`, `compliancePeriodQuarter`, and `action` (`Created` or `Amended`). 
+`POST /pom-submissions/upsert-batch` creates or amends a batch of submissions. The body is a required JSON array, with each element has the same shape as a single create or amend. A submission is created when no current row exists for its scheme, member, year and quarter, and amended when one does. The response is `200 OK` and the body is a JSON array in the same order as the request is returned with the `requestIndex`, `id` (the submission just saved), `schemeOrgId`, `memberOrgId`, `compliancePeriodYear`, `compliancePeriodQuarter`, and `action` (`Created` or `Amended`). The submissions and the outbox events commit or roll back in one transaction.
 
 `GET /pom-submissions/{id}` returns the stored submission as `200 OK`. Accepting gzip does not compress this response. The read is by id, so a submission that is no longer current is still returned.
 
@@ -42,7 +42,6 @@ As well as testing the page sizes for the get list response (see above) the unit
 Because returning the fully saved submission for each item in the batch would exceed the payload even quicker, upon a successful save we are returning the following for each item in the upsert to help identify what happened to which item:
 
 The `requestIndex`, `id` (the submission just saved), `schemeOrgId`, `memberOrgId`, `compliancePeriodYear`, `compliancePeriodQuarter`, and `action` (`Created` or `Amended`). 
-
 
 #### Request JSON
 
@@ -89,6 +88,46 @@ Two unique indexes cover a submission. The current-row index is `schemeOrgId`, `
 
 The other indexes are scheme plus year plus quarter, member plus year where `isCurrent` is true, `memberBprn`, chemistry plus battery category on the entries, and a sparse index on `supersedesSubmissionId`.
 
+#### Outbox pattern when saving a submission
+
+Each of the saves writes one outbox document per distinct scheme and compliance year, meaning several members or quarters for the same scheme and year share one event for a batch upsert.
+
+This is done within the same transaction, which ensures that the save and the outbox are an atomic operation. A relay in this process then publishes each unsent document to the service's SNS topic. Consumers subscribe a queue to that topic.
+
+The outbox event document is stored in the `outbox` collection with 
+- `id` (a GUID, the same value if the transaction is retried), 
+- `eventType` (`PomSubmissionCreated`, `PomSubmissionAmended`, or `PomSubmissionSaved` when one scheme and year both creates and amends),
+- `schemaVersion` (set by the submission event, constant 1), 
+- `subjectId` (the scheme id and year), 
+- `version` (the commit time in unix milliseconds, so a later save orders after an earlier one), 
+- `partitionKey` (the scheme id), 
+- `occurredAtUtc`, 
+- `actorId` (the users id from the configured JWT user-id claim, otherwise the name claim), 
+- `correlationId` (from the `x-cdp-request-id` header, if passed in, else the activity trace id if this exists, else a new id), 
+- `sent`, 
+- `schemeOrgId`,
+- `compliancePeriodYear`. 
+ 
+`sent` is false when the document is written. `sentAtUtc` and `expiresAtUtc` are omitted until the relay publishes the event. `expiresAtUtc` is `sentAtUtc` plus `OutboxRelayDefault:RetentionDays` (90 by default). `claimedBy` and `claimedUntilUtc` are omitted until a relay claims the document, and are removed when that publish succeeds or fails. `attemptCount` is omitted while it is zero. A failed publish sets `attemptCount` and `nextAttemptAtUtc`. Both are removed once the event is sent. `nextAttemptAtUtc` is omitted until a publish fails.
+
+An index named `sent_event_type_occurred_at` is on `sent`, then `eventType`, then `occurredAtUtc`. A unique index named `subject_version` is on `subjectId` then `version`, so one subject cannot store the same version twice.
+
+A TTL index named `expires_at` deletes a document at `expiresAtUtc` (`expireAfterSeconds` 0). An unsent document has no `expiresAtUtc`, so it is not deleted.
+
+The relay is a background service in this API. On each pass it claims up to `OutboxRelayDefault:BatchSize` (20 by default) of the oldest unsent documents whose `eventType` is one of its own, whose claim is missing or has expired, and whose next attempt is missing or due. It publishes each one and sets `sent`, `sentAtUtc` and `expiresAtUtc`. A claimed document stores `claimedBy` and `claimedUntilUtc`. A second instance cannot take that document until `claimedUntilUtc`. The publish call is cancelled after 30 seconds, which is shorter than `OutboxRelayDefault:LeaseSeconds` (60 by default), so a slow call fails and the claim is released before another task can publish the same document. A failed publish leaves `sent` false, clears `claimedBy` and `claimedUntilUtc`, and sets `attemptCount` and `nextAttemptAtUtc`, so the same document is tried again after a delay. The delay starts at `OutboxRelayDefault:RetryInitialDelaySeconds` (1) and is multiplied by `OutboxRelayDefault:RetryMultiplier` (2) after each failure, up to `OutboxRelayDefault:RetryMaxDelaySeconds` (300). The published `eventId` is the stored id. AWS assigns its own SNS message id on every publish, and the relay does not use that id.
+
+The message body is `eventId`, `eventType`, `schemaVersion`, `subjectId`, `version` (the commit time in unix milliseconds, not the submission row's version), `partitionKey`, `occurredAt`, `actorId`, `correlationId`, `schemeOrgId` and `compliancePeriodYear`. `eventId` and `eventType` are the SNS message attributes. The message omits `sent`, `sentAtUtc`, `expiresAtUtc`, `claimedBy`, `claimedUntilUtc`, `attemptCount` and `nextAttemptAtUtc`.
+
+`OutboxRelayDefault` holds the timings shared by every relay. `PomSubmissionOutboxRelay` is the POM submission relay: `Enabled`, `TopicArn` and `ServiceUrl`. A value set there replaces the matching `OutboxRelayDefault` value for that relay only.
+
+The contract for the three event types, with a schema and an example of each, is [contracts/pom-submission-events/pom-submission-events.json](contracts/pom-submission-events/pom-submission-events.json). It is an AsyncAPI 3.0 document. The unit tests check that file against the JSON the relay publishes.
+
+The POM relay publishes `PomSubmissionOutboxEvent.AllEventTypes`. Those are the same constants the save writes (`PomSubmissionCreated`, `PomSubmissionAmended` and `PomSubmissionSaved`). The API does not start when that relay is on and `PomSubmissionOutboxRelay:TopicArn` is not an SNS topic ARN, or when the lease is not longer than the 30 second publish timeout. `OutboxRelayDefault:PollIntervalSeconds` defaults to 5.
+
+In CDP the SNS has been setup by following the [cdp-documentation](https://github.com/DEFRA/cdp-documentation/blob/main/how-to/sqs-sns.md), with a standard SNS topic named `waste_batteries_submit_pom_submission_events`. `cdp-app-config` sets `PomSubmissionOutboxRelay__TopicArn` to that topic's ARN for dev, test, perf-test, ext-test and prod. Set `PomSubmissionOutboxRelay__Enabled` to false to leave events in the outbox.
+
+Locally the relay publishes to the topic `waste_batteries_submit_pom_submission_events`. The queue `waste_batteries_obligations_pom_submission_evts_queue` is subscribed to that topic. These are the same names as the CDP topic and the obligations queue. After a successful publish the outbox document has `sent` true, `sentAtUtc` set and `expiresAtUtc` 90 days later. The claim and retry fields are removed. The document stays in Mongo. The envelope stays on that queue until something deletes it. [Running](#running) covers starting the API and reading that queue. 
+
 
 ### Docker Compose
 
@@ -118,11 +157,11 @@ See above.
 docker compose up -d --wait mongodb
 ```
 
-The container starts a single-node replica set named `rs0`. The healthcheck initiates it and waits until the node is primary. `docker compose up` without `--wait` can return before that, and an amendment sent in that window fails.
+The container starts a single-node replica set named `rs0`. The healthcheck initiates it and waits until the node is primary. `docker compose up` without `--wait` can return before that, and a save sent in that window fails.
 
 #### MongoDB locally
 
-Alternatively install MongoDB locally. Amendments use a multi-document transaction, so the local server has to be a single-node replica set. A standalone `mongod` rejects the transaction.
+Alternatively install MongoDB locally. Creates, amendments and batch upserts use a multi-document transaction, so the local server has to be a single-node replica set. A standalone `mongod` rejects the transaction.
 
 - Install [MongoDB](https://www.mongodb.com/docs/manual/tutorial/#installation) on your local machine
 - Start MongoDB:
@@ -141,13 +180,13 @@ Connect with `directConnection=true`. The development and Compose connection str
 
 #### Retries
 
-Retryable reads and retryable writes stay at the MongoDB .NET driver default, which is on. The connection strings in this repo do not turn them off. A transient network error on a single-document read or write is retried by the driver. An amendment runs in one transaction. The driver retries that transaction when the error is labeled `TransientTransactionError`, and when the commit result is labeled `UnknownTransactionCommitResult`. The new document's id and timestamp are chosen before the transaction starts, so a retry writes the same document. Duplicate-key conflicts and validation failures are not retried. The transaction aborts and the previous current row is left unchanged.
+Retryable reads and retryable writes stay at the MongoDB .NET driver default, which is on. The connection strings in this repo do not turn them off. A transient network error on a single-document read or write is retried by the driver. A create, an amendment and a batch upsert each run in one transaction with their outbox events. The driver retries that transaction when the error is labeled `TransientTransactionError`, and when the commit result is labeled `UnknownTransactionCommitResult`. Submission ids, outbox event ids and the timestamp are chosen before the transaction starts, so a retry writes the same documents. Duplicate-key conflicts and validation failures are not retried. The transaction aborts and nothing from that save is left behind.
 
 #### MongoDB in CDP environments
 
 In CDP environments a MongoDB instance is already set up
 and the credentials exposed as environment variables.
-That instance is a replica set, which is what the amendment transaction requires. The deployed connection string is supplied by the platform. Do not add `directConnection=true` there: the driver should discover the set.
+That instance is a replica set, which is what the save transaction requires. The deployed connection string is supplied by the platform. Do not add `directConnection=true` there: the driver should discover the set.
 
 
 ### Inspect MongoDB
@@ -169,13 +208,91 @@ dotnet test
 
 `WasteBatteriesSubmitBackend.Tests.Unit` covers validators, mapping, the submission service and handlers without hosting the API.
 
-`WasteBatteriesSubmitBackend.Tests.Integration` hosts the API in process with `WebApplicationFactory`. The placed-on-market submission tests start MongoDB 7 as a single-node replica set with Testcontainers, so Docker must be running. The replica set is what lets an amendment commit or roll back its two writes.
+`WasteBatteriesSubmitBackend.Tests.Integration` hosts the API in process with `WebApplicationFactory`. The placed-on-market submission tests start MongoDB 7 as a single-node replica set with Testcontainers, so Docker must be running. The replica set is what lets a save commit or roll back the submission writes and the outbox events together.
 
 ### Running
 
-Run CDP-Deployments application:
+The Development launch profile listens on <http://localhost:3001>. Swagger UI is at `/swagger`. In that profile the relay is on. It publishes to floci at `http://localhost:4566` about every 5 seconds (`OutboxRelayDefault:PollIntervalSeconds`).
+
+#### API from the debugger or the command line
+
+Start MongoDB and floci from this repo. When the floci container starts, `compose/floci/start.d/10-setup-resources.sh` creates the topic `waste_batteries_submit_pom_submission_events` and the queue `waste_batteries_obligations_pom_submission_evts_queue`.
+
 ```bash
+docker compose up -d --wait mongodb floci
 dotnet run --project src/WasteBatteriesSubmitBackend --launch-profile Development
+```
+
+Visual Studio uses the same Development profile. The profile sets the local floci credentials (`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are `test`).
+
+To run the submit UI against this API, start the Defra ID stub, MongoDB and floci from `waste-batteries-submit-frontend`, then the UI. That compose publishes port 4566, so leave floci stopped in this repo while you do.
+
+```bash
+docker compose up -d cdp-defra-id-stub mongodb
+npm install
+npm run dev
+```
+
+The frontend floci script `compose/floci/start.d/30-create-submit-outbox-topic.sh` creates the same topic and queue. Then run this API with the Development profile, as above. Create or amend a submission. Within about one poll the matching outbox document is `sent` and the envelope is on the queue.
+
+#### API in Compose
+
+```bash
+docker compose up --build -d
+```
+
+The API container listens on <http://localhost:8085>. The relay in that container publishes to `http://floci:4566`.
+
+#### Read a published message
+
+The queue is `waste_batteries_obligations_pom_submission_evts_queue`. These commands run the AWS CLI that is already in the floci image, so they work on Windows, macOS and Linux with Docker alone. Run them from the directory of the Compose file that started floci: this repo, or `waste-batteries-submit-frontend` when the UI compose started it.
+
+Count the messages waiting:
+
+```bash
+docker compose exec floci aws sqs get-queue-attributes --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --attribute-names ApproximateNumberOfMessages
+```
+
+Read one envelope and leave it visible on the queue:
+
+```bash
+docker compose exec floci aws --no-cli-pager sqs receive-message --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --visibility-timeout 0 --message-attribute-names All
+```
+
+A receive returns one message. That is the SQS default for `--max-number-of-messages`. A batch upsert publishes one event per distinct scheme and compliance year, so a batch that covers more than one scheme or year leaves several envelopes on the queue. `--visibility-timeout 0` puts that message straight back, and the next call often receives it again.
+
+`eventType` in the body is `PomSubmissionCreated`, `PomSubmissionAmended`, or `PomSubmissionSaved`. The same value is the `eventType` message attribute. `--message-attribute-names All` includes that attribute. Without it the response shows the body only.
+
+Read up to 10 envelopes in one call, which is the SQS maximum per receive:
+
+```bash
+docker compose exec floci aws --no-cli-pager sqs receive-message --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --visibility-timeout 0 --max-number-of-messages 10 --message-attribute-names All
+```
+
+`--no-cli-pager` prints the whole response in the terminal. Without it the AWS CLI opens a pager once the JSON is longer than the window. The pager waits at the bottom of the first screen, and its status line reads `standard input`. Events further down the response look missing until you press Space to scroll, or `q` to leave the pager.
+
+`--visibility-timeout 0` keeps every returned message visible to the next read. A receive without it hides those messages for the queue's visibility timeout. Messages stay on the queue until something deletes them. When more than 10 are waiting, leave the visibility timeout off for the first call so those 10 stay hidden, then call again for the rest. With the timeout left at 0, the next call can return the same messages.
+
+Clear every message from the local queue. This leaves the queue and its SNS subscription in place:
+
+```bash
+docker compose exec floci aws --no-cli-pager sqs purge-queue --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue
+```
+
+SQS accepts one purge every 60 seconds. A second call inside that window fails. The command returns no body when the purge is accepted.
+
+With the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) installed on the machine, call floci on localhost directly:
+
+```bash
+aws --no-cli-pager --endpoint-url http://localhost:4566 sqs get-queue-attributes --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --attribute-names ApproximateNumberOfMessages
+```
+
+```bash
+aws --no-cli-pager --endpoint-url http://localhost:4566 sqs receive-message --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --visibility-timeout 0 --max-number-of-messages 10 --message-attribute-names All
+```
+
+```bash
+aws --no-cli-pager --endpoint-url http://localhost:4566 sqs purge-queue --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue
 ```
 
 The backend requires a Defra ID access token in the `Authorization: Bearer <token>`

@@ -22,9 +22,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!--
+      4.x requires AWSSDK.Core 4, and MongoDB.Driver.Authentication.AWS 3.14.0
+      requires AWSSDK.SecurityToken 3.7, which only allows Core 3.x (NU1608).
+      AWS SDK v4 support is in the MongoDB driver 4.0 line, which is not released.
+      3.7.502.61 is the newest 3.x release. The upper bound keeps 4.x off the Updates tab.
+    -->
+    <PackageVersion Include="AWSSDK.SimpleNotificationService" Version="[3.7.502.61,4.0.0)" />
     <PackageVersion Include="Elastic.CommonSchema.Serilog" Version="9.0.0" />
     <PackageVersion Include="Elastic.Serilog.Enrichers.Web" Version="9.0.0" />
     <PackageVersion Include="FluentValidation" Version="12.2.0" />
+    <PackageVersion Include="JsonSchema.Net" Version="9.7.0" />
     <PackageVersion Include="MongoDB.Bson" Version="3.14.0" />
     <PackageVersion Include="MongoDB.Driver" Version="3.14.0" />
     <PackageVersion Include="MongoDB.Driver.Authentication.AWS" Version="3.14.0" />
