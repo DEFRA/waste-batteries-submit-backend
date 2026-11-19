@@ -118,6 +118,8 @@ The relay is a background service in this API. On each pass it claims up to `Out
 
 The message body is `eventId`, `eventType`, `schemaVersion`, `subjectId`, `version` (the commit time in unix milliseconds, not the submission row's version), `partitionKey`, `occurredAt`, `actorId`, `correlationId`, `schemeOrgId` and `compliancePeriodYear`. `eventId` and `eventType` are the SNS message attributes. The message omits `sent`, `sentAtUtc`, `expiresAtUtc`, `claimedBy`, `claimedUntilUtc`, `attemptCount` and `nextAttemptAtUtc`.
 
+The contract for the three event types, with a schema and an example of each, is [contracts/pom-submission-events/pom-submission-events.json](contracts/pom-submission-events/pom-submission-events.json). It is an AsyncAPI 3.0 document. The unit tests check that file against the JSON the relay publishes.
+
 The relay is on unless `OutboxRelay:Enabled` is false. The API does not start when the relay is on and `OutboxRelay:TopicArn` is not an SNS topic ARN, or when the lease is not longer than the 30 second publish timeout. `OutboxRelay:PollIntervalSeconds` defaults to 5. 
 
 In CDP the SNS has been setup by following the [cdp-documentation](https://github.com/DEFRA/cdp-documentation/blob/main/how-to/sqs-sns.md), with a standard SNS topic named `waste_batteries_submit_pom_submission_events`. `cdp-app-config` sets `OutboxRelay__TopicArn` to that topic's ARN for dev, test, perf-test, ext-test and prod. Set `OutboxRelay__Enabled` to false to leave events in the outbox.
@@ -252,15 +254,17 @@ docker compose exec floci aws sqs get-queue-attributes --queue-url http://localh
 Read one envelope and leave it visible on the queue:
 
 ```bash
-docker compose exec floci aws --no-cli-pager sqs receive-message --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --visibility-timeout 0
+docker compose exec floci aws --no-cli-pager sqs receive-message --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --visibility-timeout 0 --message-attribute-names All
 ```
 
-A receive returns one message. That is the SQS default for `--max-number-of-messages`. A batch upsert publishes one event per submission, so the queue can hold several while this command keeps returning the same one. `--visibility-timeout 0` puts that message straight back, and the next call often receives it again.
+A receive returns one message. That is the SQS default for `--max-number-of-messages`. A batch upsert publishes one event per distinct scheme and compliance year, so a batch that covers more than one scheme or year leaves several envelopes on the queue. `--visibility-timeout 0` puts that message straight back, and the next call often receives it again.
+
+`eventType` in the body is `PomSubmissionCreated`, `PomSubmissionAmended`, or `PomSubmissionSaved`. The same value is the `eventType` message attribute. `--message-attribute-names All` includes that attribute. Without it the response shows the body only.
 
 Read up to 10 envelopes in one call, which is the SQS maximum per receive:
 
 ```bash
-docker compose exec floci aws --no-cli-pager sqs receive-message --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --visibility-timeout 0 --max-number-of-messages 10
+docker compose exec floci aws --no-cli-pager sqs receive-message --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --visibility-timeout 0 --max-number-of-messages 10 --message-attribute-names All
 ```
 
 `--no-cli-pager` prints the whole response in the terminal. Without it the AWS CLI opens a pager once the JSON is longer than the window. The pager waits at the bottom of the first screen, and its status line reads `standard input`. Events further down the response look missing until you press Space to scroll, or `q` to leave the pager.
@@ -282,7 +286,7 @@ aws --no-cli-pager --endpoint-url http://localhost:4566 sqs get-queue-attributes
 ```
 
 ```bash
-aws --no-cli-pager --endpoint-url http://localhost:4566 sqs receive-message --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --visibility-timeout 0 --max-number-of-messages 10
+aws --no-cli-pager --endpoint-url http://localhost:4566 sqs receive-message --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue --visibility-timeout 0 --max-number-of-messages 10 --message-attribute-names All
 ```
 
 ```bash
