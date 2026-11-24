@@ -233,7 +233,9 @@ public partial class PomSubmissionServiceTests
         await repository.Received(1).CreateManyAsync(
             session,
             Arg.Is<IReadOnlyList<PomSubmissionModel>>(saved =>
-                saved.Single().SupersedesSubmissionId == current.Id
+                saved.Single().SchemeOrgId == SamplePomSubmission.SchemeOrgId
+                && saved.Single().MemberOrgId == SamplePomSubmission.MemberOrgId
+                && saved.Single().SupersedesSubmissionId == current.Id
                 && saved.Single().Version == current.Version + 1),
             Arg.Any<CancellationToken>());
     }

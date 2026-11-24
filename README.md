@@ -206,6 +206,8 @@ dotnet test
 
 `dotnet test` runs both suites. The pull request check and the SonarCloud check both use it. The pull request check fails when line coverage of `WasteBatteriesSubmitBackend` is below 90%.
 
+`WasteBatteriesSubmitBackend.Tests.Common` holds the shared clock, capturing logger, and sample submissions used by both suites.
+
 `WasteBatteriesSubmitBackend.Tests.Unit` covers validators, mapping, the submission service and handlers without hosting the API.
 
 `WasteBatteriesSubmitBackend.Tests.Integration` hosts the API in process with `WebApplicationFactory`. The placed-on-market submission tests start MongoDB 7 as a single-node replica set with Testcontainers, so Docker must be running. The replica set is what lets a save commit or roll back the submission writes and the outbox events together.

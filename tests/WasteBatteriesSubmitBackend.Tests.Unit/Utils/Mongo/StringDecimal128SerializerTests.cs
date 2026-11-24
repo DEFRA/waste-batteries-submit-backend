@@ -12,6 +12,19 @@ public class StringDecimal128SerializerTests
         MongoConventions.Register();
     }
 
+    [Theory]
+    [InlineData("12.500", "12.500")]
+    [InlineData("  012.500  ", "12.500")]
+    [InlineData("000.000", "0.000")]
+    [InlineData("45.00", "45.00")]
+    [InlineData("045.00", "45.00")]
+    [InlineData("twelve", "twelve")]
+    [InlineData("  ", "")]
+    public void CanonicalOrOriginal_WhenCalled_UsesTheStoredDecimalText(string value, string canonical)
+    {
+        Assert.Equal(canonical, StringDecimal128Serializer.CanonicalOrOriginal(value));
+    }
+
     [Fact]
     public void ToBsonDocument_WhenTonnesHasScale_RoundTripsAsDecimal128()
     {

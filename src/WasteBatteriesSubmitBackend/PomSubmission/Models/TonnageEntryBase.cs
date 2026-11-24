@@ -22,7 +22,7 @@ public record TonnageEntryBase : TonnageEntryBase<BatteryClassificationBase>
 {
     public TonnageEntryBase Trimmed() => this with
     {
-        Tonnes = StringValues.TrimToEmpty(Tonnes),
+        Tonnes = StringDecimal128Serializer.CanonicalOrOriginal(Tonnes),
         Classification = Classification?.Trimmed()!
     };
 
