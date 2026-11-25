@@ -6,7 +6,7 @@ using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Filters;
 using WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
 using WasteBatteriesSubmitBackend.PomSubmission.Validators;
-using WasteBatteriesSubmitBackend.Utils.Text;
+using WasteBatteriesSubmitBackend.Utils.Mongo;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Services;
 
@@ -17,7 +17,7 @@ public partial class PomSubmissionService
     // Returns null when the id is not in the collection.
     public async Task<PomSubmissionModel?> GetAsync(string id, CancellationToken cancellationToken = default)
     {
-        id = StringValues.TrimToEmpty(id);
+        id = ObjectIds.CanonicalOrOriginal(id);
         if (!ObjectId.TryParse(id, out _))
         {
             throw new ValidationException(

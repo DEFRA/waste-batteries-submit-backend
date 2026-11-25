@@ -60,6 +60,7 @@ public class TimeProviderTests
 
         // Assert
         Assert.Equal(DateTimeKind.Utc, now.Kind);
+        Assert.Equal(0, now.Ticks % TimeSpan.TicksPerMillisecond);
         Assert.InRange(now, before.AddSeconds(-1), DateTime.UtcNow.AddSeconds(1));
     }
 }

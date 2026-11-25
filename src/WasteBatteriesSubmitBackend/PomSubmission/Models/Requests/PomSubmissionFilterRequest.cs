@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using WasteBatteriesSubmitBackend.Utils.Mongo;
 using WasteBatteriesSubmitBackend.Utils.Text;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
@@ -33,8 +34,8 @@ public sealed record PomSubmissionFilterRequest
 
     public PomSubmissionFilterRequest Trimmed() => this with
     {
-        SchemeOrgId = StringValues.TrimToNull(SchemeOrgId),
-        MemberOrgId = StringValues.TrimToNull(MemberOrgId),
+        SchemeOrgId = ObjectIds.CanonicalOrNull(SchemeOrgId),
+        MemberOrgId = ObjectIds.CanonicalOrNull(MemberOrgId),
         CompliancePeriodQuarters = TrimQuarters(CompliancePeriodQuarters)
     };
 

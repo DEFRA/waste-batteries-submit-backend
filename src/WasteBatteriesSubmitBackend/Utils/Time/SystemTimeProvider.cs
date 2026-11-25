@@ -21,5 +21,13 @@ public interface ITimeProvider
 
 public sealed class SystemTimeProvider : ITimeProvider
 {
-    public DateTime UtcNow => DateTime.UtcNow;
+    // BSON Date keeps milliseconds. The value written on create is the value a later read returns.
+    public DateTime UtcNow
+    {
+        get
+        {
+            var now = DateTime.UtcNow;
+            return new DateTime(now.Ticks - (now.Ticks % TimeSpan.TicksPerMillisecond), DateTimeKind.Utc);
+        }
+    }
 }

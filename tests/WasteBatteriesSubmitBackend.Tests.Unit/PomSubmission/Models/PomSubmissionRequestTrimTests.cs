@@ -47,6 +47,30 @@ public class PomSubmissionRequestTrimTests
         Assert.Equal(SamplePomSubmission.DataBasis, trimmed.DataBasis);
         var entry = Assert.Single(trimmed.TonnageEntries);
         Assert.Equal(SamplePomSubmission.Chemistry, entry.Classification.Chemistry);
+        Assert.Equal(SamplePomSubmission.Tonnes, entry.Tonnes);
+    }
+
+    [Fact]
+    public void Trimmed_WhenIdsAndTonnesAreNotCanonical_UsesTheStoredForm()
+    {
+        // Arrange
+        var request = new PomSubmissionRequest
+        {
+            SchemeOrgId = $"  {SamplePomSubmission.SchemeOrgId.ToUpperInvariant()}  ",
+            MemberOrgId = SamplePomSubmission.MemberOrgId.ToUpperInvariant(),
+            TonnageEntries =
+            [
+                new TonnageEntryBase { Tonnes = "  012.500  " }
+            ]
+        };
+
+        // Act
+        var trimmed = request.Trimmed();
+
+        // Assert
+        Assert.Equal(SamplePomSubmission.SchemeOrgId, trimmed.SchemeOrgId);
+        Assert.Equal(SamplePomSubmission.MemberOrgId, trimmed.MemberOrgId);
+        Assert.Equal("12.500", Assert.Single(trimmed.TonnageEntries).Tonnes);
     }
 
     [Fact]

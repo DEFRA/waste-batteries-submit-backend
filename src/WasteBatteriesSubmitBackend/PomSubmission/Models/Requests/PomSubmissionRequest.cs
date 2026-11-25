@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using WasteBatteriesSubmitBackend.Utils.Mongo;
 using WasteBatteriesSubmitBackend.Utils.Text;
 
 namespace WasteBatteriesSubmitBackend.PomSubmission.Models.Requests;
@@ -12,8 +13,8 @@ public sealed record PomSubmissionRequest : PomSubmissionBase
 
     public PomSubmissionRequest Trimmed() => this with
     {
-        SchemeOrgId = StringValues.TrimToEmpty(SchemeOrgId),
-        MemberOrgId = StringValues.TrimToEmpty(MemberOrgId),
+        SchemeOrgId = ObjectIds.CanonicalOrOriginal(SchemeOrgId),
+        MemberOrgId = ObjectIds.CanonicalOrOriginal(MemberOrgId),
         MemberName = StringValues.TrimToEmpty(MemberName),
         MemberBprn = StringValues.TrimToEmpty(MemberBprn),
         SchemeMembershipRef = StringValues.TrimToEmpty(SchemeMembershipRef),
