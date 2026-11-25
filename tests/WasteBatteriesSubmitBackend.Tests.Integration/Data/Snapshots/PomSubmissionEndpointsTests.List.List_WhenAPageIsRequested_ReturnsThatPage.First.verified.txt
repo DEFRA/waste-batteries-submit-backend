@@ -1,0 +1,70 @@
+{
+  "items": [
+    {
+      "id": "000000000000000000000001",
+      "schemaVersion": 1,
+      "version": 1,
+      "supersedesSubmissionId": null,
+      "isCurrent": true,
+      "status": "Submitted",
+      "tonnageEntries": [
+        {
+          "id": "000000000000000000000201",
+          "activity": "Placed",
+          "classification": {
+            "batteryCategory": "Portable",
+            "chemistry": "Alkaline"
+          },
+          "tonnes": "12.500"
+        }
+      ],
+      "submittedOnUtc": "2026-10-21T09:00:00Z",
+      "createdAtUtc": "2026-10-21T09:00:00Z",
+      "updatedAtUtc": null,
+      "schemeOrgId": "674a1b2c3d4e5f6789012601",
+      "memberOrgId": "674a1b2c3d4e5f6789012611",
+      "memberName": "Northwind Batteries Ltd",
+      "memberBprn": "BPRN-EA-2026-000123",
+      "schemeMembershipRef": "SCH-00417",
+      "compliancePeriodYear": 2026,
+      "compliancePeriodQuarter": "Quarter 2",
+      "dataBasis": "Actual"
+    },
+    {
+      "id": "000000000000000000000002",
+      "schemaVersion": 1,
+      "version": 1,
+      "supersedesSubmissionId": null,
+      "isCurrent": true,
+      "status": "Submitted",
+      "tonnageEntries": [
+        {
+          "id": "000000000000000000000202",
+          "activity": "Placed",
+          "classification": {
+            "batteryCategory": "Portable",
+            "chemistry": "Alkaline"
+          },
+          "tonnes": "12.500"
+        }
+      ],
+      "submittedOnUtc": "2026-10-21T09:00:00.001Z",
+      "createdAtUtc": "2026-10-21T09:00:00.001Z",
+      "updatedAtUtc": null,
+      "schemeOrgId": "674a1b2c3d4e5f6789012601",
+      "memberOrgId": "674a1b2c3d4e5f6789012612",
+      "memberName": "Northwind Batteries Ltd",
+      "memberBprn": "BPRN-EA-2026-000123",
+      "schemeMembershipRef": "SCH-00417",
+      "compliancePeriodYear": 2026,
+      "compliancePeriodQuarter": "Quarter 2",
+      "dataBasis": "Actual"
+    }
+  ],
+  "pageNumber": 1,
+  "pageSize": 2,
+  "totalPages": 2,
+  "totalCount": 3,
+  "hasPreviousPage": false,
+  "hasNextPage": true
+}

@@ -6,6 +6,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using WasteBatteriesSubmitBackend.Tests.Common;
+using WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
 
@@ -95,6 +96,7 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal(createdJson, responseJson);
+        Snapshot.Match(PinApiJson(responseJson, (ReadId(responseJson), 1)));
     }
 
     [Fact]
@@ -118,13 +120,10 @@ public partial class PomSubmissionEndpointsTests
 
         // Act
         var response = await client.GetAsync($"/pom-submissions/{id}", cancellationToken);
-        using var fetched = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.False(fetched.RootElement.GetProperty("isCurrent").GetBoolean());
-        Assert.Equal(id, fetched.RootElement.GetProperty("id").GetString());
-        Assert.Equal(memberOrgId, fetched.RootElement.GetProperty("memberOrgId").GetString());
-        Assert.Equal(SamplePomSubmission.MemberName, fetched.RootElement.GetProperty("memberName").GetString());
+        Snapshot.Match(PinApiJson(json, (id, 1)));
     }
 }

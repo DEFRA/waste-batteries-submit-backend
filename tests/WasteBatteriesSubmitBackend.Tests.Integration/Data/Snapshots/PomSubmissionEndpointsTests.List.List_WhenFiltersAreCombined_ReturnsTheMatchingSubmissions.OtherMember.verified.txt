@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "id": "000000000000000000000007",
+      "schemaVersion": 1,
+      "version": 1,
+      "supersedesSubmissionId": null,
+      "isCurrent": true,
+      "status": "Submitted",
+      "tonnageEntries": [
+        {
+          "id": "000000000000000000000201",
+          "activity": "Placed",
+          "classification": {
+            "batteryCategory": "Portable",
+            "chemistry": "Alkaline"
+          },
+          "tonnes": "12.500"
+        }
+      ],
+      "submittedOnUtc": "2026-10-21T09:00:00.006Z",
+      "createdAtUtc": "2026-10-21T09:00:00.006Z",
+      "updatedAtUtc": null,
+      "schemeOrgId": "674a1b2c3d4e5f6789012701",
+      "memberOrgId": "674a1b2c3d4e5f6789012712",
+      "memberName": "Member Two",
+      "memberBprn": "BPRN-EA-2026-000123",
+      "schemeMembershipRef": "SCH-00417",
+      "compliancePeriodYear": 2026,
+      "compliancePeriodQuarter": "Quarter 2",
+      "dataBasis": "Actual"
+    }
+  ],
+  "pageNumber": 1,
+  "pageSize": 750,
+  "totalPages": 1,
+  "totalCount": 1,
+  "hasPreviousPage": false,
+  "hasNextPage": false
+}

@@ -4,6 +4,7 @@ using MongoDB.Driver;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using WasteBatteriesSubmitBackend.PomSubmission.Models;
 using WasteBatteriesSubmitBackend.Tests.Common;
 using WasteBatteriesSubmitBackend.Utils.Time;
@@ -209,8 +210,92 @@ public partial class PomSubmissionEndpointsTests(PomSubmissionApiFixture fixture
         Assert.Equal(ids, actual);
     }
 
-    private static JsonElement Item(JsonElement page, string id) =>
-        page.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("id").GetString() == id);
+    // Generated submission and tonnage ids change every run. Pins keep a response snapshot stable.
+    // schemeOrgId and memberOrgId stay as returned: they are the ids the caller sent.
+    private static readonly JsonSerializerOptions s_snapshotJson = new() { WriteIndented = true };
+
+    private static string PinApiJson(string json, params (string Id, int Pin)[] submissionIds)
+    {
+        var pins = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (id, pin) in submissionIds)
+        {
+            pins[id] = PinHex(pin);
+        }
+
+        return PinApiJson(json, pins);
+    }
+
+    private static string PinApiJson(string json, IReadOnlyDictionary<string, string> submissionIds)
+    {
+        var node = JsonNode.Parse(json) ?? throw new InvalidOperationException("Response JSON was empty.");
+        var tonnageIds = new Dictionary<string, string>(StringComparer.Ordinal);
+        var nextTonnage = 0x201;
+        PinApiNode(node, submissionIds, tonnageIds, ref nextTonnage);
+        return node.ToJsonString(s_snapshotJson);
+    }
+
+    private static void PinApiNode(
+        JsonNode? node,
+        IReadOnlyDictionary<string, string> submissionIds,
+        Dictionary<string, string> tonnageIds,
+        ref int nextTonnage)
+    {
+        if (node is JsonObject obj)
+        {
+            PinKnownId(obj, "id", submissionIds, tonnageIds, ref nextTonnage);
+            PinKnownId(obj, "supersedesSubmissionId", submissionIds, tonnageIds, ref nextTonnage);
+            foreach (var property in obj)
+            {
+                PinApiNode(property.Value, submissionIds, tonnageIds, ref nextTonnage);
+            }
+
+            return;
+        }
+
+        if (node is not JsonArray array)
+        {
+            return;
+        }
+
+        foreach (var item in array)
+        {
+            PinApiNode(item, submissionIds, tonnageIds, ref nextTonnage);
+        }
+    }
+
+    private static void PinKnownId(
+        JsonObject obj,
+        string name,
+        IReadOnlyDictionary<string, string> submissionIds,
+        Dictionary<string, string> tonnageIds,
+        ref int nextTonnage)
+    {
+        if (obj[name] is not JsonValue value || value.GetValueKind() != JsonValueKind.String)
+        {
+            return;
+        }
+
+        var id = value.GetValue<string>();
+        if (submissionIds.TryGetValue(id, out var submissionPin))
+        {
+            obj[name] = submissionPin;
+            return;
+        }
+
+        if (!string.Equals(name, "id", StringComparison.Ordinal) || obj["tonnes"] is null)
+        {
+            return;
+        }
+
+        if (!tonnageIds.TryGetValue(id, out var tonnagePin))
+        {
+            tonnagePin = PinHex(nextTonnage);
+            nextTonnage++;
+            tonnageIds[id] = tonnagePin;
+        }
+
+        obj["id"] = tonnagePin;
+    }
 
     private sealed record CreatedSubmission(string Id, string Json);
 
