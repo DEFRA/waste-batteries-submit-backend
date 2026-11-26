@@ -297,17 +297,21 @@ aws --no-cli-pager --endpoint-url http://localhost:4566 sqs receive-message --qu
 aws --no-cli-pager --endpoint-url http://localhost:4566 sqs purge-queue --queue-url http://localhost:4566/000000000000/waste_batteries_obligations_pom_submission_evts_queue
 ```
 
-The backend requires a Defra ID access token in the `Authorization: Bearer <token>`
-header for every endpoint except `/health`, `/openapi/v1.json`, and `/swagger`.
-The token is validated against the configured OIDC metadata and audience.
+The backend requires a bearer token in the `Authorization` header for every endpoint
+except `/health`, `/openapi/v1.json`, and `/swagger`. A user sends a Defra ID access
+token. POM routes also accept a service token for `waste-batteries-obligations-be`.
+On CDP that token is an AWS STS web identity token whose audience is
+`waste-batteries-submit-backend`. The platform sets `CDP_JWT_ISSUER`,
+`CDP_JWT_OIDC_URL` and `CDP_JWT_JWKS_URI`. The signing-key request uses the CDP proxy.
 
 Outside Production, Swagger UI is available at `/swagger` and the OpenAPI
 document is available at `/openapi/v1.json`. Set `Swagger:Enabled` to `true`
 to turn the explorer on in Production.
 
 Local development uses the Defra ID stub values in `appsettings.Development.json`.
-Deployed environments must provide `Jwt__MetadataAddress` and `Jwt__Audience`
-configuration for the real Defra ID/API audience.
+`ServiceAuth:Mode` is `Development` there, and `ServiceAuth:DevToken` is the shared
+local token. Deployed environments must provide `Jwt__MetadataAddress` and
+`Jwt__Audience` for the real Defra ID audience. Leave `ServiceAuth:Mode` as `Aws`.
 
 ### SonarCloud
 

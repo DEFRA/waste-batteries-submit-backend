@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using WasteBatteriesSubmitBackend.Authentication;
@@ -17,7 +19,7 @@ public class AuthenticationServiceCollectionTests
         services.AddAuthenticationAuthorization(Config(
             ("Jwt:MetadataAddress", "https://idp.test/.well-known/openid-configuration"),
             ("Jwt:Audience", "test-audience"),
-            ("Jwt:UserIdClaim", "sub")));
+            ("Jwt:UserIdClaim", "sub")), Host());
         using var provider = services.BuildServiceProvider();
 
         var options = provider
@@ -43,7 +45,7 @@ public class AuthenticationServiceCollectionTests
             ("Jwt:Audience", "test-audience"),
             ("Jwt:UserIdClaim", "sub"),
             ("Jwt:AutomaticRefreshInterval", "00:10:00"),
-            ("Jwt:RefreshInterval", "00:00:30")));
+            ("Jwt:RefreshInterval", "00:00:30")), Host());
         using var provider = services.BuildServiceProvider();
 
         var options = provider
@@ -65,7 +67,7 @@ public class AuthenticationServiceCollectionTests
             ("Jwt:MetadataAddress", "https://idp.test/.well-known/openid-configuration"),
             ("Jwt:Audience", "test-audience"),
             ("Jwt:UserIdClaim", "sub"),
-            ("Jwt:AutomaticRefreshInterval", "00:01:00")));
+            ("Jwt:AutomaticRefreshInterval", "00:01:00")), Host());
         using var provider = services.BuildServiceProvider();
 
         var exception = Assert.Throws<OptionsValidationException>(() =>
@@ -74,8 +76,43 @@ public class AuthenticationServiceCollectionTests
         Assert.Contains("Jwt:AutomaticRefreshInterval", exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AddAuthenticationAuthorization_RejectsDevelopmentModeOutsideDevelopment()
+    {
+        var services = new ServiceCollection();
+        services.AddAuthenticationAuthorization(
+            Config(
+                ("Jwt:MetadataAddress", "https://idp.test/.well-known/openid-configuration"),
+                ("Jwt:Audience", "test-audience"),
+                ("Jwt:UserIdClaim", "sub"),
+                ("ServiceAuth:Mode", "Development"),
+                ("ServiceAuth:Audience", "waste-batteries-submit-backend"),
+                ("ServiceAuth:AllowedService", "waste-batteries-obligations-be"),
+                ("ServiceAuth:DevToken", "local-token")),
+            Host("Production"));
+        using var provider = services.BuildServiceProvider();
+
+        var exception = Assert.Throws<OptionsValidationException>(() =>
+            _ = provider.GetRequiredService<IOptions<ServiceAuthConfig>>().Value);
+
+        Assert.Contains("host environment is Development", exception.Message, StringComparison.Ordinal);
+    }
+
     private static IConfiguration Config(params (string Key, string Value)[] values) =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(values.ToDictionary(pair => pair.Key, pair => (string?)pair.Value))
             .Build();
+
+    private static IHostEnvironment Host(string name = "Development") => new TestEnvironment(name);
+
+    private sealed class TestEnvironment(string name) : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = name;
+
+        public string ApplicationName { get; set; } = "WasteBatteriesSubmitBackend.Tests.Unit";
+
+        public string ContentRootPath { get; set; } = ".";
+
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
 }

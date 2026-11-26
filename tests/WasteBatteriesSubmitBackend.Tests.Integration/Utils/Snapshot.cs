@@ -8,11 +8,70 @@ internal static class Snapshot
 {
     // One file per test method. Pass name for a theory case or a second snapshot in the same method:
     // Data/Snapshots/{TestFile}.{Method}.{name}.verified.txt
+    // MatchAll writes every missing or different file before it fails, so one test can own several responses.
     public static void Match(
         string actual,
         string? name = null,
         [CallerFilePath] string sourceFile = "",
         [CallerMemberName] string method = "")
+    {
+        if (!Differs(actual, name, sourceFile, method, out var expected, out var normalized, out var missingMessage))
+        {
+            return;
+        }
+
+        if (missingMessage is not null)
+        {
+            Assert.Fail(missingMessage);
+        }
+
+        Assert.Equal(expected, normalized);
+    }
+
+    public static void MatchAll(
+        (string Name, string Actual)[] snapshots,
+        [CallerFilePath] string sourceFile = "",
+        [CallerMemberName] string method = "")
+    {
+        string? firstMissing = null;
+        (string Expected, string Actual)? firstDifference = null;
+        foreach (var (name, actual) in snapshots)
+        {
+            if (!Differs(actual, name, sourceFile, method, out var expected, out var normalized, out var missingMessage))
+            {
+                continue;
+            }
+
+            if (missingMessage is not null)
+            {
+                firstMissing ??= missingMessage;
+            }
+            else
+            {
+                firstDifference ??= (expected, normalized);
+            }
+        }
+
+        if (firstMissing is not null)
+        {
+            Assert.Fail(firstMissing);
+        }
+
+        if (firstDifference is not null)
+        {
+            Assert.Equal(firstDifference.Value.Expected, firstDifference.Value.Actual);
+        }
+    }
+
+    // True when the verified file is missing or different. A received file is written for each of those.
+    private static bool Differs(
+        string actual,
+        string? name,
+        string sourceFile,
+        string method,
+        out string expected,
+        out string normalized,
+        out string? missingMessage)
     {
         if (name is not null && !IsFileName(name))
         {
@@ -27,16 +86,19 @@ internal static class Snapshot
         var directory = Path.Combine(ProjectDirectory(sourceFile), "Data", "Snapshots");
         var verifiedPath = Path.Combine(directory, $"{snapshotName}.verified.txt");
         var receivedPath = Path.Combine(directory, $"{snapshotName}.received.txt");
-        var normalized = Normalize(actual);
+        normalized = Normalize(actual);
+        expected = "";
+        missingMessage = null;
 
         if (!File.Exists(verifiedPath))
         {
             Directory.CreateDirectory(directory);
             File.WriteAllText(receivedPath, normalized);
-            Assert.Fail($"Snapshot not found: {verifiedPath}. Wrote {receivedPath}.");
+            missingMessage = $"Snapshot not found: {verifiedPath}. Wrote {receivedPath}.";
+            return true;
         }
 
-        var expected = Normalize(File.ReadAllText(verifiedPath));
+        expected = Normalize(File.ReadAllText(verifiedPath));
         if (expected == normalized)
         {
             if (File.Exists(receivedPath))
@@ -44,11 +106,11 @@ internal static class Snapshot
                 File.Delete(receivedPath);
             }
 
-            return;
+            return false;
         }
 
         File.WriteAllText(receivedPath, normalized);
-        Assert.Equal(expected, normalized);
+        return true;
     }
 
     private static bool IsFileName(string name) =>

@@ -1,0 +1,70 @@
+{
+  "items": [
+    {
+      "id": "000000000000000000000006",
+      "schemaVersion": 1,
+      "version": 1,
+      "supersedesSubmissionId": null,
+      "isCurrent": true,
+      "status": "Submitted",
+      "tonnageEntries": [
+        {
+          "id": "000000000000000000000201",
+          "activity": "Placed",
+          "classification": {
+            "batteryCategory": "Portable",
+            "chemistry": "Alkaline"
+          },
+          "tonnes": "12.500"
+        }
+      ],
+      "submittedOnUtc": "2026-10-21T09:00:00.005Z",
+      "createdAtUtc": "2026-10-21T09:00:00.005Z",
+      "updatedAtUtc": null,
+      "schemeOrgId": "674a1b2c3d4e5f6789012701",
+      "memberOrgId": "674a1b2c3d4e5f6789012711",
+      "memberName": "Member One",
+      "memberBprn": "BPRN-EA-2026-000123",
+      "schemeMembershipRef": "SCH-00417",
+      "compliancePeriodYear": 2026,
+      "compliancePeriodQuarter": "Quarter 1",
+      "dataBasis": "Actual"
+    },
+    {
+      "id": "000000000000000000000001",
+      "schemaVersion": 1,
+      "version": 1,
+      "supersedesSubmissionId": null,
+      "isCurrent": true,
+      "status": "Submitted",
+      "tonnageEntries": [
+        {
+          "id": "000000000000000000000202",
+          "activity": "Placed",
+          "classification": {
+            "batteryCategory": "Portable",
+            "chemistry": "Alkaline"
+          },
+          "tonnes": "12.500"
+        }
+      ],
+      "submittedOnUtc": "2026-10-21T09:00:00Z",
+      "createdAtUtc": "2026-10-21T09:00:00Z",
+      "updatedAtUtc": null,
+      "schemeOrgId": "674a1b2c3d4e5f6789012701",
+      "memberOrgId": "674a1b2c3d4e5f6789012711",
+      "memberName": "Member One",
+      "memberBprn": "BPRN-EA-2024-000123",
+      "schemeMembershipRef": "SCH-00417",
+      "compliancePeriodYear": 2024,
+      "compliancePeriodQuarter": "Quarter 1",
+      "dataBasis": "Actual"
+    }
+  ],
+  "pageNumber": 1,
+  "pageSize": 750,
+  "totalPages": 1,
+  "totalCount": 2,
+  "hasPreviousPage": false,
+  "hasNextPage": false
+}

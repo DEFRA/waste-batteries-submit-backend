@@ -1,11 +1,15 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using WasteBatteriesSubmitBackend.Config;
 using WasteBatteriesSubmitBackend.Tests.Common;
+using WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
 
@@ -54,6 +58,22 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Get_WhenServiceDevTokenIsPresented_IsNotChallenged()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = fixture.CreateAnonymousClient();
+        var token = fixture.Services.GetRequiredService<IOptions<ServiceAuthConfig>>().Value.DevToken;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        // Act
+        var response = await client.GetAsync($"/pom-submissions/{SamplePomSubmission.SchemeOrgId}", cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     [Theory]
     [InlineData("not-an-id")]
     [InlineData("674a1b2c3d4e5f678901234")]
@@ -95,6 +115,7 @@ public partial class PomSubmissionEndpointsTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal(createdJson, responseJson);
+        Snapshot.Match(PinApiJson(responseJson, (ReadId(responseJson), 1)));
     }
 
     [Fact]
@@ -118,13 +139,10 @@ public partial class PomSubmissionEndpointsTests
 
         // Act
         var response = await client.GetAsync($"/pom-submissions/{id}", cancellationToken);
-        using var fetched = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.False(fetched.RootElement.GetProperty("isCurrent").GetBoolean());
-        Assert.Equal(id, fetched.RootElement.GetProperty("id").GetString());
-        Assert.Equal(memberOrgId, fetched.RootElement.GetProperty("memberOrgId").GetString());
-        Assert.Equal(SamplePomSubmission.MemberName, fetched.RootElement.GetProperty("memberName").GetString());
+        Snapshot.Match(PinApiJson(json, (id, 1)));
     }
 }

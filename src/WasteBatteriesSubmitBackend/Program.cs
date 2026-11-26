@@ -66,7 +66,7 @@ static void ConfigureServices(WebApplicationBuilder builder)
     services.AddHttpContextAccessor();
     services.AddCorrelationId();
 
-    services.AddAuthenticationAuthorization(configuration);
+    services.AddAuthenticationAuthorization(configuration, builder.Environment);
     services.AddActorContext();
     services.AddHeaderPropagationFromConfiguration(configuration);
     services.AddProxyHttpClients();

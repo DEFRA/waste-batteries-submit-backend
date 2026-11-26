@@ -12,16 +12,16 @@ namespace WasteBatteriesSubmitBackend.Tests.Unit.Outbox.Relay;
 
 public class OutboxRelayTests
 {
-    private static readonly DateTime Now = new(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime s_now = new(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc);
 
-    private static readonly string[] SampleEventTypes = ["SampleEvent"];
+    private static readonly string[] s_sampleEventTypes = ["SampleEvent"];
 
     [Fact]
     public async Task PublishPending_WhenTwoDocumentsAreClaimed_PublishesEachIdAndMarksItSent()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var earlier = Document("00000000-0000-0000-0000-000000000001", Now, "corr-earlier");
-        var later = Document("00000000-0000-0000-0000-000000000002", Now.AddMinutes(1), "corr-later");
+        var earlier = Document("00000000-0000-0000-0000-000000000001", s_now, "corr-earlier");
+        var later = Document("00000000-0000-0000-0000-000000000002", s_now.AddMinutes(1), "corr-later");
         var repository = Substitute.For<IOutboxRepository>();
         var publisher = Substitute.For<IOutboxPublisher>();
         repository.ClaimNextAsync(
@@ -51,14 +51,14 @@ public class OutboxRelayTests
         await repository.Received(1).MarkSentAsync(
             earlier["_id"].AsString,
             relay.ClaimedBy,
-            Now,
-            Now.AddDays(90),
+            s_now,
+            s_now.AddDays(90),
             cancellationToken);
         await repository.Received(1).MarkSentAsync(
             later["_id"].AsString,
             relay.ClaimedBy,
-            Now,
-            Now.AddDays(90),
+            s_now,
+            s_now.AddDays(90),
             cancellationToken);
         Assert.Contains(logger.Entries, entry => entry.Message.Contains("corr-earlier", StringComparison.Ordinal));
         Assert.Contains(logger.Entries, entry => entry.Message.Contains("corr-later", StringComparison.Ordinal));
@@ -68,7 +68,7 @@ public class OutboxRelayTests
     public async Task PublishPending_WhenThePublishFails_LeavesTheSameIdUnsentAndSetsTheNextAttempt()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var document = Document("00000000-0000-0000-0000-000000000003", Now, "corr-retry");
+        var document = Document("00000000-0000-0000-0000-000000000003", s_now, "corr-retry");
         var repository = Substitute.For<IOutboxRepository>();
         var publisher = Substitute.For<IOutboxPublisher>();
         repository.ClaimNextAsync(
@@ -102,7 +102,7 @@ public class OutboxRelayTests
             document["_id"].AsString,
             relay.ClaimedBy,
             1,
-            Now.AddSeconds(1),
+            s_now.AddSeconds(1),
             cancellationToken);
         Assert.Contains(
             logger.Entries,
@@ -113,7 +113,7 @@ public class OutboxRelayTests
     public async Task PublishPending_WhenAPreviousAttemptFailed_KeepsTheEventIdAndDoublesTheDelay()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var document = Document("00000000-0000-0000-0000-000000000003", Now, "corr-retry");
+        var document = Document("00000000-0000-0000-0000-000000000003", s_now, "corr-retry");
         document["attemptCount"] = 1;
         var repository = Substitute.For<IOutboxRepository>();
         var publisher = Substitute.For<IOutboxPublisher>();
@@ -134,7 +134,7 @@ public class OutboxRelayTests
             "00000000-0000-0000-0000-000000000003",
             relay.ClaimedBy,
             2,
-            Now.AddSeconds(2),
+            s_now.AddSeconds(2),
             cancellationToken);
     }
 
@@ -142,7 +142,7 @@ public class OutboxRelayTests
     public async Task PublishPending_WhenTheDelayWouldPassTheCap_StopsAtTheCap()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var document = Document("00000000-0000-0000-0000-000000000003", Now, "corr-retry");
+        var document = Document("00000000-0000-0000-0000-000000000003", s_now, "corr-retry");
         document["attemptCount"] = 9;
         var repository = Substitute.For<IOutboxRepository>();
         var publisher = Substitute.For<IOutboxPublisher>();
@@ -169,7 +169,7 @@ public class OutboxRelayTests
             document["_id"].AsString,
             relay.ClaimedBy,
             10,
-            Now.AddSeconds(300),
+            s_now.AddSeconds(300),
             cancellationToken);
     }
 
@@ -177,7 +177,7 @@ public class OutboxRelayTests
     public async Task PublishPending_WhenTheInitialDelayIsAlreadyAboveTheCap_UsesTheCap()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var document = Document("00000000-0000-0000-0000-000000000003", Now, "corr-retry");
+        var document = Document("00000000-0000-0000-0000-000000000003", s_now, "corr-retry");
         var repository = Substitute.For<IOutboxRepository>();
         var publisher = Substitute.For<IOutboxPublisher>();
         repository.ClaimNextAsync(
@@ -203,7 +203,7 @@ public class OutboxRelayTests
             document["_id"].AsString,
             relay.ClaimedBy,
             1,
-            Now.AddSeconds(5),
+            s_now.AddSeconds(5),
             cancellationToken);
     }
 
@@ -211,8 +211,8 @@ public class OutboxRelayTests
     public async Task PublishPending_WhenTheFirstPublishFails_StillPublishesTheNextDocument()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var failed = Document("00000000-0000-0000-0000-000000000004", Now, "corr-failed");
-        var next = Document("00000000-0000-0000-0000-000000000005", Now.AddMinutes(1), "corr-next");
+        var failed = Document("00000000-0000-0000-0000-000000000004", s_now, "corr-failed");
+        var next = Document("00000000-0000-0000-0000-000000000005", s_now.AddMinutes(1), "corr-next");
         var repository = Substitute.For<IOutboxRepository>();
         var publisher = Substitute.For<IOutboxPublisher>();
         repository.ClaimNextAsync(
@@ -246,8 +246,8 @@ public class OutboxRelayTests
         await repository.Received(1).MarkSentAsync(
             next["_id"].AsString,
             relay.ClaimedBy,
-            Now,
-            Now.AddDays(90),
+            s_now,
+            s_now.AddDays(90),
             cancellationToken);
     }
 
@@ -255,7 +255,7 @@ public class OutboxRelayTests
     public async Task PublishPending_WhenTheClaimIsLostAfterPublish_DoesNotRecordAFailure()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var document = Document("00000000-0000-0000-0000-000000000006", Now, "corr-lost");
+        var document = Document("00000000-0000-0000-0000-000000000006", s_now, "corr-lost");
         var repository = Substitute.For<IOutboxRepository>();
         var publisher = Substitute.For<IOutboxPublisher>();
         repository.ClaimNextAsync(
@@ -290,7 +290,7 @@ public class OutboxRelayTests
     public async Task PublishPending_WhenTheClaimIsLostAfterFailure_LogsThatTheNextAttemptWasNotStored()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var document = Document("00000000-0000-0000-0000-000000000007", Now, "corr-lost-failure");
+        var document = Document("00000000-0000-0000-0000-000000000007", s_now, "corr-lost-failure");
         var repository = Substitute.For<IOutboxRepository>();
         var publisher = Substitute.For<IOutboxPublisher>();
         repository.ClaimNextAsync(
@@ -323,7 +323,7 @@ public class OutboxRelayTests
     public async Task PublishPending_WhenThePublishIsCancelledIndependently_RecordsTheFailure()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var document = Document("00000000-0000-0000-0000-000000000008", Now, "corr-timeout");
+        var document = Document("00000000-0000-0000-0000-000000000008", s_now, "corr-timeout");
         var repository = Substitute.For<IOutboxRepository>();
         var publisher = Substitute.For<IOutboxPublisher>();
         repository.ClaimNextAsync(
@@ -350,7 +350,7 @@ public class OutboxRelayTests
             document["_id"].AsString,
             relay.ClaimedBy,
             1,
-            Now.AddSeconds(1),
+            s_now.AddSeconds(1),
             cancellationToken);
     }
 
@@ -359,7 +359,7 @@ public class OutboxRelayTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var caller = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var document = Document("00000000-0000-0000-0000-000000000009", Now, "corr-shutdown");
+        var document = Document("00000000-0000-0000-0000-000000000009", s_now, "corr-shutdown");
         var repository = Substitute.For<IOutboxRepository>();
         var publisher = Substitute.For<IOutboxPublisher>();
         repository.ClaimNextAsync(
@@ -478,10 +478,10 @@ public class OutboxRelayTests
         await relay.PublishPendingAsync(cancellationToken);
 
         await repository.Received(1).ClaimNextAsync(
-            Now,
-            Now.AddSeconds(60),
+            s_now,
+            s_now.AddSeconds(60),
             relay.ClaimedBy,
-            Arg.Is<IReadOnlyCollection<string>>(types => types.SequenceEqual(SampleEventTypes)),
+            Arg.Is<IReadOnlyCollection<string>>(types => types.SequenceEqual(s_sampleEventTypes)),
             cancellationToken);
     }
 
@@ -526,9 +526,9 @@ public class OutboxRelayTests
                 RetryInitialDelaySeconds = initialDelaySeconds,
                 RetryMaxDelaySeconds = maxDelaySeconds,
                 RetryMultiplier = multiplier,
-                EventTypes = SampleEventTypes
+                EventTypes = s_sampleEventTypes
             }),
-            new FixedTime(Now),
+            new FixedTime(s_now),
             logger,
             publisher);
 

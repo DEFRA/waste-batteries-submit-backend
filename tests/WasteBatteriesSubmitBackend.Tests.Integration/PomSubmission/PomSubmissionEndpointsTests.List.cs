@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using System.Text.Json.Nodes;
+using WasteBatteriesSubmitBackend.Config;
 using WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
@@ -21,6 +24,43 @@ public partial class PomSubmissionEndpointsTests
 
         // Assert
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task List_WhenTokenIsRejected_ReturnsUnauthorized()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = fixture.CreateAnonymousClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "not-the-test-token");
+
+        // Act
+        var response = await client.GetAsync(
+            "/pom-submissions?schemeOrgId=674a1b2c3d4e5f6789012345",
+            cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task List_WhenServiceDevTokenIsPresented_ReturnsThePage()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = fixture.CreateAnonymousClient();
+        var token = fixture.Services.GetRequiredService<IOptions<ServiceAuthConfig>>().Value.DevToken;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        // Act
+        var response = await client.GetAsync(
+            "/pom-submissions?schemeOrgId=674a1b2c3d4e5f6789012aaa",
+            cancellationToken);
+        var page = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(0, page.GetProperty("totalCount").GetInt32());
     }
 
     [Theory]
@@ -88,7 +128,8 @@ public partial class PomSubmissionEndpointsTests
             ("pageNumber", "2"));
 
         // Assert
-        AssertPage(page.RootElement, 1, fixture.Defaults.MaxPageSize, 0, 0, false, false);
+        // No rows, so the page number is kept at 1 and the omitted page size is the configured maximum.
+        Snapshot.Match(PinApiJson(page.RootElement.GetRawText()));
     }
 
     [Fact]
@@ -130,11 +171,6 @@ public partial class PomSubmissionEndpointsTests
             [member2Year2026Quarter2.Id] = PinHex(7),
             [member2Year2025Quarter2.Id] = PinHex(8)
         };
-        var members = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            [member1] = PinHex(0x101),
-            [member2] = PinHex(0x102)
-        };
 
         // Act
         using var scheme = await ReadPage(client, cancellationToken, ("schemeOrgId", schemeOrgId));
@@ -166,17 +202,16 @@ public partial class PomSubmissionEndpointsTests
             ("memberOrgId", member2));
 
         // Assert
-        // Each list is that query's matches, already in list order: member, then latest year, quarter and version.
-        var snapshot = new JsonObject
-        {
-            ["scheme"] = PinPage(scheme.RootElement, submissions, members),
-            ["member"] = PinPage(member.RootElement, submissions, members),
-            ["memberYearsAndQuarter2"] = PinPage(memberYearsAndQuarter.RootElement, submissions, members),
-            ["quarter1Or3"] = PinPage(quarter1Or3.RootElement, submissions, members),
-            ["currentAndHistorical"] = PinPage(currentAndHistorical.RootElement, submissions, members),
-            ["otherMember"] = PinPage(otherMember.RootElement, submissions, members)
-        };
-        Snapshot.Match(snapshot.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        // Each file is that query's page. Items are the stored submissions, already in list order.
+        Snapshot.MatchAll(
+        [
+            ("Scheme", PinApiJson(scheme.RootElement.GetRawText(), submissions)),
+            ("Member", PinApiJson(member.RootElement.GetRawText(), submissions)),
+            ("MemberYearsAndQuarter2", PinApiJson(memberYearsAndQuarter.RootElement.GetRawText(), submissions)),
+            ("Quarter1Or3", PinApiJson(quarter1Or3.RootElement.GetRawText(), submissions)),
+            ("CurrentAndHistorical", PinApiJson(currentAndHistorical.RootElement.GetRawText(), submissions)),
+            ("OtherMember", PinApiJson(otherMember.RootElement.GetRawText(), submissions))
+        ]);
     }
 
     [Fact]
@@ -222,12 +257,24 @@ public partial class PomSubmissionEndpointsTests
             ("pageSize", "2"));
 
         // Assert
-        AssertPage(firstPage.RootElement, 1, 2, 2, 3, false, true, first.Id, second.Id);
-        AssertPage(secondPage.RootElement, 2, 2, 2, 3, true, false, third.Id);
-        AssertPage(pastTheEnd.RootElement, 2, 2, 2, 3, true, false, third.Id);
-        AssertPage(all.RootElement, 1, fixture.Defaults.MaxPageSize, 1, 3, false, false, first.Id, second.Id, third.Id);
-        AssertPage(oversized.RootElement, 1, fixture.Defaults.MaxPageSize, 1, 3, false, false, first.Id, second.Id, third.Id);
-        AssertPage(none.RootElement, 1, 2, 0, 0, false, false);
+        // A page past the end is the last page. A missing or oversized page size is the configured maximum.
+        var submissions = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [first.Id] = PinHex(1),
+            [second.Id] = PinHex(2),
+            [third.Id] = PinHex(3)
+        };
+        var secondJson = PinApiJson(secondPage.RootElement.GetRawText(), submissions);
+        var allJson = PinApiJson(all.RootElement.GetRawText(), submissions);
+        Assert.Equal(secondJson, PinApiJson(pastTheEnd.RootElement.GetRawText(), submissions));
+        Assert.Equal(allJson, PinApiJson(oversized.RootElement.GetRawText(), submissions));
+        Snapshot.MatchAll(
+        [
+            ("First", PinApiJson(firstPage.RootElement.GetRawText(), submissions)),
+            ("Second", secondJson),
+            ("All", allJson),
+            ("None", PinApiJson(none.RootElement.GetRawText(), submissions))
+        ]);
     }
 
     private static async Task<string> Amend(
@@ -247,33 +294,5 @@ public partial class PomSubmissionEndpointsTests
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return ReadId(json);
-    }
-
-    // The page envelope stays out of this snapshot. totalCount and the item order are the filter and the sort.
-    private static JsonObject PinPage(
-        JsonElement page,
-        Dictionary<string, string> submissionIds,
-        Dictionary<string, string> memberIds)
-    {
-        var items = new JsonArray();
-        foreach (var item in page.GetProperty("items").EnumerateArray())
-        {
-            items.Add(new JsonObject
-            {
-                ["id"] = submissionIds[item.GetProperty("id").GetString()!],
-                ["memberOrgId"] = memberIds[item.GetProperty("memberOrgId").GetString()!],
-                ["memberName"] = item.GetProperty("memberName").GetString(),
-                ["compliancePeriodYear"] = item.GetProperty("compliancePeriodYear").GetInt32(),
-                ["compliancePeriodQuarter"] = item.GetProperty("compliancePeriodQuarter").GetString(),
-                ["version"] = item.GetProperty("version").GetInt32(),
-                ["isCurrent"] = item.GetProperty("isCurrent").GetBoolean()
-            });
-        }
-
-        return new JsonObject
-        {
-            ["totalCount"] = page.GetProperty("totalCount").GetInt32(),
-            ["items"] = items
-        };
     }
 }

@@ -77,6 +77,9 @@ public partial class ProblemDetailsTraceIdTests
             builder.UseEnvironment(Environments.Production);
             builder.UseSetting("Jwt:MetadataAddress", "https://idp.test/.well-known/openid-configuration");
             builder.UseSetting("Jwt:Audience", "test-audience");
+            // Production keeps ServiceAuth in Aws mode, which requires the platform issuer.
+            builder.UseSetting("ServiceAuth:Issuer", "https://issuer.test");
+            builder.UseSetting("ServiceAuth:OidcUrl", "https://issuer.test/.well-known/openid-configuration");
             builder.ConfigureTestAuthentication();
             builder.ConfigureServices(services =>
             {

@@ -1,0 +1,9 @@
+{
+  "items": [],
+  "pageNumber": 1,
+  "pageSize": 2,
+  "totalPages": 0,
+  "totalCount": 0,
+  "hasPreviousPage": false,
+  "hasNextPage": false
+}

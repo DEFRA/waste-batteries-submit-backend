@@ -28,7 +28,7 @@ public sealed class BearerSecuritySchemeTransformer : IOpenApiDocumentTransforme
             Type = SecuritySchemeType.Http,
             Scheme = "bearer",
             BearerFormat = "JWT",
-            Description = "Defra ID access token."
+            Description = "Defra ID access token. POM routes also accept a waste-batteries-obligations-be service token."
         };
 
         var requirement = new OpenApiSecurityRequirement();
