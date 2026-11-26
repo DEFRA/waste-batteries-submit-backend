@@ -88,6 +88,9 @@ services:
       Jwt__Audience: 63983fc2-cfff-45bb-8ec2-959e21062b9a
       Jwt__RequireHttpsMetadata: false
       Mongo__DatabaseUri: mongodb://mongodb:27017/?directConnection=true
+      # ZAP and this compose file do not receive the CDP_JWT_* variables. The values only have to pass startup checks.
+      ServiceAuth__Issuer: https://issuer.test
+      ServiceAuth__OidcUrl: https://issuer.test/.well-known/openid-configuration
       AWS_ENDPOINT_URL: http://floci:4566
       PomSubmissionOutboxRelay__Enabled: "true"
       PomSubmissionOutboxRelay__TopicArn: arn:aws:sns:eu-west-2:000000000000:waste_batteries_submit_pom_submission_events
