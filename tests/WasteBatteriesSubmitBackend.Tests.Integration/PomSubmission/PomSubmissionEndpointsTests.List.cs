@@ -1,6 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
+using WasteBatteriesSubmitBackend.Config;
 using WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.PomSubmission;
@@ -19,6 +24,43 @@ public partial class PomSubmissionEndpointsTests
 
         // Assert
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task List_WhenTokenIsRejected_ReturnsUnauthorized()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = fixture.CreateAnonymousClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "not-the-test-token");
+
+        // Act
+        var response = await client.GetAsync(
+            "/pom-submissions?schemeOrgId=674a1b2c3d4e5f6789012345",
+            cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task List_WhenServiceDevTokenIsPresented_ReturnsThePage()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = fixture.CreateAnonymousClient();
+        var token = fixture.Services.GetRequiredService<IOptions<ServiceAuthConfig>>().Value.DevToken;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        // Act
+        var response = await client.GetAsync(
+            "/pom-submissions?schemeOrgId=674a1b2c3d4e5f6789012aaa",
+            cancellationToken);
+        var page = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(0, page.GetProperty("totalCount").GetInt32());
     }
 
     [Theory]

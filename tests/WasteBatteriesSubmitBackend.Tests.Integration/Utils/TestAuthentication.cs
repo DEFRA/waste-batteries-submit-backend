@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using WasteBatteriesSubmitBackend.Authentication;
 
 namespace WasteBatteriesSubmitBackend.Tests.Integration.Utils;
 
@@ -40,6 +42,30 @@ public static class TestAuthentication
             {
                 options.DefaultAuthenticateScheme = Scheme;
                 options.DefaultChallengeScheme = Scheme;
+            });
+
+            // POM routes name Defra ID and the service scheme. The test user is a third scheme.
+            services.PostConfigure<AuthorizationOptions>(options =>
+            {
+                var policy = options.GetPolicy(ServiceAuthDefaults.Policy);
+                if (policy is null)
+                {
+                    return;
+                }
+
+                var builder = new AuthorizationPolicyBuilder();
+                foreach (var scheme in policy.AuthenticationSchemes)
+                {
+                    builder.AddAuthenticationSchemes(scheme);
+                }
+
+                builder.AddAuthenticationSchemes(Scheme);
+                foreach (var requirement in policy.Requirements)
+                {
+                    builder.AddRequirements(requirement);
+                }
+
+                options.AddPolicy(ServiceAuthDefaults.Policy, builder.Build());
             });
         });
     }

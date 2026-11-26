@@ -421,10 +421,10 @@ public partial class PomSubmissionEndpointsTests
         }
 
         BsonValue value = documents.Count == 1 ? documents[0] : new BsonArray(documents);
-        return value.ToJson(CanonicalJson);
+        return value.ToJson(s_canonicalJson);
     }
 
-    private static readonly JsonWriterSettings CanonicalJson = new()
+    private static readonly JsonWriterSettings s_canonicalJson = new()
     {
         OutputMode = JsonOutputMode.CanonicalExtendedJson,
         Indent = true,
