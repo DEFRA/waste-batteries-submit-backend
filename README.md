@@ -214,7 +214,16 @@ dotnet test
 
 ### Running
 
-The Development launch profile listens on <http://localhost:3001>. Swagger UI is at `/swagger`. In that profile the relay is on. It publishes to floci at `http://localhost:4566` about every 5 seconds (`OutboxRelayDefault:PollIntervalSeconds`).
+When the Batteries services run together locally, each one uses these ports. `dotnet run` binds this API to port 8086.
+
+| Service      | UI   | API  |
+| ------------ | ---- | ---- |
+| Registration | 3000 | 8085 |
+| Submissions  | 3001 | 8086 |
+| Obligations  | 3002 | 8087 |
+| Admin panel  | 3003 | n/a  |
+
+The Development launch profile listens on <http://localhost:8086>. Swagger UI is at `/swagger`. In that profile the relay is on. It publishes to floci at `http://localhost:4566` about every 5 seconds (`OutboxRelayDefault:PollIntervalSeconds`).
 
 #### API from the debugger or the command line
 
